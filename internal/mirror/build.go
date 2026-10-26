@@ -20,11 +20,14 @@ import (
 	"compress/gzip"
 	"encoding/json"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"sort"
 	"strings"
 	"time"
+
+	"github.com/klauspost/compress/zstd"
 
 	"github.com/go-wasmcontainers/engine/image"
 )
@@ -35,11 +38,13 @@ type Image struct {
 	Tags []string // first one is the primary
 	// Description is shown by the playground's help.
 	Description string
-	// Exactly one of Layer (a ready tar+gzip layer) or Files (built into a
-	// tar+gzip layer) or Module (a CNCF wasm artifact) is set.
-	Layer  []byte
-	Files  map[string][]byte // path -> content; *.wasm get mode 0755
-	Module []byte
+	// Exactly one of Layer (a ready tar+gzip layer, or tar+zstd with
+	// LayerZstd) or Files (built into a tar+gzip layer) or Module (a CNCF
+	// wasm artifact) is set.
+	Layer     []byte
+	LayerZstd bool
+	Files     map[string][]byte // path -> content; *.wasm get mode 0755
+	Module    []byte
 	// Entrypoint, Cmd, Env and WorkingDir go into the config.
 	Entrypoint []string
 	Cmd        []string
@@ -167,11 +172,15 @@ func Write(dir string, images []Image) error {
 					return err
 				}
 			}
-			l, err := w.blob(image.MediaTypeOCILayerGz, layer)
+			mt := image.MediaTypeOCILayerGz
+			if img.LayerZstd {
+				mt = image.MediaTypeOCILayerZst
+			}
+			l, err := w.blob(mt, layer)
 			if err != nil {
 				return err
 			}
-			diff, err := gunzipDigest(layer)
+			diff, err := diffID(layer, img.LayerZstd)
 			if err != nil {
 				return fmt.Errorf("%s: %w", img.Name, err)
 			}
@@ -216,14 +225,33 @@ func Write(dir string, images []Image) error {
 	return os.WriteFile(filepath.Join(dir, "catalog.json"), mustJSON(catalog), 0o644)
 }
 
-func gunzipDigest(layer []byte) (image.Digest, error) {
-	zr, err := gzip.NewReader(bytes.NewReader(layer))
+// diffID is the digest of the uncompressed tar (the config's diff_id).
+func diffID(layer []byte, zst bool) (image.Digest, error) {
+	r, closeFn, err := decompress(layer, zst)
 	if err != nil {
 		return "", err
 	}
+	defer closeFn()
 	var raw bytes.Buffer
-	if _, err := raw.ReadFrom(zr); err != nil {
+	if _, err := raw.ReadFrom(io.LimitReader(r, 1<<30)); err != nil {
 		return "", err
 	}
 	return image.FromBytes(raw.Bytes()), nil
+}
+
+// decompress opens a gzip or zstd layer (build-time, trusted bottles; the
+// engine bounds what it unpacks on its side).
+func decompress(layer []byte, zst bool) (io.Reader, func(), error) {
+	if zst {
+		zr, err := zstd.NewReader(bytes.NewReader(layer), zstd.WithDecoderConcurrency(1))
+		if err != nil {
+			return nil, nil, err
+		}
+		return zr, zr.Close, nil
+	}
+	zr, err := gzip.NewReader(bytes.NewReader(layer))
+	if err != nil {
+		return nil, nil, err
+	}
+	return zr, func() { zr.Close() }, nil
 }

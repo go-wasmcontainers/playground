@@ -137,6 +137,7 @@ func Build(ctx context.Context, o Options) (*Manifest, error) {
 				Name: b.Name, Tags: []string{bl.Ref.Tag, "latest"},
 				Description: "pkgx bottle " + bl.Ref.Path + ":" + bl.Ref.Tag + " (" + strings.TrimPrefix(bl.WasmPath, "/") + ")",
 				Layer:       bl.Layer,
+				LayerZstd:   bl.Zstd,
 				Entrypoint:  []string{bl.WasmPath},
 				Env:         []string{"PATH=" + bin + ":/usr/local/bin:/usr/bin:/bin"},
 				Created:     time.Date(2026, 10, 26, 0, 0, 0, 0, time.UTC),

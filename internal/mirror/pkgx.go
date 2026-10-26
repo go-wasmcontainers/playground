@@ -2,8 +2,6 @@ package mirror
 
 import (
 	"archive/tar"
-	"bytes"
-	"compress/gzip"
 	"context"
 	"fmt"
 	"io"
@@ -29,6 +27,11 @@ var Pilots = []Bottle{
 	{Name: "age", Ref: "ghcr.io/go-pkgx/packages/filippo.io/age:1.3.2", Binary: "age"},
 	{Name: "go-md2man", Ref: "ghcr.io/go-pkgx/packages/github.com/cpuguy83/go-md2man:2.0.7", Binary: "go-md2man"},
 	{Name: "shfmt", Ref: "ghcr.io/go-pkgx/packages/mvdan.cc/sh:3.14.1", Binary: "shfmt"},
+	// C bottles: lua raises errors with WebAssembly exception handling.
+	{Name: "lua", Ref: "ghcr.io/go-pkgx/packages/lua.org:5.4.9", Binary: "lua"},
+	{Name: "sqlite3", Ref: "ghcr.io/go-pkgx/packages/sqlite.org:3.53.4", Binary: "sqlite3"},
+	// zlib's bottle is a library plus its minigzip example command.
+	{Name: "minigzip", Ref: "ghcr.io/go-pkgx/packages/zlib.net:1.3.2", Binary: "minigzip"},
 }
 
 // BottleLayer is what FetchBottle found.
@@ -36,7 +39,9 @@ type BottleLayer struct {
 	Ref       image.Reference
 	Layer     []byte // the bottle tarball, verified against its digest
 	MediaType string
-	Entries   []string // tar entry names
+	// Zstd says the tarball is zstd (the C bottles), not gzip.
+	Zstd    bool
+	Entries []string // tar entry names
 	// WasmPath is the entry that is bin/<Binary>.wasm, whatever prefix the
 	// bottle puts before bin/.
 	WasmPath string
@@ -82,18 +87,20 @@ func FetchBottle(ctx context.Context, b Bottle, maxLayer int64) (*BottleLayer, e
 	if l.Size > maxLayer {
 		return nil, fmt.Errorf("%s: layer of %d bytes, limit %d", b.Ref, l.Size, maxLayer)
 	}
-	if !strings.HasSuffix(l.MediaType, "+gzip") && !strings.HasSuffix(l.MediaType, ".gzip") {
-		return nil, fmt.Errorf("%s: layer media type %q is not gzip", b.Ref, l.MediaType)
+	zst := strings.HasSuffix(l.MediaType, "+zstd")
+	if !zst && !strings.HasSuffix(l.MediaType, "+gzip") && !strings.HasSuffix(l.MediaType, ".gzip") {
+		return nil, fmt.Errorf("%s: layer media type %q is neither gzip nor zstd", b.Ref, l.MediaType)
 	}
 	data, err := fetchVerified(ctx, src, l, maxLayer)
 	if err != nil {
 		return nil, err
 	}
-	out := &BottleLayer{Ref: ref, Layer: data, MediaType: l.MediaType}
-	zr, err := gzip.NewReader(bytes.NewReader(data))
+	out := &BottleLayer{Ref: ref, Layer: data, MediaType: l.MediaType, Zstd: zst}
+	zr, closeFn, err := decompress(data, zst)
 	if err != nil {
 		return nil, err
 	}
+	defer closeFn()
 	tr := tar.NewReader(zr)
 	for {
 		h, err := tr.Next()
