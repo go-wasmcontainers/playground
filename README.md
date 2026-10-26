@@ -2,6 +2,7 @@
 
 [![Docs](https://img.shields.io/badge/docs-hugo%20%2B%20hextra-0079A8)](https://go-wasmcontainers.github.io/docs/)
 [![License: BSD-3-Clause](https://img.shields.io/badge/license-BSD--3--Clause-blue)](LICENSE)
+[![CI](https://github.com/go-wasmcontainers/playground/actions/workflows/ci.yml/badge.svg)](https://github.com/go-wasmcontainers/playground/actions/workflows/ci.yml)
 ![status](https://img.shields.io/badge/status-planned-lightgrey)
 
 **An in-browser container playground: a terminal running `docker` against WASI
@@ -13,8 +14,8 @@ machine to provision.
 > the playground, reserved before its code. It needs the
 > [engine](https://github.com/go-wasmcontainers/engine)'s executor to run in a
 > browser worker, and the engine's first milestone (M1, native) is still in
-> progress. No Go Reference or CI badge is shown here for the same reason: there
-> is no module and no workflow to point them at yet.
+> progress. There is no Go Reference badge because there is no Go module yet;
+> the CI badge is the README's link check, the only thing to check so far.
 
 ## What it will be
 
