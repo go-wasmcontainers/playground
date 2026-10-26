@@ -56,8 +56,12 @@ jobs:
         with: { go-version: '1.27.3' }
       - uses: actions/download-artifact@v8
         with: { name: build-manifest, path: manifest }
+      # pipefail: without it the pipeline's status is tee's, and a verify that
+      # never matched reported success (it did, on the first deployment).
       - name: the live site serves this build, byte for byte
-        run: go run ./cmd/site verify --url https://go-wasmcontainers.github.io/playground/ --manifest manifest/build.json --timeout 25m | tee -a "$GITHUB_STEP_SUMMARY"
+        run: |
+          set -o pipefail
+          go run ./cmd/site verify --url https://go-wasmcontainers.github.io/playground/ --manifest manifest/build.json --timeout 25m | tee -a "$GITHUB_STEP_SUMMARY"
 
   # Then use it: the e2e session typed into the deployed page, in Chromium,
   # which runs the isolating service worker as a visitor's browser does.
