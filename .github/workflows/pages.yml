@@ -58,3 +58,28 @@ jobs:
         with: { name: build-manifest, path: manifest }
       - name: the live site serves this build, byte for byte
         run: go run ./cmd/site verify --url https://go-wasmcontainers.github.io/playground/ --manifest manifest/build.json --timeout 25m | tee -a "$GITHUB_STEP_SUMMARY"
+
+  # Then use it: the e2e session typed into the deployed page, in Chromium,
+  # which runs the isolating service worker as a visitor's browser does.
+  live:
+    needs: verify
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
+        with: { go-version: '1.27.3' }
+      - uses: actions/setup-node@v7
+        with: { node-version: 22 }
+      - name: Playwright driver and Chromium
+        run: |
+          echo "PLAYWRIGHT_DRIVER_PATH=$RUNNER_TEMP/pwdriver" >> "$GITHUB_ENV"
+          echo "PLAYWRIGHT_NODEJS_PATH=$(command -v node)" >> "$GITHUB_ENV"
+          go run ./cmd/site playwright-driver --dir "$RUNNER_TEMP/pwdriver"
+          PLAYWRIGHT_DRIVER_PATH="$RUNNER_TEMP/pwdriver" PLAYWRIGHT_NODEJS_PATH="$(command -v node)" \
+            go run github.com/playwright-community/playwright-go/cmd/playwright install --with-deps chromium
+      - name: the live page, used
+        env:
+          E2E_URL: https://go-wasmcontainers.github.io/playground/
+          E2E_PKGX: "1"
+        run: go test -tags e2e -count=1 -v -run TestLive -timeout 15m ./e2e/ > "$RUNNER_TEMP/live.log" 2>&1; status=$?; tail -20 "$RUNNER_TEMP/live.log"; exit $status

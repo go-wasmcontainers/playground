@@ -33,6 +33,9 @@ import (
 var siteDir string
 
 func TestMain(m *testing.M) {
+	if os.Getenv("E2E_URL") != "" {
+		os.Exit(m.Run()) // a deployed site: nothing to build
+	}
 	dir, err := os.MkdirTemp("", "e2e-site-")
 	if err != nil {
 		panic(err)
@@ -83,7 +86,12 @@ type Report struct {
 
 func session(t *testing.T, pw *playwright.Playwright, browserName, mode string) Report {
 	isolate := mode == "headers"
-	url := serve(t, isolate)
+	var url string
+	if mode == "live" {
+		url = os.Getenv("E2E_URL")
+	} else {
+		url = serve(t, isolate)
+	}
 	var bt playwright.BrowserType
 	switch browserName {
 	case "chromium":
@@ -257,7 +265,26 @@ func session(t *testing.T, pw *playwright.Playwright, browserName, mode string) 
 	return rep
 }
 
+// TestLive runs the same session against a deployed site (E2E_URL, e.g.
+// https://go-wasmcontainers.github.io/playground/) in Chromium, which runs
+// the isolating service worker as a visitor's browser does.
+func TestLive(t *testing.T) {
+	if os.Getenv("E2E_URL") == "" {
+		t.Skip("set E2E_URL to test a deployed site")
+	}
+	pw, err := playwright.Run()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer pw.Stop()
+	r := session(t, pw, "chromium", "live")
+	t.Logf("%+v", r)
+}
+
 func TestBrowsers(t *testing.T) {
+	if os.Getenv("E2E_URL") != "" {
+		t.Skip("E2E_URL set: TestLive only")
+	}
 	pw, err := playwright.Run()
 	if err != nil {
 		t.Fatal(err)
