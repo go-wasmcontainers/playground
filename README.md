@@ -3,39 +3,159 @@
 [![Docs](https://img.shields.io/badge/docs-hugo%20%2B%20hextra-0079A8)](https://go-wasmcontainers.github.io/docs/)
 [![License: BSD-3-Clause](https://img.shields.io/badge/license-BSD--3--Clause-blue)](LICENSE)
 [![CI](https://github.com/go-wasmcontainers/playground/actions/workflows/ci.yml/badge.svg)](https://github.com/go-wasmcontainers/playground/actions/workflows/ci.yml)
-![status](https://img.shields.io/badge/status-planned-lightgrey)
+[![Pages](https://github.com/go-wasmcontainers/playground/actions/workflows/pages.yml/badge.svg)](https://github.com/go-wasmcontainers/playground/actions/workflows/pages.yml)
+![status](https://img.shields.io/badge/status-M1-green)
 
 **An in-browser container playground: a terminal running `wctr` against WASI
-containers**, for cloud and container training labs. A learner types container
-commands in a web page, with no virtual machine to provision.
+containers**, for cloud and container training labs. A learner types
+container commands in a web page — no virtual machine, no server: the
+[engine](https://github.com/go-wasmcontainers/engine) runs in the page.
 
-> **Status: planned. Nothing is written yet.** This repository is the home of
-> the playground, reserved before its code. It needs the
-> [engine](https://github.com/go-wasmcontainers/engine)'s executor to run in a
-> browser worker, and the engine's first milestone (M1, native) is still in
-> progress. There is no Go Reference badge because there is no Go module yet;
-> the CI badge is the README's link check, the only thing to check so far.
+**Open it: <https://go-wasmcontainers.github.io/playground/>**
 
-## What it will be
+> **Status: M1.** `wctr pull`, `run` (`--rm`, `-d`, `--name`, `-e`, `-w`,
+> `-m`, `--entrypoint`), `ps`, `logs`, `rm`, `rmi`, `images`, `inspect`,
+> `kill`, with the same semantics and exit codes as the native engine,
+> tested by typing them into the page in Chromium and Firefox. No shell
+> (one `wctr` command per line), no networking, no stdin yet.
 
-- a terminal in the page, running the `wctr` commands the engine serves
-  (`pull`, `run`, `ps`, `logs`, `rm`, `rmi`, `inspect`, `images` first);
-- WASI (`wasip1/wasm`) containers executed in browser workers, so the lab is a
-  web page;
-- labs for cloud and container training on top of that.
+## Try
 
-Networking, a shell and `exec`, building from a Dockerfile, Compose and a
-mini-Kubernetes are all **planned** for the engine and are not promised here
-before they exist.
+```console
+$ wctr run --rm hello
+Unable to find image 'hello' locally
+…
+Hello from a WebAssembly container!
+$ wctr run --rm -e NAME=you greet
+Hello, you!
+$ wctr run -d --name counter lab count 5
+$ wctr logs -f counter
+$ wctr run --name failing lab exit 42
+bye
+[exit status 42]
+$ wctr ps -a
+$ wctr run --rm shfmt --version
+$ wctr images
+```
+
+`help` lists the commands and the images; `clear` clears the screen; Ctrl-C
+stops waiting for a command; Up/Down recall previous lines.
+
+Images: `hello`, `greet` (a CNCF wasm OCI artifact), `lab` (a toolbox:
+`echo env pwd ls cat write count sleep spin hog bench fs exit esc`), and
+three pkgx `wasip1` bottles — `age` 1.3.2, `go-md2man` 2.0.7, `shfmt`
+3.14.1 — taken from `ghcr.io/go-pkgx/packages` at build time.
+
+## How it works
+
+```
+page (main thread)          engine worker (GOOS=js)                 container workers
+xterm.js + line editor ───► session: wctr command tree (in-process)
+   ▲  filtered output        └─► API (in-memory transport) ─► daemon
+   └──────────────────────────  image store (IndexedDB) ◄─ /v2 mirror (same origin)
+                                 browser executor ── one Worker per container ──► guest.wasm
+                                 package wasi ◄── SharedArrayBuffer + Atomics.wait ── WASI imports
+```
+
+- **One engine, in a worker.** The engine's daemon, its API (a subset
+  compatible with the Docker Engine API) and the `wctr` command tree run in
+  one dedicated worker built `GOOS=js`; `wctr` reaches the API through an
+  in-memory transport (a browser has no unix sockets). The page only edits
+  lines and prints.
+- **One worker per container.** The guest is compiled once per image
+  (`WebAssembly.compile`, cached by digest and memory limit) and posted to a
+  fresh worker. Its `wasi_snapshot_preview1` imports block in
+  `Atomics.wait` while the engine's worker serves them with the engine's
+  own WASI host — the same Go code the native engine runs in its tests — so
+  there is **one** file system per container, the copy-on-write tree the
+  engine already has, and volumes later need nothing new. Measured: a WASI
+  call (`stat`) round-trips in **~38 µs**.
+- **Limits as natively.** The guest's memory is capped in the binary (the
+  engine rewrites the module's memory limits, which also makes it shared so
+  the engine can read it); the wall-clock limit terminates the worker (exit
+  137); logs, written bytes and the number of containers are bounded.
+  The preopened `/` is the container's root and `PWD` its working
+  directory, which Go's `wasip1` port needs to resolve relative paths.
+- **Images, same origin.** ghcr.io sends no CORS headers and the page's CSP
+  allows its own origin only, so CI publishes a static, read-only `/v2`
+  mirror with the site (`/playground/v2/library/<name>/…`); `wctr pull
+  hello` resolves `docker.io/library/hello` to it. A pkgx bottle becomes an
+  image without being repacked: its tar+gzip layer as is, plus a config
+  whose `Entrypoint` is the bottle's `bin/<name>.wasm`. Pulled blobs are kept
+  in IndexedDB, verified again when used, so a reload keeps the images.
+- **Cross-origin isolation on GitHub Pages.** Shared memory needs COOP/COEP,
+  which Pages cannot send; `sw.js` (after coi-serviceworker) re-serves the
+  site's own responses with them and with the CSP, at the cost of one reload
+  on the first visit.
+
+## Security
+
+- The page and its workers fetch their own origin only: CSP
+  `default-src 'self'`, `connect-src 'self'`, `script-src 'self'
+  'wasm-unsafe-eval'` (WebAssembly, no `eval`), no inline script; xterm.js
+  is served from the site (fetched from npm, checked against the registry's
+  sha512).
+- Container output is hostile: before it reaches xterm.js the engine keeps
+  text, `\t \n \r \b`, colours (SGR) and erase-in-line, and drops every other
+  escape (OSC 52 clipboard writes, OSC 8 links, title and report sequences
+  that echo back as input, DCS/APC/PM/SOS), C1 controls and invalid UTF-8;
+  output is rate-limited (256 KiB/s, 1 MiB burst). The filter is fuzzed, and
+  the browser test prints an OSC 52 and a `javascript:` link from a
+  container and checks neither reaches the terminal.
+- Each container is a worker with no DOM; its only door to the engine is the
+  WASI host, which bounds every argument (fuzzed in the engine).
+
+## Performance
+
+Chromium, headless, Apple M4 Max (from the e2e run's report; numbers are
+from Enter to the prompt, including compile):
+
+| | Browser (Chromium) | Native, wazero (engine) |
+|---|---|---|
+| engine ready (page load to prompt) | 0.25 s | — |
+| first `run` of `hello` (compile + run) | 31 ms | 430 ms |
+| next `run` of `hello` (cached compile) | 15 ms | 2.3 ms |
+| WASI round trip (`lab bench`, a `stat`) | 38 µs | — |
+
+V8 compiles the 2.4 MB guest lazily (baseline tier first), which is why a
+cold start is faster in the browser than wazero's ahead-of-time compile;
+a warm start pays a worker creation. CI also measures wasmtime on the same
+module (`perf` job). A compiled `WebAssembly.Module` cannot be stored in
+IndexedDB (measured: `DataCloneError` in Chromium), so modules compile once
+per page load.
+
+## Building and testing
+
+```console
+$ go run ./cmd/site build --out _site --pkgx          # images + mirror, engine.wasm, the page
+$ go run ./cmd/site serve --dir _site                  # http://127.0.0.1:8080/playground/
+$ go test ./...                                        # native: session transcript, filter, mirror
+$ go run ./cmd/site playwright-driver --dir /tmp/pwd   # once: driver from npm playwright-core
+$ PLAYWRIGHT_DRIVER_PATH=/tmp/pwd PLAYWRIGHT_NODEJS_PATH=$(command -v node) \
+  go run github.com/playwright-community/playwright-go/cmd/playwright install chromium firefox
+$ PLAYWRIGHT_DRIVER_PATH=/tmp/pwd PLAYWRIGHT_NODEJS_PATH=$(command -v node) go test -tags e2e ./e2e/
+```
+
+The `pages` workflow publishes the site, then `cmd/site verify` waits until
+every file served at the live URL hashes like the build (Pages caches for
+600 s).
+
+## Limitations
+
+- One `wctr` command per line, no shell, no pipes; containers have no
+  stdin and no network.
+- Containers do not survive a reload (images do).
+- Interrupting `wctr run` with Ctrl-C stops waiting; the container keeps
+  running (`wctr kill`).
 
 ## Links
 
-- [go-wasmcontainers](https://github.com/go-wasmcontainers): the organisation
 - [Website](https://go-wasmcontainers.github.io) and
-  [documentation](https://go-wasmcontainers.github.io/docs/): architecture and
-  roadmap
+  [documentation](https://go-wasmcontainers.github.io/docs/)
 - [engine](https://github.com/go-wasmcontainers/engine): the container engine
+- [docs/REFERENCES.md](docs/REFERENCES.md): what each design choice rests on
 
 ## Licence
 
-BSD-3-Clause.
+BSD-3-Clause. `web/vendor/` holds xterm.js and its fit addon (MIT, licences
+alongside).

@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; connect-src 'self'; worker-src 'self'; img-src 'self' data:; object-src 'none'; base-uri 'none'; form-action 'none'">
+<meta name="referrer" content="no-referrer">
+<title>wctr playground</title>
+<link rel="stylesheet" href="vendor/xterm.css?v={{BUILD}}">
+<link rel="stylesheet" href="style.css?v={{BUILD}}">
+</head>
+<body>
+<header>
+  <strong>wctr playground</strong>
+  <span id="status">starting…</span>
+  <nav><a href="https://go-wasmcontainers.github.io/docs/" rel="noopener">docs</a> · <a href="https://github.com/go-wasmcontainers/playground" rel="noopener">source</a></nav>
+</header>
+<main><div id="terminal" data-build="{{BUILD}}" data-version="{{VERSION}}"></div></main>
+<noscript>The playground runs in your browser and needs JavaScript and WebAssembly.</noscript>
+<script src="vendor/xterm.js?v={{BUILD}}"></script>
+<script src="vendor/addon-fit.js?v={{BUILD}}"></script>
+<script src="app.js?v={{BUILD}}"></script>
+</body>
+</html>

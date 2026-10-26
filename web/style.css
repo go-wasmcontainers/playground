@@ -1,0 +1,41 @@
+:root {
+  --bg: #0f1419;
+  --fg: #e6e1cf;
+  --muted: #8a9199;
+  --accent: #39bae6;
+}
+html, body {
+  margin: 0;
+  height: 100%;
+  background: var(--bg);
+  color: var(--fg);
+  font: 14px/1.4 system-ui, sans-serif;
+}
+body {
+  display: flex;
+  flex-direction: column;
+}
+header {
+  display: flex;
+  gap: 1em;
+  align-items: baseline;
+  padding: 8px 16px;
+  border-bottom: 1px solid #253340;
+}
+header nav {
+  margin-left: auto;
+}
+header a {
+  color: var(--accent);
+}
+#status {
+  color: var(--muted);
+}
+main {
+  flex: 1;
+  min-height: 0;
+  padding: 8px 16px 16px;
+}
+#terminal {
+  height: 100%;
+}
