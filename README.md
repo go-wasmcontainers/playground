@@ -14,10 +14,12 @@ container commands in a web page — no virtual machine, no server: the
 **Open it: <https://go-wasmcontainers.github.io/playground/>**
 
 > **Status: M1.** `wctr pull`, `run` (`--rm`, `-d`, `--name`, `-e`, `-w`,
-> `-m`, `--entrypoint`), `ps`, `logs`, `rm`, `rmi`, `images`, `inspect`,
-> `kill`, with the same semantics and exit codes as the native engine,
-> tested by typing them into the page in Chromium and Firefox. No shell
-> (one `wctr` command per line), no networking, no stdin yet.
+> `-m`, `--entrypoint`), `ps`, `logs`, `start`, `diff`, `rm`, `rmi`,
+> `images`, `inspect`, `kill`, `system df`, `system prune`, with the same
+> semantics and exit codes as the native engine, tested by typing them into
+> the page in Chromium and Firefox. Images and containers survive a reload;
+> the page works offline. No shell (one `wctr` command per line), no
+> networking, no stdin yet.
 
 ## Try
 
@@ -50,6 +52,27 @@ inside quotes. Up/Down and Ctrl-R search the history, kept for the tab's
 session; Left/Right, Home/End, Ctrl-A/E/B/F, Ctrl-U/K/W, Ctrl-D and Ctrl-L
 edit. Measured from the key press to the completed line on screen (sampled
 every 5 ms): **7–14 ms** in Chromium, **23 ms** in Firefox (CI runner).
+
+**It keeps your work.** Pulled images, containers (state, exit code, logs,
+the files they wrote) live in the browser's IndexedDB: a reload, or coming
+back later, finds them as you left them. A container that was running is
+then exited with status 137, and a `--rm` one is gone, as after a daemon
+restart (`wctr diff NAME` shows what a container wrote; `wctr start NAME`
+runs it again). The page itself is kept by its service worker, so a reload
+works offline; a new version installs in the background and is used only
+when you click "Reload to update". One tab runs the engine: a second tab
+of the same browser offers to take over. `wctr system df` shows what is
+stored and the browser's quota; `wctr system prune -f` (`-a` for unused
+images too) frees it. After the first `pull` or `run` the page asks the
+browser to keep its storage (`navigator.storage.persist()`): Chromium and
+Safari decide without asking, Firefox asks you.
+
+Measured in Chromium (CI numbers are in each run's summary): the engine is
+ready in 130–190 ms on a first visit, 80–115 ms after a reload, 75 ms
+offline. Compiled modules are not kept across reloads by default: measured,
+compiling a 2.8 MB module from Cache Storage with `compileStreaming` takes
+8.4 ms against 1.5 ms from bytes, and the guest runs no faster for it
+(`?codecache=1` turns it on).
 
 Images: `hello`, `greet` (a CNCF wasm OCI artifact), `lab` (a toolbox:
 `echo env pwd ls cat write count sleep spin hog bench fs exit esc`), and
@@ -164,7 +187,12 @@ every file served at the live URL hashes like the build (Pages caches for
 
 - One `wctr` command per line, no shell, no pipes; containers have no
   stdin and no network.
-- Containers do not survive a reload (images do).
+- A running container's writes are stored every 2 s: a reload loses at
+  most the last 2 s of them. Storage is best effort unless the browser
+  grants `persist()`: under disk pressure it may evict the whole origin.
+- When a second tab takes over, the first tab's engine stops at once; a
+  write it had under way is lost (each write is one IndexedDB
+  transaction, so nothing is left half-written).
 - Interrupting `wctr run` with Ctrl-C stops waiting; the container keeps
   running (`wctr kill`).
 

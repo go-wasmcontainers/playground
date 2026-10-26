@@ -141,17 +141,20 @@ jobs:
         env:
           E2E_PKGX: "1"
           E2E_REPORT: ${{ runner.temp }}/e2e.json
+          E2E_PERSIST_REPORT: ${{ runner.temp }}/persist.json
         run: go test -tags e2e -count=1 -v -timeout 25m ./e2e/ > "$RUNNER_TEMP/e2e.log" 2>&1; status=$?; tail -150 "$RUNNER_TEMP/e2e.log"; exit $status
       - name: measurements
         if: always()
         run: |
           { echo '### Browser measurements'; echo '```json'; cat "$RUNNER_TEMP/e2e.json" 2>/dev/null || echo 'none'; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
+          { echo '### Persistence: reload, offline, compiled-module cache A/B'; echo '```json'; cat "$RUNNER_TEMP/persist.json" 2>/dev/null || echo 'none'; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
       - uses: actions/upload-artifact@v7
         if: always()
         with:
           name: e2e
           path: |
             ${{ runner.temp }}/e2e.json
+            ${{ runner.temp }}/persist.json
             ${{ runner.temp }}/e2e.log
 
   # The same images natively, for comparison: wazero through the engine,

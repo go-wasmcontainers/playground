@@ -11,10 +11,13 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"sort"
+	"strings"
 	"sync"
 	"syscall/js"
 
 	"github.com/go-wasmcontainers/engine/image"
+	"github.com/go-wasmcontainers/engine/state"
 )
 
 // Backend is the IndexedDB backend. The JS side (engine-worker.js) defines
@@ -164,4 +167,77 @@ func (b *Backend) LoadRefs() ([]byte, error) {
 func (b *Backend) SaveRefs(raw []byte) error {
 	_, err := await(b.idb.Call("put", b.db, "meta", "refs", toJS(raw)))
 	return err
+}
+
+// State is the engine's state.Store in the same database, object store
+// "state": containers, their logs and writable layers. Each Put is one
+// IndexedDB transaction, so it commits whole or not at all.
+type State struct{ b *Backend }
+
+// State returns the state store sharing b's database.
+func (b *Backend) State() *State { return &State{b} }
+
+var _ state.Store = (*State)(nil)
+
+// storeErr maps a quota failure to state.ErrNoSpace.
+func storeErr(err error) error {
+	if err != nil && strings.Contains(err.Error(), "QuotaExceededError") {
+		return fmt.Errorf("%w: %v", state.ErrNoSpace, err)
+	}
+	return err
+}
+
+func (s *State) Get(k string) ([]byte, error) {
+	if err := state.CheckKey(k); err != nil {
+		return nil, err
+	}
+	v, err := await(s.b.idb.Call("get", s.b.db, "state", k))
+	if err != nil {
+		return nil, err
+	}
+	if v.IsUndefined() || v.IsNull() || v.Get("byteLength").IsUndefined() {
+		return nil, state.ErrNotFound
+	}
+	return toGo(v), nil
+}
+
+func (s *State) Put(k string, v []byte) error {
+	if err := state.CheckKey(k); err != nil {
+		return err
+	}
+	_, err := await(s.b.idb.Call("put", s.b.db, "state", k, toJS(v)))
+	return storeErr(err)
+}
+
+func (s *State) Delete(k string) error {
+	if err := state.CheckKey(k); err != nil {
+		return err
+	}
+	_, err := await(s.b.idb.Call("del", s.b.db, "state", k))
+	return err
+}
+
+func (s *State) Keys(prefix string) ([]string, error) {
+	ks, err := await(s.b.idb.Call("keys", s.b.db, "state"))
+	if err != nil {
+		return nil, err
+	}
+	var out []string
+	for i := 0; i < ks.Length(); i++ {
+		k := ks.Index(i)
+		if k.Type() == js.TypeString && strings.HasPrefix(k.String(), prefix) && state.CheckKey(k.String()) == nil {
+			out = append(out, k.String())
+		}
+	}
+	sort.Strings(out)
+	return out, nil
+}
+
+// Usage is the browser's view of this origin's storage.
+func (b *Backend) Usage() (usage, quota int64, persisted bool) {
+	v, err := await(b.idb.Call("usage"))
+	if err != nil {
+		return -1, -1, false
+	}
+	return int64(v.Get("usage").Float()), int64(v.Get("quota").Float()), v.Get("persisted").Truthy()
 }

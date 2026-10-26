@@ -8,6 +8,7 @@ package console
 import (
 	"context"
 	"fmt"
+	"strings"
 	"sync"
 	"time"
 	"unicode/utf8"
@@ -15,6 +16,7 @@ import (
 	"github.com/go-wasmcontainers/engine/cli/lineedit"
 
 	"github.com/go-wasmcontainers/playground/internal/session"
+	"github.com/go-wasmcontainers/playground/internal/termfilter"
 )
 
 // Done reports a finished line (for tests and the page's transcript).
@@ -37,6 +39,9 @@ type Options struct {
 	Cols int
 	// Saved is a restored history.
 	Saved []string
+	// Notice lines are printed after the banner (what came back from the
+	// last visit), through the terminal filter like any output.
+	Notice []string
 }
 
 // Console is one terminal.
@@ -56,6 +61,10 @@ func New(o Options) *Console {
 	c.ed.SetHistory(o.Saved)
 	c.r = &lineedit.Renderer{Cols: o.Cols}
 	o.Write("\x1b[1mwctr playground\x1b[0m: WebAssembly containers, in this tab. Type \x1b[1mhelp\x1b[0m; Tab completes.\r\n")
+	for _, n := range o.Notice {
+		var f termfilter.Filter
+		o.Write("\x1b[2m" + string(f.Filter([]byte(strings.ReplaceAll(n, "\n", " ")))) + "\x1b[0m\r\n")
+	}
 	o.Write(c.r.Render(c.ed.State()))
 	go c.loop()
 	return c
