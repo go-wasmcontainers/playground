@@ -5,6 +5,7 @@ go 1.27.3
 require (
 	github.com/go-wasmcontainers/dashboard v0.4.1
 	github.com/go-wasmcontainers/engine v0.11.0
+	github.com/go-wasmcontainers/relay v0.2.1
 	github.com/go-widgets/mvvm v0.15.0
 	github.com/go-widgets/webcanvas v0.5.0
 	github.com/klauspost/compress v1.20.0
@@ -14,10 +15,12 @@ require (
 )
 
 require (
+	connectrpc.com/connect/v2 v2.0.2 // indirect
 	github.com/andybalholm/brotli v1.2.6 // indirect
 	github.com/coder/websocket v1.8.15 // indirect
 	github.com/deckarep/golang-set/v2 v2.8.0 // indirect
 	github.com/docker/go-units v0.5.0 // indirect
+	github.com/go-authn/oidc v0.4.3 // indirect
 	github.com/go-crdt/collab v0.77.4 // indirect
 	github.com/go-crdt/crdt v0.57.0 // indirect
 	github.com/go-gfx/gfx v0.36.1 // indirect

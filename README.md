@@ -133,6 +133,30 @@ engine natively: every socket read or write is a WASI call that crosses
 from the container's worker to the engine's (a `SharedArrayBuffer` round
 trip, ~40–100 µs). Larger reads per call are the open item.
 
+**Join class.** With a teacher's
+[relay](https://github.com/go-wasmcontainers/relay), the page joins the
+class network: "Join class", the relay's address (`https://` only; the
+page reloads once), your name and the join code. A `class` network then
+appears (`wctr run --network class …`): your containers get the class's
+addresses and names (`web.<you>.<domain>`), reach your classmates' under
+the teacher's firewall, and are reached by them. "Leave class" ends the
+session.
+
+- The engine worker alone talks to the relay: the service worker extends
+  *that worker's* CSP `connect-src` to the one relay origin you entered
+  (https and wss), and the page keeps `connect-src 'self'` (both tested).
+- The join code is a secret: typed in a password field, posted once to the
+  engine worker, cleared; never stored, logged, put in a URL or the
+  history (the e2e checks every place the page keeps things). The session
+  token is kept in IndexedDB so a reload rejoins without the code, and is
+  deleted by "Leave class".
+- The relay's certificate must be one the browser trusts: a publicly
+  trusted one (`wctr-relay serve --tls acme`), or the classroom CA
+  (`wctr-relay ca export`) installed in the browser or the system. A page
+  cannot pin a CA itself. The relay must also allow the playground's origin
+  (`--origin`) and answer its CORS preflight (the e2e stands in for that
+  until the relay does).
+
 **Planned: `-p` in the browser.** `wctr run -p 8080:80 net serve` would
 make the service worker route `/playground/port/8080/…` to the container's
 port 80 (an HTTP proxy through the engine worker), so a learner opens their

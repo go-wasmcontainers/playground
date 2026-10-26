@@ -25,7 +25,23 @@ const CACHE = "shell-" + BUILD;
 const CSP = "default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; " +
   "connect-src 'self'; worker-src 'self'; img-src 'self' data:; object-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'";
 
-function isolate(res) {
+// The engine worker started for a class (engine-worker.js?relay=https://
+// host[:port]) may connect to that one relay, https and wss; everything
+// else keeps 'self'. The same rule as internal/site CSPFor (tested there):
+// the value is spliced into the header, so only a plain host passes.
+const RELAY_RE = /^https:\/\/([a-z0-9.-]{1,253}|\[[0-9a-f:]{2,39}\])(:[0-9]{1,5})?$/;
+function cspFor(url) {
+  if (url.pathname.endsWith("/engine-worker.js")) {
+    const r = url.searchParams.get("relay");
+    if (r && RELAY_RE.test(r)) {
+      const host = r.slice("https://".length);
+      return CSP.replace("connect-src 'self'", "connect-src 'self' https://" + host + " wss://" + host);
+    }
+  }
+  return CSP;
+}
+
+function isolate(res, csp) {
   if (res.status === 0) {
     return res;
   }
@@ -33,7 +49,7 @@ function isolate(res) {
   h.set("Cross-Origin-Opener-Policy", "same-origin");
   h.set("Cross-Origin-Embedder-Policy", "require-corp");
   h.set("Cross-Origin-Resource-Policy", "same-origin");
-  h.set("Content-Security-Policy", CSP);
+  h.set("Content-Security-Policy", csp || CSP);
   h.set("X-Content-Type-Options", "nosniff");
   return new Response(res.body, { status: res.status, statusText: res.statusText, headers: h });
 }
@@ -113,6 +129,18 @@ self.addEventListener("fetch", (e) => {
       if (req.mode === "navigate" || url.pathname === new URL(self.registration.scope).pathname ||
         url.pathname.endsWith("/index.html")) {
         key = shellURL("");
+      }
+      // The engine worker for a class: the shell's copy, with its CSP.
+      const csp = cspFor(url);
+      if (csp !== CSP) {
+        const k = new URL(url);
+        k.searchParams.delete("relay");
+        k.searchParams.delete("codecache");
+        const hit = await cache.match(k.href);
+        if (hit) {
+          return isolate(hit, csp);
+        }
+        return isolate(await fetch(req), csp);
       }
       const hit = (await cache.match(key)) || (await cache.match(key.replace(/\/$/, "/index.html")));
       if (hit) {
