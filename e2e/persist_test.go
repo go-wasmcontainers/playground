@@ -316,6 +316,7 @@ func persistence(t *testing.T, pw *playwright.Playwright, browserName, mode stri
 		t.Fatal(err)
 	}
 	b2.ready()
+	p2.BringToFront()
 	b.until("tab 1 did not stop", `() => window.__playground.state.owner === false && document.getElementById("notice").textContent.includes("Another tab took over")`, 30*time.Second)
 	b2.must("wctr ps -a", 0, "keep")
 	return rep

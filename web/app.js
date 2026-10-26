@@ -121,6 +121,7 @@
   function start() {
     state.owner = true;
     notice.hidden = true;
+    term.focus(); // after "Use it here", focus was on the (now hidden) button
     // ?codecache=1 on the page turns the compiled-module cache on (off by
     // default: measured, it does not pay; see cmd/engine).
     const cc = /[?&]codecache=1\b/.test(location.search) ? "&codecache=1" : "";
