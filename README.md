@@ -5,10 +5,9 @@
 [![CI](https://github.com/go-wasmcontainers/playground/actions/workflows/ci.yml/badge.svg)](https://github.com/go-wasmcontainers/playground/actions/workflows/ci.yml)
 ![status](https://img.shields.io/badge/status-planned-lightgrey)
 
-**An in-browser container playground: a terminal running `docker` against WASI
-containers**, for cloud and container training labs. A learner types the
-`docker` commands they will type at work, in a web page, with no virtual
-machine to provision.
+**An in-browser container playground: a terminal running `wctr` against WASI
+containers**, for cloud and container training labs. A learner types container
+commands in a web page, with no virtual machine to provision.
 
 > **Status: planned. Nothing is written yet.** This repository is the home of
 > the playground, reserved before its code. It needs the
@@ -19,14 +18,15 @@ machine to provision.
 
 ## What it will be
 
-- a terminal in the page, running the `docker` commands the engine serves
-  (`pull`, `run`, `ps`, `logs`, `rm`, `inspect` first);
+- a terminal in the page, running the `wctr` commands the engine serves
+  (`pull`, `run`, `ps`, `logs`, `rm`, `rmi`, `inspect`, `images` first);
 - WASI (`wasip1/wasm`) containers executed in browser workers, so the lab is a
   web page;
 - labs for cloud and container training on top of that.
 
-Networking, a shell and `exec`, `docker build`, Compose and a mini-Kubernetes
-are all **planned** for the engine and are not promised here before they exist.
+Networking, a shell and `exec`, building from a Dockerfile, Compose and a
+mini-Kubernetes are all **planned** for the engine and are not promised here
+before they exist.
 
 ## Links
 
