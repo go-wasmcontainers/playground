@@ -149,9 +149,11 @@ jobs:
       - name: measurements
         if: always()
         run: |
-          { echo '### Browser measurements'; echo '```json'; cat "$RUNNER_TEMP/e2e.json" 2>/dev/null || echo 'none'; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
-          { echo '### Persistence: reload, offline, compiled-module cache A/B'; echo '```json'; cat "$RUNNER_TEMP/persist.json" 2>/dev/null || echo 'none'; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
-          { echo '### Dashboard (the default page): ready, reload, offline'; echo '```json'; cat "$RUNNER_TEMP/dashboard.json" 2>/dev/null || echo 'none'; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
+          {
+            echo '### Browser measurements'; echo '```json'; cat "$RUNNER_TEMP/e2e.json" 2>/dev/null || echo 'none'; echo '```'
+            echo '### Persistence: reload, offline, compiled-module cache A/B'; echo '```json'; cat "$RUNNER_TEMP/persist.json" 2>/dev/null || echo 'none'; echo '```'
+            echo '### Dashboard (the default page): ready, reload, offline'; echo '```json'; cat "$RUNNER_TEMP/dashboard.json" 2>/dev/null || echo 'none'; echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
       - uses: actions/upload-artifact@v7
         if: always()
         with:
