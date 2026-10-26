@@ -1,8 +1,9 @@
 // The page: cross-origin isolation (service worker on hosts that cannot
-// send the headers), the terminal, and a minimal line editor that sends
-// each line to the engine worker and prints what comes back. The engine
-// filters escape sequences and bounds the output rate before anything
-// reaches the terminal.
+// send the headers) and the terminal, a thin adapter: keys go to the engine
+// worker raw, whose Go console (the engine's cli/lineedit) edits, completes
+// and runs the line, and its output is written back. The engine filters
+// escape sequences and bounds the output rate before anything reaches the
+// terminal.
 "use strict";
 
 (function () {
@@ -52,8 +53,17 @@
   window.addEventListener("resize", () => fit.fit());
   term.focus();
 
-  const PROMPT = "\x1b[1;36m$\x1b[0m ";
-  const state = { ready: false, running: null, line: "", history: [], hist: 0, nextId: 1, transcript: [], raw: "" };
+  // Line editing, history and completion are the engine's (Go, cli/lineedit):
+  // this page forwards keys raw and writes what comes back.
+  const HKEY = "wctr-history";
+  let saved = [];
+  try {
+    const h = JSON.parse(sessionStorage.getItem(HKEY) || "[]");
+    if (Array.isArray(h)) saved = h.filter((s) => typeof s === "string").slice(-500);
+  } catch (e) {
+    saved = [];
+  }
+  const state = { ready: false, transcript: [], raw: "" };
   // For tests: the terminal's visible text, and whether a command runs.
   window.__playground = {
     state,
@@ -72,30 +82,24 @@
     const m = e.data;
     switch (m.t) {
       case "ready":
-        state.ready = true;
         say("engine " + m.version + " ready · images stored in " + m.storage);
-        term.writeln("\x1b[1mwctr playground\x1b[0m: WebAssembly containers, in this tab. Type \x1b[1mhelp\x1b[0m.");
-        term.write(PROMPT);
+        engine.postMessage({ t: "init", history: saved, cols: term.cols });
+        state.ready = true;
         break;
-      case "out":
-        if (state.running && m.id === state.running.id) {
-          term.write(m.data);
-          // What reached the terminal, for tests (bounded).
-          state.raw = (state.raw + m.data).slice(-1 << 20);
+      case "write":
+        term.write(m.data);
+        // What reached the terminal, for tests (bounded).
+        state.raw = (state.raw + m.data).slice(-1 << 20);
+        break;
+      case "history":
+        try {
+          sessionStorage.setItem(HKEY, JSON.stringify(m.items));
+        } catch (e) {
+          // full or disabled storage: history stays for this page only
         }
         break;
       case "done":
-        if (!state.running || m.id !== state.running.id) {
-          break;
-        }
-        state.transcript.push({ line: state.running.line, code: m.code, ms: performance.now() - state.running.t0 });
-        state.running = null;
-        if (m.clear) {
-          term.clear();
-        } else if (m.code !== 0) {
-          term.writeln("\x1b[2m[exit status " + m.code + "]\x1b[0m");
-        }
-        term.write(PROMPT);
+        state.transcript.push({ line: m.line, code: m.code, ms: m.ms });
         break;
       case "fatal":
         say("engine failed: " + m.message);
@@ -105,70 +109,10 @@
   };
   engine.onerror = (e) => say("engine worker error: " + (e.message || e));
 
-  function submit() {
-    const line = state.line;
-    state.line = "";
-    term.write("\r\n");
-    if (line.trim() !== "") {
-      state.history.push(line);
-      if (state.history.length > 200) state.history.shift();
-    }
-    state.hist = state.history.length;
-    if (line.trim() === "") {
-      term.write(PROMPT);
-      return;
-    }
-    const id = state.nextId++;
-    state.running = { id, line, t0: performance.now() };
-    engine.postMessage({ t: "line", id, text: line });
-  }
-
-  function replaceLine(s) {
-    term.write("\r\x1b[2K" + PROMPT + s);
-    state.line = s;
-  }
-
   term.onData((data) => {
-    if (!state.ready) return;
-    if (state.running) {
-      if (data.includes("\x03")) {
-        engine.postMessage({ t: "interrupt", id: state.running.id });
-        term.write("^C");
-      }
-      return; // no stdin for containers yet
-    }
-    if (data === "\x1b[A") {
-      if (state.hist > 0) replaceLine(state.history[--state.hist]);
-      return;
-    }
-    if (data === "\x1b[B") {
-      if (state.hist < state.history.length - 1) replaceLine(state.history[++state.hist]);
-      else {
-        state.hist = state.history.length;
-        replaceLine("");
-      }
-      return;
-    }
-    if (data.startsWith("\x1b")) return; // other keys: no cursor editing yet
-    for (const ch of data) {
-      if (ch === "\r" || ch === "\n") {
-        submit();
-        if (state.running) return; // the rest of a paste waits for the prompt
-      } else if (ch === "\x7f" || ch === "\b") {
-        if (state.line.length > 0) {
-          state.line = state.line.slice(0, -1);
-          term.write("\b \b");
-        }
-      } else if (ch === "\x03") {
-        state.line = "";
-        term.write("^C\r\n" + PROMPT);
-      } else if (ch === "\x0c") {
-        term.clear();
-        replaceLine(state.line);
-      } else if (ch >= " " && state.line.length < 4096) {
-        state.line += ch;
-        term.write(ch);
-      }
-    }
+    if (state.ready) engine.postMessage({ t: "input", data });
+  });
+  term.onResize(({ cols }) => {
+    if (state.ready) engine.postMessage({ t: "resize", cols });
   });
 })();

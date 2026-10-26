@@ -16,12 +16,60 @@ import (
 	"sync"
 	"time"
 
+	"github.com/spf13/cobra"
+
 	"github.com/go-wasmcontainers/engine/api"
 	"github.com/go-wasmcontainers/engine/cli"
+	"github.com/go-wasmcontainers/engine/cli/lineedit"
 
-	"github.com/go-wasmcontainers/playground/internal/shell"
 	"github.com/go-wasmcontainers/playground/internal/termfilter"
 )
+
+// Builtins are the playground's own commands, for completion of the
+// first word.
+var Builtins = []cli.Candidate{
+	{Value: "wctr", Description: "the container command"},
+	{Value: "help", Description: "what this terminal can do"},
+	{Value: "clear", Description: "clear the screen"},
+}
+
+// LabCommands complete `wctr run lab <TAB>`.
+var LabCommands = []cobra.Completion{
+	"echo\tprint the arguments", "env\tprint the environment", "pwd\tprint the working directory",
+	"ls\tlist a directory", "cat\tprint a file", "write\twrite a file (in this container only)",
+	"count\tcount, slowly", "sleep\tsleep MS milliseconds", "spin\tloop for ever (see the timeout)",
+	"hog\teat memory (see the limit)", "bench\ttime N WASI calls", "fs\ta file-system workout",
+	"exit\texit with a status", "esc\tprint escapes (see the filter)",
+}
+
+// CLIOptions is the wctr command tree this session runs and completes.
+func (s *Session) CLIOptions() cli.Options {
+	return cli.Options{
+		Version:             s.Version,
+		DefaultHost:         "inproc://engine",
+		Client:              s.Client,
+		LookupEnv:           func(string) (string, bool) { return "", false },
+		NoCompletionCommand: true,
+		PullCandidates: func(context.Context) []cobra.Completion {
+			var out []cobra.Completion
+			for _, i := range s.Images {
+				out = append(out, cobra.CompletionWithDesc(i.Name, "pullable: "+i.Description))
+			}
+			return out
+		},
+		RunArgs: func(image string, args []string) []cobra.Completion {
+			if (image == "lab" || image == "lab:latest") && len(args) == 0 {
+				return LabCommands
+			}
+			return nil
+		},
+	}
+}
+
+// Completer completes the playground's lines: builtins, then wctr.
+func (s *Session) Completer() lineedit.Completer {
+	return lineedit.WctrCompleter(s.CLIOptions(), Builtins)
+}
 
 // Image is a catalog entry for help.
 type Image struct {
@@ -56,7 +104,7 @@ type Result struct {
 func (s *Session) Run(ctx context.Context, line string, out io.Writer) Result {
 	w := s.writer(out)
 	defer w.flush()
-	words, err := shell.Split(line)
+	words, err := lineedit.Split(line)
 	if err != nil {
 		fmt.Fprintln(w, "playground:", err)
 		return Result{Code: 2}
@@ -71,12 +119,7 @@ func (s *Session) Run(ctx context.Context, line string, out io.Writer) Result {
 	case "clear":
 		return Result{Clear: true}
 	case "wctr":
-		cmd := cli.RootCmd(cli.Options{
-			Version:     s.Version,
-			DefaultHost: "inproc://engine",
-			Client:      s.Client,
-			LookupEnv:   func(string) (string, bool) { return "", false },
-		})
+		cmd := cli.RootCmd(s.CLIOptions())
 		cmd.SetOut(w)
 		cmd.SetErr(w)
 		cmd.SetArgs(words[1:])
@@ -106,7 +149,9 @@ Containers are WebAssembly (wasip1) modules; nothing leaves your browser.
   wctr inspect NAME               details, as JSON
   wctr kill CONTAINER             stop a running container
   clear                           clear the screen
-Ctrl-C interrupts the running command. Up/Down recall previous lines.
+Tab completes commands, flags, images and container names; Tab Tab lists
+them. Up/Down and Ctrl-R recall previous lines; Ctrl-A/E, Ctrl-U/K/W edit.
+Ctrl-C interrupts the running command.
 `)
 	if len(s.Images) > 0 {
 		fmt.Fprintln(w, "\nImages:")

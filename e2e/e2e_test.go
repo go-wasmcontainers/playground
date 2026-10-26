@@ -82,6 +82,9 @@ type Report struct {
 	Runs            map[string]float64 `json:"runsMs"`
 	StatRoundTripUs float64            `json:"statRoundTripMicros"`
 	ModuleInIDB     string             `json:"moduleInIndexedDB"`
+	// TabMs is the slowest Tab, key press to completed line on screen
+	// (sampled every 5 ms).
+	TabMs float64 `json:"slowestTabMs"`
 }
 
 func session(t *testing.T, pw *playwright.Playwright, browserName, mode string) Report {
@@ -215,6 +218,7 @@ func session(t *testing.T, pw *playwright.Playwright, browserName, mode string) 
 			}
 		}
 	}
+	rep.TabMs = completion(t, page, browserName+"/"+mode, len(steps))
 	// Can a compiled module be stored in IndexedDB (structured clone)?
 	probe, err := page.Evaluate(`async () => {
 	  const mod = await WebAssembly.compile(new Uint8Array([0,97,115,109,1,0,0,0]));
@@ -263,6 +267,100 @@ func session(t *testing.T, pw *playwright.Playwright, browserName, mode string) 
 		t.Fatalf("%s: images lost on reload:\n%s", browserName, txt)
 	}
 	return rep
+}
+
+// completion types keys as a user would and reads the terminal back: Tab,
+// Tab Tab, Ctrl-U, Ctrl-R and Up. It returns the slowest Tab, from the key
+// press to the completed line on screen. done is the transcript length so
+// far.
+func completion(t *testing.T, page playwright.Page, who string, done int) float64 {
+	t.Helper()
+	screen := func() string {
+		v, _ := page.Evaluate(`() => window.__playground.text()`)
+		s, _ := v.(string)
+		return s
+	}
+	last := func() string {
+		s := screen()
+		return s[strings.LastIndexByte(s, '\n')+1:]
+	}
+	// until waits for the screen to satisfy ok, and says how long it took.
+	until := func(what string, ok func() bool) float64 {
+		t0 := time.Now()
+		for !ok() {
+			if time.Since(t0) > 10*time.Second {
+				t.Fatalf("%s: %s; screen:\n%s", who, what, screen())
+			}
+			time.Sleep(5 * time.Millisecond)
+		}
+		return float64(time.Since(t0).Microseconds()) / 1000
+	}
+	press := func(keys ...string) {
+		for _, k := range keys {
+			if err := page.Keyboard().Press(k); err != nil {
+				t.Fatal(err)
+			}
+		}
+	}
+	typ := func(s string) {
+		if err := page.Keyboard().Type(s); err != nil {
+			t.Fatal(err)
+		}
+	}
+	finished := func(n int) {
+		until(fmt.Sprintf("line %d did not finish", n), func() bool {
+			v, _ := page.Evaluate(`() => window.__playground.state.transcript.length`)
+			f, _ := v.(float64)
+			i, _ := v.(int)
+			return int(f) >= n || i >= n
+		})
+	}
+	var slowest float64
+	tab := func(want string) {
+		press("Tab")
+		if ms := until(fmt.Sprintf("Tab: line is %q, want %q", last(), want), func() bool { return last() == want }); ms > slowest {
+			slowest = ms
+		}
+	}
+	// A unique match completes with a space; flags, images and containers
+	// come from the cobra tree and the engine.
+	typ("wctr ru")
+	tab("$ wctr run")
+	typ("--rm hel")
+	tab("$ wctr run --rm hello")
+	press("Enter")
+	finished(done + 1)
+	if !strings.Contains(screen(), "Hello from a WebAssembly container!") {
+		t.Fatalf("%s: completed line did not run:\n%s", who, screen())
+	}
+	// Tab Tab lists the candidates with their descriptions, then the line
+	// comes back unchanged.
+	typ("wctr run --rm lab e")
+	press("Tab", "Tab")
+	until("Tab Tab did not list lab's commands", func() bool {
+		s := screen()
+		return strings.Contains(s, "echo") && strings.Contains(s, "print the arguments") && strings.Contains(s, "exit")
+	})
+	until("the line did not come back after the list", func() bool { return last() == "$ wctr run --rm lab e" })
+	press("Control+u")
+	until("Ctrl-U did not clear the line", func() bool { return last() == "$" })
+	typ("wctr logs ")
+	tab("$ wctr logs") // no container left: nothing to insert, the line stays
+	press("Control+u")
+	// Ctrl-R finds a line typed earlier; Enter runs it.
+	press("Control+r")
+	typ("NAME=b")
+	until("Ctrl-R did not find the greet line", func() bool {
+		return strings.Contains(last(), "wctr run --rm -e NAME=browser greet")
+	})
+	press("Enter")
+	finished(done + 2)
+	// Up recalls it again.
+	press("ArrowUp")
+	until("Up did not recall the last line", func() bool { return last() == "$ wctr run --rm -e NAME=browser greet" })
+	press("Control+u")
+	until("Ctrl-U did not clear the line", func() bool { return last() == "$" })
+	return slowest
 }
 
 // TestLive runs the same session against a deployed site (E2E_URL, e.g.
