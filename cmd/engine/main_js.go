@@ -11,12 +11,12 @@
 // (what the terminal received from the keyboard, raw), {t:"resize", cols}.
 // Messages to the page: {t:"ready", version, storage}, {t:"write", data}
 // (ANSI for the terminal), {t:"history", items}, {t:"done", line, code, ms}.
+// The dashboard's http.* messages (package bridge) carry the engine's API
+// to the canvas UI.
 package main
 
 import (
-	"encoding/json"
 	"fmt"
-	"io"
 	"net/http"
 	"strings"
 	"syscall/js"
@@ -31,6 +31,8 @@ import (
 	"github.com/go-wasmcontainers/engine/rootfs"
 	"github.com/go-wasmcontainers/engine/runtime/browser"
 	"github.com/go-wasmcontainers/engine/state"
+
+	"github.com/go-wasmcontainers/dashboard/bridge"
 
 	"github.com/go-wasmcontainers/playground/internal/console"
 	"github.com/go-wasmcontainers/playground/internal/idbstore"
@@ -126,11 +128,15 @@ func main() {
 			notice = append(notice, "Repaired: "+m)
 		}
 	}
-	hc := &http.Client{Transport: &inproc.Transport{Handler: server.New(d, server.Info{Version: version})}}
+	handler := server.New(d, server.Info{Version: version})
+	hc := &http.Client{Transport: &inproc.Transport{Handler: handler}}
+	// The dashboard (the page's canvas UI) reaches the same API over
+	// postMessage: its http.* messages go to the bridge.
+	_, bridgeHandle := bridge.ServeJS(handler, js.Global())
 	sess := &session.Session{
 		Version: version,
 		Client:  func(string) (*api.Client, error) { return api.NewClientWith(hc, "http://engine"), nil },
-		Images:  catalog(base + "catalog.json" + v),
+		Images:  session.FetchCatalog(base + "catalog.json" + v),
 	}
 
 	// The callback only copies the message and hands it on: a js.FuncOf
@@ -139,6 +145,9 @@ func main() {
 	var con *console.Console
 	js.Global().Set("onmessage", js.FuncOf(func(_ js.Value, a []js.Value) any {
 		data := a[0].Get("data")
+		if bridgeHandle(data) {
+			return nil
+		}
 		switch data.Get("t").String() {
 		case "init":
 			if con != nil {
@@ -198,30 +207,4 @@ func cols(data js.Value) int {
 		return 80
 	}
 	return n
-}
-
-// catalog fetches the mirror's catalog.json (same origin) for help.
-func catalog(url string) []session.Image {
-	resp, err := http.Get(url)
-	if err != nil {
-		return nil
-	}
-	defer resp.Body.Close()
-	b, err := io.ReadAll(io.LimitReader(resp.Body, 1<<20))
-	if err != nil {
-		return nil
-	}
-	var entries []struct {
-		Name        string   `json:"name"`
-		Tags        []string `json:"tags"`
-		Description string   `json:"description"`
-	}
-	if json.Unmarshal(b, &entries) != nil {
-		return nil
-	}
-	out := make([]session.Image, len(entries))
-	for i, e := range entries {
-		out[i] = session.Image{Name: e.Name, Tags: e.Tags, Description: e.Description}
-	}
-	return out
 }

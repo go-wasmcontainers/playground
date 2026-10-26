@@ -6,6 +6,7 @@
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; connect-src 'self'; worker-src 'self'; img-src 'self' data:; object-src 'none'; base-uri 'none'; form-action 'none'">
 <meta name="referrer" content="no-referrer">
 <title>wctr playground</title>
+<meta name="description" content="WebAssembly containers in a browser tab: a dashboard of containers, images and volumes, and a wctr terminal.">
 <link rel="stylesheet" href="vendor/xterm.css?v={{BUILD}}">
 <link rel="stylesheet" href="style.css?v={{BUILD}}">
 </head>
@@ -14,12 +15,14 @@
   <strong>wctr playground</strong>
   <span id="status">starting…</span>
   <span id="notice" role="status" hidden></span>
-  <nav><a href="https://go-wasmcontainers.github.io/docs/" rel="noopener">docs</a> · <a href="https://github.com/go-wasmcontainers/playground" rel="noopener">source</a></nav>
+  <nav><a id="switch" href="?ui=terminal">terminal only</a> · <a href="https://go-wasmcontainers.github.io/docs/" rel="noopener">docs</a> · <a href="https://github.com/go-wasmcontainers/playground" rel="noopener">source</a></nav>
 </header>
 <main><div id="terminal" data-build="{{BUILD}}" data-version="{{VERSION}}"></div></main>
+<canvas id="screen" tabindex="0" aria-label="wctr dashboard: containers, images, volumes and a wctr terminal"></canvas>
 <noscript>The playground runs in your browser and needs JavaScript and WebAssembly.</noscript>
 <script src="vendor/xterm.js?v={{BUILD}}"></script>
 <script src="vendor/addon-fit.js?v={{BUILD}}"></script>
+<script src="wasm_exec.js?v={{BUILD}}"></script>
 <script src="app.js?v={{BUILD}}"></script>
 </body>
 </html>

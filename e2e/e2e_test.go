@@ -115,7 +115,7 @@ func session(t *testing.T, pw *playwright.Playwright, browserName, mode string) 
 	page.On("console", func(m playwright.ConsoleMessage) { console = append(console, m.Text()) })
 	page.On("pageerror", func(err error) { console = append(console, "pageerror: "+err.Error()) })
 	t0 := time.Now()
-	if _, err := page.Goto(url); err != nil {
+	if _, err := page.Goto(url + "?ui=terminal"); err != nil { // the xterm.js page
 		t.Fatal(err)
 	}
 	ready := func() bool {
@@ -398,6 +398,9 @@ func TestBrowsers(t *testing.T) {
 		{"chromium", "headers"},
 		{"firefox", "headers"}, // Playwright's Firefox runs no service workers
 	} {
+		if os.Getenv("E2E_BROWSERS") != "" && !strings.Contains(os.Getenv("E2E_BROWSERS"), c.browser) {
+			continue
+		}
 		t.Run(c.browser+"/"+c.mode, func(t *testing.T) {
 			r := session(t, pw, c.browser, c.mode)
 			t.Logf("%+v", r)
