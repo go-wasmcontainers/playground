@@ -1,0 +1,50 @@
+name: ci
+
+# The playground has no code yet, so the only thing to check is what the README
+# says: every https:// URL it names must resolve. Replace this with the build
+# and test jobs when the first code lands; keep the link check.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  links:
+    name: every README link resolves
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - name: Check
+        run: |
+          set -uo pipefail
+          # The character class matters: an extractor stopping only at ) and "
+          # carries a closing > or < into the request.
+          urls=$(grep -hoE 'https?://[^)">< [:space:]]+' README.md | sed -E 's/[.,`]+$//' | sort -u)
+          test -n "$urls" || { echo "::error::no links found; is the README still there?"; exit 1; }
+          echo "checking $(printf '%s\n' "$urls" | wc -l) distinct URLs"
+          fail=0
+          while read -r u; do
+            case "$u" in
+              # Renders whatever it is asked for; proves nothing.
+              *img.shields.io*) continue ;;
+              # The documentation is published by go-wasmcontainers/docs.
+              *go-wasmcontainers.github.io*) continue ;;
+            esac
+            code=000
+            for _ in 1 2 3; do
+              code=$(curl -sS -o /dev/null -w '%{http_code}' -L --max-time 25 "$u" 2>/dev/null) || true
+              code=${code:-000}
+              case "$code" in 2*|3*) break ;; esac
+              sleep 3
+            done
+            case "$code" in
+              2*|3*) printf '  ok   %s  %s\n' "$code" "$u" ;;
+              *)     printf '  FAIL %s  %s\n' "$code" "$u"; fail=1 ;;
+            esac
+          done <<< "$urls"
+          test "$fail" -eq 0 || { echo "::error::at least one link does not resolve"; exit 1; }
