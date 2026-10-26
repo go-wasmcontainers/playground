@@ -76,8 +76,18 @@ compiling a 2.8 MB module from Cache Storage with `compileStreaming` takes
 
 Images: `hello`, `greet` (a CNCF wasm OCI artifact), `lab` (a toolbox:
 `echo env pwd ls cat write count sleep spin hog bench fs exit esc`), and
-three pkgx `wasip1` bottles — `age` 1.3.2, `go-md2man` 2.0.7, `shfmt`
-3.14.1 — taken from `ghcr.io/go-pkgx/packages` at build time.
+pkgx `wasip1` bottles taken from `ghcr.io/go-pkgx/packages` at build time:
+the Go ones `age` 1.3.2, `go-md2man` 2.0.7, `shfmt` 3.14.1, and the C ones
+`lua` 5.4.9, `sqlite3` 3.53.4 and `minigzip` (zlib 1.3.2), whose layers are
+`tar+zstd`, served as published. lua raises its errors with WebAssembly
+exception handling, which runs in Chromium and Firefox (tested) and natively:
+
+```console
+$ wctr run --rm lua -e 'print(pcall(function() error("boom") end))'
+false	(command line):1: boom
+$ wctr run --rm sqlite3 :memory: 'select 6*7;'
+42
+```
 
 ## How it works
 

@@ -161,6 +161,10 @@ func session(t *testing.T, pw *playwright.Playwright, browserName, mode string) 
 		steps = append(steps,
 			step{"wctr run --rm age --version", 0, []string{"v1.3.2"}},
 			step{"wctr run --rm shfmt --version", 0, []string{"v3.14.1"}},
+			// C bottles (tar+zstd); lua's error() is a wasm exception.
+			step{`wctr run --rm lua -e 'print(pcall(error))'`, 0, []string{"false", "nil"}},
+			step{`wctr run --rm lua -e 'print(pcall(function() error("boom") end))'`, 0, []string{"false", "(command line):1: boom"}},
+			step{`wctr run --rm sqlite3 :memory: 'select 6*7;'`, 0, []string{"42"}},
 		)
 	}
 	textBefore := ""
