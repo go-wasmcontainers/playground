@@ -143,7 +143,8 @@ $ PLAYWRIGHT_DRIVER_PATH=/tmp/pwd PLAYWRIGHT_NODEJS_PATH=$(command -v node) go t
 
 The `pages` workflow publishes the site, then `cmd/site verify` waits until
 every file served at the live URL hashes like the build (Pages caches for
-600 s).
+600 s), then the same e2e session is typed into the live page in Chromium
+(`E2E_URL=https://go-wasmcontainers.github.io/playground/ go test -tags e2e -run TestLive ./e2e/`).
 
 ## Limitations
 
