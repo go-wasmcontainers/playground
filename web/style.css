@@ -57,3 +57,37 @@ main {
 #terminal {
   height: 100%;
 }
+#screen {
+  display: none;
+}
+
+/* The dashboard (the default UI): the canvas fills the viewport from its
+   top-left corner (its controls are addressed in canvas pixels); the
+   header becomes an overlay for the status and the notices, hidden once
+   the dashboard runs unless a notice needs the user. */
+body.dash main {
+  display: none;
+}
+body.dash #screen {
+  display: block;
+  position: fixed;
+  inset: 0;
+  width: 100vw;
+  height: 100vh;
+}
+body.dash header {
+  position: fixed;
+  z-index: 1;
+  right: 12px;
+  bottom: 12px;
+  max-width: calc(100vw - 48px);
+  background: rgba(15, 20, 25, 0.92);
+  border: 1px solid #253340;
+  border-radius: 6px;
+}
+body.dash.running header {
+  display: none;
+}
+body.dash.running.noticed header {
+  display: flex;
+}

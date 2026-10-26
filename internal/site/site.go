@@ -154,6 +154,10 @@ func Build(ctx context.Context, o Options) (*Manifest, error) {
 	if err := goBuild(o.Root, "./cmd/engine", filepath.Join(o.Out, "engine.wasm"), []string{"GOOS=js", "GOARCH=wasm", "CGO_ENABLED=0"}, ld); err != nil {
 		return nil, err
 	}
+	// The main UI: the dashboard on a canvas, in the page.
+	if err := goBuild(o.Root, "./cmd/dashboard", filepath.Join(o.Out, "dashboard.wasm"), []string{"GOOS=js", "GOARCH=wasm", "CGO_ENABLED=0"}, ld); err != nil {
+		return nil, err
+	}
 	gr, err := goRoot()
 	if err != nil {
 		return nil, err

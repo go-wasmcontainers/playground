@@ -6,12 +6,18 @@
 [![Pages](https://github.com/go-wasmcontainers/playground/actions/workflows/pages.yml/badge.svg)](https://github.com/go-wasmcontainers/playground/actions/workflows/pages.yml)
 ![status](https://img.shields.io/badge/status-M1-green)
 
-**An in-browser container playground: a terminal running `wctr` against WASI
-containers**, for cloud and container training labs. A learner types
-container commands in a web page — no virtual machine, no server: the
+**An in-browser container playground: a dashboard of WASI containers,
+images and volumes, with a terminal running `wctr`**, for cloud and
+container training labs. A learner types container commands in a web page
+and sees what they do — no virtual machine, no server: the
 [engine](https://github.com/go-wasmcontainers/engine) runs in the page.
 
-**Open it: <https://go-wasmcontainers.github.io/playground/>**
+**Open it: <https://go-wasmcontainers.github.io/playground/>** — the
+[dashboard](https://github.com/go-wasmcontainers/dashboard) (Containers,
+Images, Volumes, Terminal; logs and stats of the selected container, stop,
+start and remove buttons that print the `wctr` command they ran). The
+terminal alone, on xterm.js, stays at
+[`?ui=terminal`](https://go-wasmcontainers.github.io/playground/?ui=terminal).
 
 > **Status: M1.** `wctr pull`, `run` (`--rm`, `-d`, `--name`, `-e`, `-w`,
 > `-m`, `--entrypoint`), `ps`, `logs`, `start`, `diff`, `rm`, `rmi`,
@@ -93,6 +99,9 @@ $ wctr run --rm sqlite3 :memory: 'select 6*7;'
 
 ```
 page (main thread)          engine worker (GOOS=js)                 container workers
+dashboard.wasm (canvas) ──► API over postMessage (dashboard bridge) ─► daemon
+  its Terminal: session (wctr) in the page, API over the same bridge
+or ?ui=terminal:
 xterm.js (keys, raw) ─────► console: engine's cli/lineedit + session
                              session: wctr command tree (in-process)
    ▲  filtered output        └─► API (in-memory transport) ─► daemon
@@ -101,6 +110,13 @@ xterm.js (keys, raw) ─────► console: engine's cli/lineedit + session
                                  package wasi ◄── SharedArrayBuffer + Atomics.wait ── WASI imports
 ```
 
+- **The dashboard rides the same engine.** `dashboard.wasm` (go-widgets on
+  a `<canvas>`, 20 MB) is downloaded and compiled while the engine worker
+  starts, and runs once the engine is ready; it speaks the engine's HTTP API
+  to the worker through the dashboard's postMessage bridge and follows
+  `/events`. Its Terminal runs the playground's session (wctr, `help`,
+  `clear`, the image catalogue for `pull`) in the page. The service worker
+  caches it with the rest of the shell, so the dashboard works offline.
 - **One engine, in a worker.** The engine's daemon, its API (a subset
   compatible with the Docker Engine API) and the `wctr` command tree run in
   one dedicated worker built `GOOS=js`; `wctr` reaches the API through an
@@ -191,7 +207,16 @@ $ PLAYWRIGHT_DRIVER_PATH=/tmp/pwd PLAYWRIGHT_NODEJS_PATH=$(command -v node) go t
 The `pages` workflow publishes the site, then `cmd/site verify` waits until
 every file served at the live URL hashes like the build (Pages caches for
 600 s), then the same e2e session is typed into the live page in Chromium
-(`E2E_URL=https://go-wasmcontainers.github.io/playground/ go test -tags e2e -run TestLive ./e2e/`).
+(`E2E_URL=https://go-wasmcontainers.github.io/playground/ go test -tags e2e -run 'TestLive|TestDashboard' ./e2e/`).
+`TestDashboard` drives the dashboard as a person does — one key press per
+character, clicks at the coordinates the dashboard reports for its controls
+(`window.__dashboard.state()`), never pixels: a run typed in its Terminal
+appears in Containers, its logs show, the Stop button stops it, a reload
+restores it, and (service worker) an offline reload brings the dashboard
+back. Chromium (service worker and headers) and Firefox (headers) in CI, and
+Chromium against the live page: Playwright's Firefox runs no service
+workers, and GitHub Pages cannot send the isolation headers, so there is no
+live Firefox run.
 
 ## Limitations
 

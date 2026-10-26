@@ -90,6 +90,8 @@ jobs:
         include:
           # Container output is attacker-controlled and reaches xterm.js.
           - { target: FuzzFilter, pkg: ./internal/termfilter }
+          # catalog.json, read by the engine worker and the dashboard.
+          - { target: FuzzParseCatalog, pkg: ./internal/session }
           # Typed lines and keys are parsed by the engine's cli/lineedit,
           # fuzzed there (FuzzEditor, FuzzSplitPartial).
     steps:
@@ -142,12 +144,16 @@ jobs:
           E2E_PKGX: "1"
           E2E_REPORT: ${{ runner.temp }}/e2e.json
           E2E_PERSIST_REPORT: ${{ runner.temp }}/persist.json
+          E2E_DASH_REPORT: ${{ runner.temp }}/dashboard.json
         run: go test -tags e2e -count=1 -v -timeout 25m ./e2e/ > "$RUNNER_TEMP/e2e.log" 2>&1; status=$?; tail -150 "$RUNNER_TEMP/e2e.log"; exit $status
       - name: measurements
         if: always()
         run: |
-          { echo '### Browser measurements'; echo '```json'; cat "$RUNNER_TEMP/e2e.json" 2>/dev/null || echo 'none'; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
-          { echo '### Persistence: reload, offline, compiled-module cache A/B'; echo '```json'; cat "$RUNNER_TEMP/persist.json" 2>/dev/null || echo 'none'; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
+          {
+            echo '### Browser measurements'; echo '```json'; cat "$RUNNER_TEMP/e2e.json" 2>/dev/null || echo 'none'; echo '```'
+            echo '### Persistence: reload, offline, compiled-module cache A/B'; echo '```json'; cat "$RUNNER_TEMP/persist.json" 2>/dev/null || echo 'none'; echo '```'
+            echo '### Dashboard (the default page): ready, reload, offline'; echo '```json'; cat "$RUNNER_TEMP/dashboard.json" 2>/dev/null || echo 'none'; echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
       - uses: actions/upload-artifact@v7
         if: always()
         with:

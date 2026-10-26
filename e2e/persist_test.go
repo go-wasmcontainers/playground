@@ -165,6 +165,7 @@ func (b tab) lastCompile() compile {
 func persistence(t *testing.T, pw *playwright.Playwright, browserName, mode string) PersistReport {
 	sw := mode == "service-worker"
 	url, dir := serveCopy(t, !sw)
+	url += "?ui=terminal" // the xterm.js page; the dashboard has its own test
 	bt := pw.Chromium
 	if browserName == "firefox" {
 		bt = pw.Firefox
@@ -232,7 +233,7 @@ func persistence(t *testing.T, pw *playwright.Playwright, browserName, mode stri
 	// The same with the compiled-module cache (?codecache=1): one visit
 	// stores the module, the next compiles it from Cache Storage.
 	for i, want := range []string{"stored", "cache"} {
-		if _, err := page.Goto(url + "?codecache=1"); err != nil {
+		if _, err := page.Goto(url + "&codecache=1"); err != nil {
 			t.Fatal(err)
 		}
 		b.ready()
