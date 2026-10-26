@@ -48,8 +48,8 @@ complete to their common prefix, and Tab Tab lists them in columns with
 their descriptions (asking first beyond 100). Completion works mid-line and
 inside quotes. Up/Down and Ctrl-R search the history, kept for the tab's
 session; Left/Right, Home/End, Ctrl-A/E/B/F, Ctrl-U/K/W, Ctrl-D and Ctrl-L
-edit. Measured
-in Chromium: a Tab is on screen **7–14 ms** after the key press.
+edit. Measured from the key press to the completed line on screen (sampled
+every 5 ms): **7–14 ms** in Chromium, **23 ms** in Firefox (CI runner).
 
 Images: `hello`, `greet` (a CNCF wasm OCI artifact), `lab` (a toolbox:
 `echo env pwd ls cat write count sleep spin hog bench fs exit esc`), and
