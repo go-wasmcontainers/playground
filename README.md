@@ -107,22 +107,27 @@ xterm.js + line editor ───► session: wctr command tree (in-process)
 
 ## Performance
 
-Chromium, headless, Apple M4 Max (from the e2e run's report; numbers are
-from Enter to the prompt, including compile):
+The same `hello` module (2.4 MB, Go `wasip1`), on one GitHub-hosted
+`ubuntu-latest` runner in one CI run (`e2e` and `perf` jobs); browser
+numbers are from Enter to the prompt, including compile:
 
-| | Browser (Chromium) | Native, wazero (engine) |
-|---|---|---|
-| engine ready (page load to prompt) | 0.25 s | — |
-| first `run` of `hello` (compile + run) | 31 ms | 430 ms |
-| next `run` of `hello` (cached compile) | 15 ms | 2.3 ms |
-| WASI round trip (`lab bench`, a `stat`) | 38 µs | — |
+| | Chromium (headless) | Firefox (headless) | Native: engine on wazero | Native: wasmtime 50 |
+|---|---|---|---|---|
+| engine ready (page load to prompt) | 0.46 s | 1.0 s | — | — |
+| first `run` (compile + run) | 81 ms | 291 ms | 825 ms | 23 ms (`wasmtime run`, a process) |
+| next `run` (compiled module cached) | 47 ms | 231 ms | 5.4 ms | — |
+| WASI round trip (`lab bench`: one `stat`) | 97 µs | 354 µs | — | — |
 
-V8 compiles the 2.4 MB guest lazily (baseline tier first), which is why a
-cold start is faster in the browser than wazero's ahead-of-time compile;
-a warm start pays a worker creation. CI also measures wasmtime on the same
-module (`perf` job). A compiled `WebAssembly.Module` cannot be stored in
-IndexedDB (measured: `DataCloneError` in Chromium), so modules compile once
-per page load.
+On an Apple M4 Max (Chromium, local): ready 0.25 s, first run 31 ms, next
+15 ms, WASI round trip 38 µs; the native engine 430 ms / 2.3 ms.
+
+The browsers compile the guest lazily (a baseline tier first), wazero
+compiles it ahead of time, which is why the engine's native cold start is
+the slowest here and wasmtime's the fastest; a warm start in a browser pays
+a worker's creation and instantiation, more so in Firefox. A compiled
+`WebAssembly.Module` cannot be stored in IndexedDB (measured:
+`DataCloneError` in both browsers), so container modules compile once per
+page load.
 
 ## Building and testing
 

@@ -40,6 +40,11 @@ jobs:
               *img.shields.io*) continue ;;
               # Published by this repository and go-wasmcontainers/docs.
               *go-wasmcontainers.github.io*) continue ;;
+              # This repository's own workflow pages exist once the workflow
+              # is on main; a PR adding one would otherwise fail on itself.
+              *github.com/go-wasmcontainers/playground/actions/workflows/*) continue ;;
+              # Examples of a local server, not links.
+              *127.0.0.1*|*localhost*) continue ;;
             esac
             code=000
             for _ in 1 2 3; do
