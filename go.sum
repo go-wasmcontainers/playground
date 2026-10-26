@@ -46,8 +46,8 @@ github.com/go-typeset/bidi v0.3.1 h1:fsTa0b9txt2SkH7M55EZ06+q3N9C4O0Oerf+SPLLGFs
 github.com/go-typeset/bidi v0.3.1/go.mod h1:ct3cmYT8Qt1FGJQ+2QaakrUxqaP4ZysgdQQg2ym5+Xo=
 github.com/go-wasmcontainers/dashboard v0.4.1 h1:XrSizz0BUOb/plYDY5zQmwz+MsyhD3lMv/ezzFwkkHY=
 github.com/go-wasmcontainers/dashboard v0.4.1/go.mod h1:Mj9Hfi+ZJ752h7m5/G78RJe+HcQkOc1JbK0mh3fhYXI=
-github.com/go-wasmcontainers/engine v0.10.0 h1:vdt08Bwrvw4IviHt5MyKU73W83Di4SmChes0eFG3eYk=
-github.com/go-wasmcontainers/engine v0.10.0/go.mod h1:K20JKyjxWQY4LwYKVsfomGsbNXPfIJk+UDbR0zrnpNI=
+github.com/go-wasmcontainers/engine v0.11.0 h1:mt5YDEGBchMZ4bZVnGPg/jenpWd+1e5jlbFpzdYrQa4=
+github.com/go-wasmcontainers/engine v0.11.0/go.mod h1:K20JKyjxWQY4LwYKVsfomGsbNXPfIJk+UDbR0zrnpNI=
 github.com/go-widgets/mvvm v0.15.0 h1:VvZiLB7gm+5CIEeQH3GNI53ytUndzOznT/fJvaG8hOQ=
 github.com/go-widgets/mvvm v0.15.0/go.mod h1:ZJj5M8zDg/gdzcvdWnJgZj/fcV0qe84fALq+EQVzUOM=
 github.com/go-widgets/painter v0.16.0 h1:j8FFObisySQChY2JiXS7Di2Mo4cqufIc0PDUnoDPMiA=
