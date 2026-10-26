@@ -42,6 +42,13 @@ var LabCommands = []cobra.Completion{
 	"exit\texit with a status", "esc\tprint escapes (see the filter)",
 }
 
+// NetCommands are the net image's commands, for completion.
+var NetCommands = []cobra.Completion{
+	"serve\tHTTP server (port 80)", "get\tGET a URL", "bench\tlatency and throughput of a server",
+	"udp-echo\techo datagrams (port 7)", "udp\tsend a datagram, print the reply", "lookup\tresolve a name",
+	"dial\topen a TCP connection",
+}
+
 // CLIOptions is the wctr command tree this session runs and completes.
 func (s *Session) CLIOptions() cli.Options {
 	return cli.Options{
@@ -58,8 +65,11 @@ func (s *Session) CLIOptions() cli.Options {
 			return out
 		},
 		RunArgs: func(image string, args []string) []cobra.Completion {
-			if (image == "lab" || image == "lab:latest") && len(args) == 0 {
+			switch {
+			case (image == "lab" || image == "lab:latest") && len(args) == 0:
 				return LabCommands
+			case (image == "net" || image == "net:latest") && len(args) == 0:
+				return NetCommands
 			}
 			return nil
 		},

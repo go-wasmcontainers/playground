@@ -85,6 +85,11 @@ type Report struct {
 	// TabMs is the slowest Tab, key press to completed line on screen
 	// (sampled every 5 ms).
 	TabMs float64 `json:"slowestTabMs"`
+	// HTTP between two containers on the bridge (net bench): sequential
+	// GETs' latency, and one 8 MiB GET's throughput.
+	HTTPp50Ms float64 `json:"httpP50Ms"`
+	HTTPp90Ms float64 `json:"httpP90Ms"`
+	HTTPMBps  float64 `json:"httpMBps"`
 }
 
 func session(t *testing.T, pw *playwright.Playwright, browserName, mode string) Report {
@@ -157,6 +162,17 @@ func session(t *testing.T, pw *playwright.Playwright, browserName, mode string) 
 		{"docker ps", 127, []string{"wctr"}},
 		{`wctr run --rm lab esc '\e]52;c;ZXZpbA==\asafe \e]8;;javascript:alert(1)\e\link\e]8;;\e\ \e[6n\e[31mred'`, 0, []string{"safe link red"}},
 	}
+	// Networking: two containers by name on the default bridge, UDP, the
+	// network's DNS, and a measurement (the browser's socket wait path).
+	steps = append(steps,
+		step{"wctr run -d --name web net serve", 0, nil},
+		step{"wctr run --rm net get http://web/browser", 0, []string{"hello browser from 10.88.0."}},
+		step{"wctr run -d --name echo net udp-echo", 0, nil},
+		step{"wctr run --rm net udp echo:7 ping", 0, []string{"reply: ping"}},
+		step{"wctr run --rm net lookup nobody", 1, []string{"no such host"}},
+		step{"wctr run --rm net bench http://web 200", 0, []string{"200 requests: p50"}},
+		step{"wctr rm -f web echo", 0, nil},
+	)
 	if os.Getenv("E2E_PKGX") == "1" {
 		steps = append(steps,
 			step{"wctr run --rm age --version", 0, []string{"v1.3.2"}},
@@ -215,11 +231,20 @@ func session(t *testing.T, pw *playwright.Playwright, browserName, mode string) 
 			}
 		}
 		rep.Runs[fmt.Sprintf("%02d %s", i, s.line)] = e.Ms
-		if strings.Contains(s.line, "bench") {
+		if strings.Contains(s.line, "lab bench") {
 			m := regexp.MustCompile(`([0-9.]+) µs each`).FindStringSubmatch(out)
 			if m != nil {
 				rep.StatRoundTripUs, _ = strconv.ParseFloat(m[1], 64)
 			}
+		}
+		if strings.Contains(s.line, "net bench") {
+			m := regexp.MustCompile(`p50 ([0-9.]+) ms, p90 ([0-9.]+) ms; .*: ([0-9.]+) MB/s`).FindStringSubmatch(out)
+			if m == nil {
+				t.Fatalf("%s/%s: no measurement in %q", browserName, mode, out)
+			}
+			rep.HTTPp50Ms, _ = strconv.ParseFloat(m[1], 64)
+			rep.HTTPp90Ms, _ = strconv.ParseFloat(m[2], 64)
+			rep.HTTPMBps, _ = strconv.ParseFloat(m[3], 64)
 		}
 	}
 	rep.TabMs = completion(t, page, browserName+"/"+mode, len(steps))

@@ -24,8 +24,9 @@ terminal alone, on xterm.js, stays at
 > `images`, `inspect`, `kill`, `system df`, `system prune`, with the same
 > semantics and exit codes as the native engine, tested by typing them into
 > the page in Chromium and Firefox. Images and containers survive a reload;
-> the page works offline. No shell (one `wctr` command per line), no
-> networking, no stdin yet.
+> the page works offline. Containers talk to each other over TCP and UDP,
+> by name ([Networking](#networking)). No shell (one `wctr` command per
+> line), no stdin yet.
 
 ## Try
 
@@ -94,6 +95,48 @@ false	(command line):1: boom
 $ wctr run --rm sqlite3 :memory: 'select 6*7;'
 42
 ```
+
+## Networking
+
+```console
+$ wctr run -d --name web net serve
+$ wctr run --rm net get http://web/me
+hello me from 10.88.0.3:49153
+$ wctr run -d --name echo net udp-echo
+$ wctr run --rm net udp echo:7 ping
+reply: ping
+$ wctr run --rm net lookup nobody
+net: lookup nobody on 127.0.0.1:53: no such host
+$ wctr network create lab && wctr run -d --network lab --name db net serve
+```
+
+Every container joins the `bridge` network (or `--network NAME`; `wctr
+network create|ls|inspect|rm`), in the page: the engine (v0.10.0) serves
+the WasmEdge socket calls of a guest's WASI imports and answers its DNS
+queries with the network's names, so a stock Go program using
+[stealthrocket/net](https://github.com/stealthrocket/net) runs unchanged —
+the `net` image is one (`serve`, `get`, `bench`, `udp-echo`, `udp`,
+`lookup`, `dial`). Nothing leaves the page: there is no route to the
+Internet or to the machine.
+
+Measured (`net bench`: 200 sequential GETs, then one 8 MiB GET, between two
+containers on the bridge), Apple M4 Max, load 16–19 so indicative:
+
+| | latency p50 / p90 | throughput |
+|---|---|---|
+| Chromium (the page) | 1.1 / 1.4 ms | 106–112 MB/s |
+| native: the same engine on wazero (`perf` job) | 0.33 / 0.39 ms | 1.2 GB/s |
+| native: Go `net/http` over loopback TCP (upper bound) | 0.05 / 0.07 ms | 3.8 GB/s |
+
+The browser is ~3× slower in latency and ~11× in throughput than the same
+engine natively: every socket read or write is a WASI call that crosses
+from the container's worker to the engine's (a `SharedArrayBuffer` round
+trip, ~40–100 µs). Larger reads per call are the open item.
+
+**Planned: `-p` in the browser.** `wctr run -p 8080:80 net serve` would
+make the service worker route `/playground/port/8080/…` to the container's
+port 80 (an HTTP proxy through the engine worker), so a learner opens their
+web server in a tab or an iframe of the page. Not implemented yet.
 
 ## How it works
 
@@ -221,7 +264,8 @@ live Firefox run.
 ## Limitations
 
 - One `wctr` command per line, no shell, no pipes; containers have no
-  stdin and no network.
+  stdin. Networks stay inside the page (no Internet, no published ports
+  yet).
 - A running container's writes are stored every 2 s: a reload loses at
   most the last 2 s of them. Storage is best effort unless the browser
   grants `persist()`: under disk pressure it may evict the whole origin.

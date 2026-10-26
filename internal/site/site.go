@@ -79,6 +79,7 @@ var Images = []struct {
 	{Name: "greet", Description: "greets $NAME (a CNCF wasm OCI artifact)", Artifact: true},
 	{Name: "lab", Description: "a toolbox: echo, env, pwd, ls, cat, write, count, sleep, spin, hog, bench, fs, exit", Index: true,
 		Files: map[string]string{"etc/motd": "Welcome to the go-wasmcontainers playground.\n"}},
+	{Name: "net", Description: "networking: serve (HTTP), get, bench, udp-echo, udp, lookup, dial — containers reach each other by name"},
 }
 
 // Build assembles the site into o.Out.
