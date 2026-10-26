@@ -4,20 +4,20 @@
 // dedicated Web Worker (engine-worker.js): the image store (IndexedDB),
 // the daemon and its API served in-process, the browser executor (one
 // worker per container), and the session that runs the terminal's lines
-// through the wctr command tree.
+// through the wctr command tree, behind the console: the engine's line
+// editor (cli/lineedit), so editing, history and Tab completion are Go.
 //
-// Messages from the page: {t:"line", id, text}, {t:"interrupt", id}.
-// Messages to the page: {t:"ready", version, storage}, {t:"out", id, data},
-// {t:"done", id, code, clear}.
+// Messages from the page: {t:"init", history, cols}, {t:"input", data}
+// (what the terminal received from the keyboard, raw), {t:"resize", cols}.
+// Messages to the page: {t:"ready", version, storage}, {t:"write", data}
+// (ANSI for the terminal), {t:"history", items}, {t:"done", line, code, ms}.
 package main
 
 import (
-	"context"
 	"encoding/json"
 	"io"
 	"net/http"
 	"strings"
-	"sync"
 	"syscall/js"
 	"time"
 
@@ -30,6 +30,7 @@ import (
 	"github.com/go-wasmcontainers/engine/rootfs"
 	"github.com/go-wasmcontainers/engine/runtime/browser"
 
+	"github.com/go-wasmcontainers/playground/internal/console"
 	"github.com/go-wasmcontainers/playground/internal/idbstore"
 	"github.com/go-wasmcontainers/playground/internal/session"
 )
@@ -37,13 +38,6 @@ import (
 var version = "dev"
 
 func post(v map[string]any) { js.Global().Call("postMessage", js.ValueOf(v)) }
-
-type out struct{ id int }
-
-func (o out) Write(p []byte) (int, error) {
-	post(map[string]any{"t": "out", "id": o.id, "data": string(p)})
-	return len(p), nil
-}
 
 func main() {
 	href := js.Global().Get("location").Get("href").String()
@@ -91,37 +85,68 @@ func main() {
 		Images:  catalog(base + "catalog.json" + v),
 	}
 
-	var mu sync.Mutex
-	running := map[int]context.CancelFunc{}
+	// The callback only copies the message and hands it on: a js.FuncOf
+	// callback must never block (completion may wait on IndexedDB, which
+	// needs this very event loop).
+	var con *console.Console
 	js.Global().Set("onmessage", js.FuncOf(func(_ js.Value, a []js.Value) any {
 		data := a[0].Get("data")
-		id := data.Get("id").Int()
 		switch data.Get("t").String() {
-		case "line":
-			text := data.Get("text").String()
-			ctx, cancel := context.WithCancel(context.Background())
-			mu.Lock()
-			running[id] = cancel
-			mu.Unlock()
-			go func() {
-				res := sess.Run(ctx, text, out{id})
-				mu.Lock()
-				delete(running, id)
-				mu.Unlock()
-				cancel()
-				post(map[string]any{"t": "done", "id": id, "code": res.Code, "clear": res.Clear})
-			}()
-		case "interrupt":
-			mu.Lock()
-			if c := running[id]; c != nil {
-				c()
+		case "init":
+			if con != nil {
+				break
 			}
-			mu.Unlock()
+			var saved []string
+			if h := data.Get("history"); h.Type() == js.TypeObject {
+				for i := 0; i < h.Length() && i < 1000; i++ {
+					if s := h.Index(i); s.Type() == js.TypeString {
+						saved = append(saved, s.String())
+					}
+				}
+			}
+			con = console.New(console.Options{
+				Session: sess,
+				Cols:    cols(data),
+				Saved:   saved,
+				Write:   func(s string) { post(map[string]any{"t": "write", "data": s}) },
+				History: func(h []string) {
+					items := make([]any, len(h))
+					for i, s := range h {
+						items[i] = s
+					}
+					post(map[string]any{"t": "history", "items": items})
+				},
+				Done: func(d console.Done) {
+					post(map[string]any{"t": "done", "line": d.Line, "code": d.Code, "ms": float64(d.Took.Microseconds()) / 1000})
+				},
+			})
+		case "input":
+			if con != nil {
+				con.Input(data.Get("data").String())
+			}
+		case "resize":
+			if con != nil {
+				n := cols(data)
+				go con.Resize(n)
+			}
 		}
 		return nil
 	}))
 	post(map[string]any{"t": "ready", "version": version, "storage": storage})
 	select {}
+}
+
+// cols reads a terminal width, bounded.
+func cols(data js.Value) int {
+	c := data.Get("cols")
+	if c.Type() != js.TypeNumber {
+		return 80
+	}
+	n := c.Int()
+	if n < 10 || n > 1000 {
+		return 80
+	}
+	return n
 }
 
 // catalog fetches the mirror's catalog.json (same origin) for help.

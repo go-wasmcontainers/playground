@@ -90,7 +90,8 @@ jobs:
         include:
           # Container output is attacker-controlled and reaches xterm.js.
           - { target: FuzzFilter, pkg: ./internal/termfilter }
-          - { target: FuzzSplit, pkg: ./internal/shell }
+          # Typed lines and keys are parsed by the engine's cli/lineedit,
+          # fuzzed there (FuzzEditor, FuzzSplitPartial).
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-go@v7

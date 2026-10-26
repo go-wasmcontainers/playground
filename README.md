@@ -39,7 +39,17 @@ $ wctr images
 ```
 
 `help` lists the commands and the images; `clear` clears the screen; Ctrl-C
-stops waiting for a command; Up/Down recall previous lines.
+stops waiting for a command.
+
+**Line editing, as in bash.** Tab completes commands, flags, flag values,
+images (local ones for `run`, the catalogue for `pull`), container names and
+IDs, and `lab`'s commands; a unique match gets a trailing space, several
+complete to their common prefix, and Tab Tab lists them in columns with
+their descriptions (asking first beyond 100). Completion works mid-line and
+inside quotes. Up/Down and Ctrl-R search the history, kept for the tab's
+session; Left/Right, Home/End, Ctrl-A/E/B/F, Ctrl-U/K/W, Ctrl-D and Ctrl-L
+edit. Measured from the key press to the completed line on screen (sampled
+every 5 ms): **7–14 ms** in Chromium, **23 ms** in Firefox (CI runner).
 
 Images: `hello`, `greet` (a CNCF wasm OCI artifact), `lab` (a toolbox:
 `echo env pwd ls cat write count sleep spin hog bench fs exit esc`), and
@@ -50,7 +60,8 @@ three pkgx `wasip1` bottles — `age` 1.3.2, `go-md2man` 2.0.7, `shfmt`
 
 ```
 page (main thread)          engine worker (GOOS=js)                 container workers
-xterm.js + line editor ───► session: wctr command tree (in-process)
+xterm.js (keys, raw) ─────► console: engine's cli/lineedit + session
+                             session: wctr command tree (in-process)
    ▲  filtered output        └─► API (in-memory transport) ─► daemon
    └──────────────────────────  image store (IndexedDB) ◄─ /v2 mirror (same origin)
                                  browser executor ── one Worker per container ──► guest.wasm
@@ -60,8 +71,11 @@ xterm.js + line editor ───► session: wctr command tree (in-process)
 - **One engine, in a worker.** The engine's daemon, its API (a subset
   compatible with the Docker Engine API) and the `wctr` command tree run in
   one dedicated worker built `GOOS=js`; `wctr` reaches the API through an
-  in-memory transport (a browser has no unix sockets). The page only edits
-  lines and prints.
+  in-memory transport (a browser has no unix sockets). The page only
+  forwards keys and prints: editing, history and completion are the
+  engine's pure-Go line editor (`cli/lineedit`), which completes through the
+  same cobra `__complete` path as `wctr completion bash`, in-process, and is
+  tested natively.
 - **One worker per container.** The guest is compiled once per image
   (`WebAssembly.compile`, cached by digest and memory limit) and posted to a
   fresh worker. Its `wasi_snapshot_preview1` imports block in
