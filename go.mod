@@ -3,7 +3,7 @@ module github.com/go-wasmcontainers/playground
 go 1.27.3
 
 require (
-	github.com/go-wasmcontainers/engine v0.4.1
+	github.com/go-wasmcontainers/engine v0.9.0
 	github.com/klauspost/compress v1.20.0
 	github.com/playwright-community/playwright-go v0.5700.1
 	github.com/spf13/cobra v1.10.2

@@ -141,14 +141,22 @@ Containers are WebAssembly (wasip1) modules; nothing leaves your browser.
 
   wctr pull IMAGE                 fetch an image
   wctr images                     list images
-  wctr run [--rm] [-d] [--name N] [-e K=V] [-w DIR] [-m 64m] IMAGE [ARGS...]
+  wctr run [--rm] [-d] [--name N] [-e K=V] [-w DIR] [-m 64m] [-v VOL:/path[:ro]] IMAGE [ARGS...]
   wctr ps [-a]                    list containers
   wctr logs [-f] CONTAINER        show a container's output
+  wctr start [-a] CONTAINER       run a stopped container again (-a: wait, show its output)
+  wctr stop | restart CONTAINER   stop (at once: wasm has no signals) / restart
+  wctr kill CONTAINER             stop a running container
+  wctr diff CONTAINER             the files it added (A), changed (C), deleted (D)
+  wctr stats [--no-stream]        memory and writes of running containers
   wctr rm [-f] CONTAINER...       remove containers
+  wctr volume create|ls|rm NAME   named volumes, shared by the containers mounting them
   wctr rmi IMAGE...               remove images
   wctr inspect NAME               details, as JSON
-  wctr kill CONTAINER             stop a running container
+  wctr events                     what happens, as it happens (Ctrl-C to stop)
+  wctr system df | prune -f       what is stored, and freeing it
   clear                           clear the screen
+Everything is kept in this browser across reloads; the page works offline.
 Tab completes commands, flags, images and container names; Tab Tab lists
 them. Up/Down and Ctrl-R recall previous lines; Ctrl-A/E, Ctrl-U/K/W edit.
 Ctrl-C interrupts the running command.
