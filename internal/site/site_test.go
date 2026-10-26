@@ -22,7 +22,7 @@ func TestBuildServeVerify(t *testing.T) {
 		t.Fatal(err, log.String())
 	}
 	for _, f := range []string{"index.html", "engine.wasm", "wasm_exec.js", "container-worker.js", "engine-worker.js", "sw.js", "app.js",
-		"vendor/xterm.js", "catalog.json", "v2/library/hello/manifests/latest", ".nojekyll"} {
+		"vendor/xterm.js", "catalog.json", "v2/library/hello/manifests/latest"} {
 		if _, ok := m.Files[f]; !ok {
 			t.Errorf("site lacks %s", f)
 		}

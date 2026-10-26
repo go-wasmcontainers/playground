@@ -175,9 +175,8 @@ func Build(ctx context.Context, o Options) (*Manifest, error) {
 	if err != nil {
 		return nil, err
 	}
-	if err := os.WriteFile(filepath.Join(o.Out, ".nojekyll"), nil, 0o644); err != nil {
-		return nil, err
-	}
+	// No .nojekyll: a site deployed by an Actions workflow is not built by
+	// Jekyll, and Pages does not serve dot-files (a .nojekyll here 404s).
 	// The build id is the hash of everything but index.html, which then
 	// names it on every asset URL, so a cached page asks for matching files.
 	m, err := hashTree(o.Out)
@@ -240,6 +239,11 @@ func hashTree(dir string) (*Manifest, error) {
 		rel = filepath.ToSlash(rel)
 		if rel == "build.json" {
 			return nil
+		}
+		for _, part := range strings.Split(rel, "/") {
+			if strings.HasPrefix(part, ".") {
+				return fmt.Errorf("%s: Pages does not serve dot-files", rel)
+			}
 		}
 		b, err := os.ReadFile(p)
 		if err != nil {
