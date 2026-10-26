@@ -40,9 +40,14 @@ func TestConsole(t *testing.T) {
 		Done:    func(d Done) { s.mu.Lock(); s.done = append(s.done, d); s.mu.Unlock() },
 		Cols:    80,
 		Saved:   []string{"wctr ps"},
+		// A notice names stored containers: through the filter.
+		Notice: []string{"Restored 1 container(s)", "Repaired: x \x1b]52;c;ZXZpbA==\a\nnext"},
 	})
 	if !strings.Contains(s.text(), "Tab completes") || !strings.HasSuffix(s.text(), "\x1b[0m\r\x1b[2C") {
 		t.Fatalf("%q", s.text())
+	}
+	if !strings.Contains(s.text(), "Restored 1 container(s)") || strings.Contains(s.text(), "\x1b]52") || !strings.Contains(s.text(), "x  next") {
+		t.Fatalf("notice: %q", s.text())
 	}
 	c.Input("he\t")
 	wait(t, func() bool { return strings.Contains(s.text(), "help ") })

@@ -177,8 +177,9 @@ func Build(ctx context.Context, o Options) (*Manifest, error) {
 	}
 	// No .nojekyll: a site deployed by an Actions workflow is not built by
 	// Jekyll, and Pages does not serve dot-files (a .nojekyll here 404s).
-	// The build id is the hash of everything but index.html, which then
-	// names it on every asset URL, so a cached page asks for matching files.
+	// The build id is the hash of everything but index.html (sw.js counts
+	// as its template), which then names it on every asset URL, so a cached
+	// page asks for matching files.
 	m, err := hashTree(o.Out)
 	if err != nil {
 		return nil, err
@@ -203,6 +204,33 @@ func Build(ctx context.Context, o Options) (*Manifest, error) {
 	page = bytes.ReplaceAll(page, []byte("{{BUILD}}"), []byte(build))
 	page = bytes.ReplaceAll(page, []byte("{{VERSION}}"), []byte(o.Version))
 	if err := os.WriteFile(idx, page, 0o644); err != nil {
+		return nil, err
+	}
+	// The service worker keeps this build's app shell offline: it names
+	// the build (so a new build is a byte-different worker, which is how a
+	// browser notices it) and lists the files ("" is the page). The image
+	// mirror is not part of the shell: pulled images live in IndexedDB.
+	shell := []string{""}
+	for _, k := range keys {
+		if k != "index.html" && k != "sw.js" && !strings.HasPrefix(k, "v2/") && !strings.HasSuffix(k, ".LICENSE") {
+			if strings.ContainsAny(k, `'\`) { // the list sits in a JS '…' literal
+				return nil, fmt.Errorf("%s: a shell file name may not contain a quote or a backslash", k)
+			}
+			shell = append(shell, k)
+		}
+	}
+	sl, _ := json.Marshal(shell)
+	swp := filepath.Join(o.Out, "sw.js")
+	sw, err := os.ReadFile(swp)
+	if err != nil {
+		return nil, err
+	}
+	if !bytes.Contains(sw, []byte("{{BUILD}}")) || !bytes.Contains(sw, []byte("{{SHELL}}")) {
+		return nil, fmt.Errorf("sw.js lacks its {{BUILD}} or {{SHELL}} placeholder")
+	}
+	sw = bytes.ReplaceAll(sw, []byte("{{BUILD}}"), []byte(build))
+	sw = bytes.ReplaceAll(sw, []byte("{{SHELL}}"), sl) // JSON of plain paths: no quote to escape
+	if err := os.WriteFile(swp, sw, 0o644); err != nil {
 		return nil, err
 	}
 	m, err = hashTree(o.Out)

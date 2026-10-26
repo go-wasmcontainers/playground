@@ -31,6 +31,20 @@ func TestBuildServeVerify(t *testing.T) {
 	if bytes.Contains(page, []byte("{{")) || !bytes.Contains(page, []byte("?v="+m.Build)) {
 		t.Fatal("index.html not stamped with the build")
 	}
+	// The service worker names the build (a new build is a new worker)
+	// and lists the shell: the page and its assets, not the image mirror.
+	sw, _ := os.ReadFile(filepath.Join(out, "sw.js"))
+	if bytes.Contains(sw, []byte("{{")) || !bytes.Contains(sw, []byte(`const BUILD = "`+m.Build+`"`)) {
+		t.Fatal("sw.js not stamped with the build")
+	}
+	for _, want := range []string{`[""`, `"engine.wasm"`, `"app.js"`, `"vendor/xterm.js"`, `"catalog.json"`} {
+		if !bytes.Contains(sw, []byte(want)) {
+			t.Errorf("sw.js shell lacks %s", want)
+		}
+	}
+	if bytes.Contains(sw, []byte(`"v2/`)) || bytes.Contains(sw, []byte(`"sw.js"`)) {
+		t.Error("the shell lists the mirror or the worker itself")
+	}
 	srv := httptest.NewServer(Handler(out, "/playground", true))
 	defer srv.Close()
 	resp, err := http.Get(srv.URL + "/playground/")
