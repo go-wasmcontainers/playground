@@ -1,9 +1,5 @@
 name: ci
 
-# The playground has no code yet, so the only thing to check is what the README
-# says: every https:// URL it names must resolve. Replace this with the build
-# and test jobs when the first code lands; keep the link check.
-
 on:
   push:
     branches: [main]
@@ -14,6 +10,16 @@ permissions:
   contents: read
 
 jobs:
+  actionlint:
+    name: actionlint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - name: actionlint
+        run: |
+          bash <(curl -fsSL https://raw.githubusercontent.com/rhysd/actionlint/main/scripts/download-actionlint.bash)
+          ./actionlint -color
+
   links:
     name: every README link resolves
     runs-on: ubuntu-latest
@@ -32,8 +38,13 @@ jobs:
             case "$u" in
               # Renders whatever it is asked for; proves nothing.
               *img.shields.io*) continue ;;
-              # The documentation is published by go-wasmcontainers/docs.
+              # Published by this repository and go-wasmcontainers/docs.
               *go-wasmcontainers.github.io*) continue ;;
+              # This repository's own workflow pages exist once the workflow
+              # is on main; a PR adding one would otherwise fail on itself.
+              *github.com/go-wasmcontainers/playground/actions/workflows/*) continue ;;
+              # Examples of a local server, not links.
+              *127.0.0.1*|*localhost*) continue ;;
             esac
             code=000
             for _ in 1 2 3; do
@@ -48,3 +59,110 @@ jobs:
             esac
           done <<< "$urls"
           test "$fail" -eq 0 || { echo "::error::at least one link does not resolve"; exit 1; }
+
+  test:
+    name: test (native)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
+        with: { go-version: '1.27.3' }
+      - run: go version
+      - name: gofmt
+        run: |
+          out=$(gofmt -l .)
+          if [ -n "$out" ]; then echo "::error::not gofmt-ed:"; echo "$out"; exit 1; fi
+      - run: go vet ./...
+      - run: GOOS=js GOARCH=wasm go vet ./cmd/engine ./internal/idbstore
+      - name: go test -race, with coverage
+        run: |
+          go test -race -count=1 -coverprofile=cov.out ./...
+          go tool cover -func=cov.out > cov.txt
+          tail -1 cov.txt
+          echo "### Coverage: $(tail -1 cov.txt | tr -s '\t ' ' ')" >> "$GITHUB_STEP_SUMMARY"
+
+  fuzz:
+    name: fuzz smoke ${{ matrix.target }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # Container output is attacker-controlled and reaches xterm.js.
+          - { target: FuzzFilter, pkg: ./internal/termfilter }
+          - { target: FuzzSplit, pkg: ./internal/shell }
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
+        with: { go-version: '1.27.3' }
+      - run: go test -run '^$' -fuzz '^${{ matrix.target }}$' -fuzztime 45s ${{ matrix.pkg }}
+
+  vulns:
+    name: govulncheck, judged by vulngate
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
+        with: { go-version: '1.27.3' }
+      - name: govulncheck, judged by vulngate
+        run: |
+          set -eu
+          go install golang.org/x/vuln/cmd/govulncheck@latest
+          go install github.com/go-fleettools/fleettools/cmd/vulngate@v0.20.1
+          BIN="$(go env GOPATH)/bin"
+          "$BIN/govulncheck" -format json ./... > /tmp/vuln.json || true
+          test -s /tmp/vuln.json || { echo "::error::govulncheck wrote nothing at all"; exit 1; }
+          "$BIN/vulngate" -go "$(go env GOVERSION)" /tmp/vuln.json
+
+  # The interaction itself: type commands into the terminal in Chromium
+  # (service-worker isolation, as on GitHub Pages, and header isolation)
+  # and Firefox, and assert the text and the exit statuses.
+  e2e:
+    name: browsers (Chromium, Firefox)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
+        with: { go-version: '1.27.3' }
+      # Node 26 hangs after unpacking a browser (seen locally); 22 does not.
+      - uses: actions/setup-node@v7
+        with: { node-version: 22 }
+      - run: go version && node --version
+      - name: Playwright driver and browsers
+        run: |
+          echo "PLAYWRIGHT_DRIVER_PATH=$RUNNER_TEMP/pwdriver" >> "$GITHUB_ENV"
+          echo "PLAYWRIGHT_NODEJS_PATH=$(command -v node)" >> "$GITHUB_ENV"
+          go run ./cmd/site playwright-driver --dir "$RUNNER_TEMP/pwdriver"
+          PLAYWRIGHT_DRIVER_PATH="$RUNNER_TEMP/pwdriver" PLAYWRIGHT_NODEJS_PATH="$(command -v node)" \
+            go run github.com/playwright-community/playwright-go/cmd/playwright install --with-deps chromium firefox
+      - name: go test -tags e2e
+        env:
+          E2E_PKGX: "1"
+          E2E_REPORT: ${{ runner.temp }}/e2e.json
+        run: go test -tags e2e -count=1 -v -timeout 25m ./e2e/ > "$RUNNER_TEMP/e2e.log" 2>&1; status=$?; tail -150 "$RUNNER_TEMP/e2e.log"; exit $status
+      - name: measurements
+        if: always()
+        run: |
+          { echo '### Browser measurements'; echo '```json'; cat "$RUNNER_TEMP/e2e.json" 2>/dev/null || echo 'none'; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: e2e
+          path: |
+            ${{ runner.temp }}/e2e.json
+            ${{ runner.temp }}/e2e.log
+
+  # The same images natively, for comparison: wazero through the engine,
+  # and wasmtime.
+  perf:
+    name: native start times (wazero, wasmtime)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
+        with: { go-version: '1.27.3' }
+      - uses: bytecodealliance/actions/wasmtime/setup@v1
+      - run: wasmtime --version
+      - name: go test -tags perf
+        run: go test -tags perf -count=1 -v ./perf/ > "$RUNNER_TEMP/perf.log" 2>&1; status=$?; tail -40 "$RUNNER_TEMP/perf.log"; grep '^    perf_test' "$RUNNER_TEMP/perf.log" >> "$GITHUB_STEP_SUMMARY" || true; exit $status
