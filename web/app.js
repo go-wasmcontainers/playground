@@ -180,6 +180,135 @@
       (err) => say("the dashboard failed to load: " + err),
     );
   }
+  // Join class. The relay's origin (not a secret) is remembered in
+  // localStorage; the engine worker is started with it in its URL, and the
+  // service worker extends that worker's CSP connect-src to it, and only
+  // it. The join code is typed into a password field, posted to the worker
+  // once, and cleared: it is never stored, logged, put in a URL or in the
+  // history. "Leave class" deletes the session token (IndexedDB) and the
+  // remembered relay.
+  const RKEY = "wctr-relay";
+  const RELAY_RE = /^https:\/\/([a-z0-9.-]{1,253}|\[[0-9a-f:]{2,39}\])(:[0-9]{1,5})?$/;
+  const relayOrigin = (s) => {
+    try {
+      const u = new URL(String(s).trim());
+      if (u.protocol !== "https:" || u.username || u.password || u.search || u.hash || (u.pathname !== "/" && u.pathname !== "")) return "";
+      const o = "https://" + u.host.toLowerCase();
+      return RELAY_RE.test(o) ? o : "";
+    } catch (e) {
+      return "";
+    }
+  };
+  let relay = "";
+  try {
+    relay = relayOrigin(localStorage.getItem(RKEY) || "");
+  } catch (e) {
+    relay = "";
+  }
+  state.class = { state: "none", relay };
+  const $ = (id) => document.getElementById(id);
+  const dlg = $("joindlg");
+  const showClass = () => {
+    const c = state.class;
+    const info = $("classinfo");
+    $("joinbtn").hidden = c.state === "joined";
+    if (c.state === "joined") {
+      info.textContent = "class: you are " + c.label + (c.domain ? "." + c.domain : "") + " on " + c.relay + " (run --network class) ";
+      const b = document.createElement("button");
+      b.textContent = "Leave class";
+      b.id = "leavebtn";
+      b.addEventListener("click", () => engine && engine.postMessage({ t: "leave" }));
+      info.appendChild(b);
+      info.hidden = false;
+    } else {
+      info.hidden = true;
+    }
+  };
+  const joinErr = (s) => {
+    $("joinerr").textContent = s;
+    $("joinerr").hidden = !s;
+  };
+  const openJoin = () => {
+    joinErr("");
+    $("joinstep1").hidden = !!relay;
+    $("joinstep2").hidden = !relay;
+    $("relayshown").textContent = relay;
+    $("joinok").textContent = relay ? "Join" : "Continue";
+    if (!dlg.open) dlg.showModal();
+    (relay ? $("joinname") : $("relay")).focus();
+  };
+  $("joinbtn").addEventListener("click", openJoin);
+  $("joincancel").addEventListener("click", () => {
+    $("joincode").value = "";
+    dlg.close();
+  });
+  $("relaychange").addEventListener("click", () => {
+    try {
+      localStorage.removeItem(RKEY);
+    } catch (e) {}
+    sessionStorage.setItem("wctr-join-open", "1");
+    location.reload();
+  });
+  $("joinform").addEventListener("submit", (e) => {
+    e.preventDefault();
+    if (!relay) {
+      const o = relayOrigin($("relay").value);
+      if (!o) {
+        joinErr("Enter the relay's address as https://host[:port] (https only).");
+        return;
+      }
+      try {
+        localStorage.setItem(RKEY, o);
+      } catch (err) {
+        joinErr("This browser does not let the page remember the relay.");
+        return;
+      }
+      // Reopen the dialog after the reload, for the name and the code.
+      sessionStorage.setItem("wctr-join-open", "1");
+      location.reload();
+      return;
+    }
+    const code = $("joincode").value;
+    $("joincode").value = ""; // the code leaves the page's fields at once
+    if (!engine || !state.ready) {
+      joinErr("The engine is not running in this tab.");
+      return;
+    }
+    joinErr("");
+    $("joinok").disabled = true;
+    engine.postMessage({ t: "join", code, name: $("joinname").value });
+  });
+  if (sessionStorage.getItem("wctr-join-open") === "1") {
+    sessionStorage.removeItem("wctr-join-open");
+    setTimeout(openJoin, 0);
+  }
+  const onClass = (m) => {
+    $("joinok").disabled = false;
+    if (m.state === "joined") {
+      state.class = { state: "joined", relay: m.relay, label: m.label, domain: m.domain, network: m.network, subnet: m.subnet };
+      if (dlg.open) dlg.close();
+    } else if (m.state === "left") {
+      state.class = { state: "left", relay: "" };
+      try {
+        localStorage.removeItem(RKEY);
+      } catch (e) {}
+      relay = "";
+      tell("You left the class. The page will no longer connect to that relay after a reload.", "OK", untell);
+    } else {
+      state.class = { state: "error", relay, error: m.error };
+      if (dlg.open) {
+        joinErr(m.error);
+      } else {
+        tell("Class: " + m.error, "Join again", () => {
+          untell();
+          openJoin();
+        });
+      }
+    }
+    showClass();
+  };
+  showClass();
+
   function start() {
     state.owner = true;
     untell();
@@ -187,7 +316,8 @@
     // ?codecache=1 on the page turns the compiled-module cache on (off by
     // default: measured, it does not pay; see cmd/engine).
     const cc = /[?&]codecache=1\b/.test(location.search) ? "&codecache=1" : "";
-    engine = new Worker("engine-worker.js?v=" + build + cc);
+    const rp = relay ? "&relay=" + encodeURIComponent(relay) : "";
+    engine = new Worker("engine-worker.js?v=" + build + cc + rp);
     window.__wctrEngine = engine;
     window.__wctrBuild = build;
     // The dashboard's bridge listens on the worker too (addEventListener);
@@ -212,6 +342,9 @@
           } else {
             engine.postMessage({ t: "init", history: saved, cols: term.cols });
           }
+          break;
+        case "class":
+          onClass(m);
           break;
         case "write":
           term.write(m.data);

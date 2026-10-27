@@ -17,6 +17,23 @@
   <span id="notice" role="status" hidden></span>
   <nav><a id="switch" href="?ui=terminal">terminal only</a> · <a href="https://go-wasmcontainers.github.io/docs/" rel="noopener">docs</a> · <a href="https://github.com/go-wasmcontainers/playground" rel="noopener">source</a></nav>
 </header>
+<div id="classbar"><button id="joinbtn" type="button">Join class</button><span id="classinfo" hidden></span></div>
+<dialog id="joindlg" aria-labelledby="jointitle">
+  <form id="joinform" method="dialog" autocomplete="off">
+    <h2 id="jointitle">Join a class</h2>
+    <div id="joinstep1">
+      <p>Your teacher gives you the relay's address. The page reloads once to allow that address, and only it.</p>
+      <label>Relay <input id="relay" type="url" inputmode="url" placeholder="https://relay.example:8443" spellcheck="false" autocomplete="off"></label>
+    </div>
+    <div id="joinstep2" hidden>
+      <p>Relay: <code id="relayshown"></code> <button id="relaychange" type="button">change</button></p>
+      <label>Your name <input id="joinname" maxlength="64" autocomplete="off" spellcheck="false"></label>
+      <label>Join code <input id="joincode" type="password" maxlength="64" autocomplete="off" spellcheck="false"></label>
+    </div>
+    <p id="joinerr" role="alert" hidden></p>
+    <menu><button id="joincancel" type="button">Cancel</button> <button id="joinok" type="submit">Continue</button></menu>
+  </form>
+</dialog>
 <main><div id="terminal" data-build="{{BUILD}}" data-version="{{VERSION}}"></div></main>
 <canvas id="screen" tabindex="0" aria-label="wctr dashboard: containers, images, volumes and a wctr terminal"></canvas>
 <noscript>The playground runs in your browser and needs JavaScript and WebAssembly.</noscript>

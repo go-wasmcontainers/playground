@@ -60,6 +60,56 @@ main {
 #screen {
   display: none;
 }
+/* Join class: a line under the header; over the dashboard, a chip at the
+   bottom left (the dashboard will get its own Network view). */
+#classbar {
+  display: flex;
+  gap: 0.8em;
+  padding: 4px 16px;
+  color: var(--muted);
+}
+#classbar button, #classinfo button {
+  font: inherit;
+  color: var(--accent);
+  background: none;
+  border: 0;
+  padding: 0;
+  cursor: pointer;
+  text-decoration: underline;
+}
+body.dash #classbar {
+  position: fixed;
+  z-index: 1;
+  left: 12px;
+  bottom: 12px;
+  background: rgba(15, 20, 25, 0.92);
+  border: 1px solid #253340;
+  border-radius: 6px;
+}
+#classinfo[hidden], #joinerr[hidden], #joinstep1[hidden], #joinstep2[hidden] {
+  display: none;
+}
+#joindlg {
+  background: var(--bg);
+  color: var(--fg);
+  border: 1px solid #253340;
+  border-radius: 6px;
+  max-width: min(32em, calc(100vw - 32px));
+}
+#joindlg label {
+  display: block;
+  margin: 0.6em 0;
+}
+#joindlg input {
+  display: block;
+  width: 100%;
+  box-sizing: border-box;
+  font: inherit;
+  margin-top: 0.2em;
+}
+#joinerr {
+  color: #f07178;
+}
 
 /* The dashboard (the default UI): the canvas fills the viewport from its
    top-left corner (its controls are addressed in canvas pixels); the

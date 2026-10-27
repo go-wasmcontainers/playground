@@ -12,9 +12,11 @@ import (
 	"io"
 	"io/fs"
 	"net/http"
+	"net/url"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"runtime"
 	"sort"
 	"strings"
@@ -297,6 +299,29 @@ func hashTree(dir string) (*Manifest, error) {
 const CSP = "default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; " +
 	"connect-src 'self'; worker-src 'self'; img-src 'self' data:; object-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'"
 
+// relayRE is the relay origin the engine worker may connect to: what
+// class.Origin returns (https, a host, an optional port), nothing more —
+// it is spliced into a CSP header, so nothing that could end a source
+// expression may pass.
+var relayRE = regexp.MustCompile(`^https://([a-z0-9.-]{1,253}|\[[0-9a-f:]{2,39}\])(:[0-9]{1,5})?$`)
+
+// CSPFor is the CSP of a response: CSP, except for the engine worker
+// started for a class (engine-worker.js?relay=https://host[:port]), whose
+// connect-src adds that one relay (https for joining, wss for the data
+// channel). A worker takes its CSP from its own response; the page keeps
+// 'self' only. web/sw.js applies the same rule.
+func CSPFor(u *url.URL) string {
+	if !strings.HasSuffix(u.Path, "/engine-worker.js") {
+		return CSP
+	}
+	r := u.Query().Get("relay")
+	if !relayRE.MatchString(r) {
+		return CSP
+	}
+	host := strings.TrimPrefix(r, "https://")
+	return strings.Replace(CSP, "connect-src 'self'", "connect-src 'self' https://"+host+" wss://"+host, 1)
+}
+
 // Handler serves dir under prefix like GitHub Pages; with isolate it also
 // sends the COOP/COEP/CORP and CSP headers the service worker otherwise
 // adds (Firefox under automation does not run service workers).
@@ -312,7 +337,7 @@ func Handler(dir, prefix string, isolate bool) http.Handler {
 			w.Header().Set("Cross-Origin-Opener-Policy", "same-origin")
 			w.Header().Set("Cross-Origin-Embedder-Policy", "require-corp")
 			w.Header().Set("Cross-Origin-Resource-Policy", "same-origin")
-			w.Header().Set("Content-Security-Policy", CSP)
+			w.Header().Set("Content-Security-Policy", CSPFor(r.URL))
 		}
 		w.Header().Set("Cache-Control", "max-age=600")
 		r2 := r.Clone(r.Context())

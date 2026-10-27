@@ -16,8 +16,11 @@
 package main
 
 import (
+	"context"
+	"errors"
 	"fmt"
 	"net/http"
+	"net/url"
 	"strings"
 	"syscall/js"
 	"time"
@@ -34,6 +37,7 @@ import (
 
 	"github.com/go-wasmcontainers/dashboard/bridge"
 
+	"github.com/go-wasmcontainers/playground/internal/class"
 	"github.com/go-wasmcontainers/playground/internal/console"
 	"github.com/go-wasmcontainers/playground/internal/idbstore"
 	"github.com/go-wasmcontainers/playground/internal/session"
@@ -139,6 +143,33 @@ func main() {
 		Images:  session.FetchCatalog(base + "catalog.json" + v),
 	}
 
+	// Join class: the relay origin is in this worker's URL (relay=...; the
+	// service worker allowed exactly that origin in this worker's CSP).
+	cls := &class.Class{Store: store, Nets: d.Networks(), HTTP: &http.Client{}}
+	relay := ""
+	if q, err := url.ParseQuery(strings.TrimPrefix(js.Global().Get("location").Get("search").String(), "?")); err == nil && q.Get("relay") != "" {
+		if o, err := class.Origin(q.Get("relay")); err == nil {
+			relay = o
+		}
+	}
+	postClass := func(st class.Status, err error) {
+		m := map[string]any{"t": "class", "state": st.State, "relay": st.Relay, "label": st.Label, "domain": st.Domain, "network": st.Network, "subnet": st.Subnet}
+		if err != nil {
+			m["state"], m["error"] = "error", err.Error()
+		}
+		post(m)
+	}
+	if relay != "" {
+		go func() {
+			ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+			defer cancel()
+			st, ok, err := cls.Resume(ctx, relay)
+			if ok || err != nil {
+				postClass(st, err)
+			}
+		}()
+	}
+
 	// The callback only copies the message and hands it on: a js.FuncOf
 	// callback must never block (completion may wait on IndexedDB, which
 	// needs this very event loop).
@@ -187,6 +218,24 @@ func main() {
 				n := cols(data)
 				go con.Resize(n)
 			}
+		case "join":
+			// The code is used once, here, and never stored nor logged.
+			code, name := str(data, "code"), str(data, "name")
+			go func() {
+				ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+				defer cancel()
+				if relay == "" {
+					postClass(class.Status{}, errors.New("this engine was started without a relay address"))
+					return
+				}
+				st, err := cls.Join(ctx, relay, code, name)
+				postClass(st, err)
+			}()
+		case "leave":
+			go func() {
+				st, err := cls.Leave()
+				postClass(st, err)
+			}()
 		}
 		return nil
 	}))
@@ -194,6 +243,19 @@ func main() {
 	post(map[string]any{"t": "ready", "version": version, "storage": storage,
 		"restored": r.Restored - len(r.Removed), "stopped": r.Stopped, "repaired": len(r.Repaired)})
 	select {}
+}
+
+// str reads a bounded string field of a message.
+func str(data js.Value, name string) string {
+	v := data.Get(name)
+	if v.Type() != js.TypeString {
+		return ""
+	}
+	s := v.String()
+	if len(s) > 256 {
+		return ""
+	}
+	return s
 }
 
 // cols reads a terminal width, bounded.
