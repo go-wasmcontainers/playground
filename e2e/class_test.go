@@ -11,6 +11,7 @@ import (
 	"net/netip"
 	"os"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -104,8 +105,31 @@ func classSession(t *testing.T, pw *playwright.Playwright, browserName, mode str
 		t.Fatal(err)
 	}
 	b := tab{t, page, browserName + "/" + mode + " (class)"}
-	var console []string
+	var console, wconsole []string
 	page.On("console", func(m playwright.ConsoleMessage) { console = append(console, m.Text()) })
+	// The engine worker's own console (a CSP block is reported there).
+	var mu sync.Mutex
+	var workers []playwright.Worker
+	page.OnWorker(func(w playwright.Worker) {
+		mu.Lock()
+		workers = append(workers, w)
+		mu.Unlock()
+		w.OnConsole(func(m playwright.ConsoleMessage) {
+			mu.Lock()
+			wconsole = append(wconsole, m.Text())
+			mu.Unlock()
+		})
+	})
+	engineWorker := func() playwright.Worker {
+		mu.Lock()
+		defer mu.Unlock()
+		for i := len(workers) - 1; i >= 0; i-- {
+			if strings.Contains(workers[i].URL(), "engine-worker.js") {
+				return workers[i]
+			}
+		}
+		return nil
+	}
 	if _, err := page.Goto(url + "?ui=terminal"); err != nil {
 		t.Fatal(err)
 	}
@@ -136,7 +160,7 @@ func classSession(t *testing.T, pw *playwright.Playwright, browserName, mode str
 		if s, _ := st.(string); strings.Contains(s, `"state":"joined"`) {
 			break
 		} else if time.Now().After(deadline) || strings.Contains(s, `"state":"error"`) {
-			t.Fatalf("%s: not joined: %s\nconsole: %q", b.who, s, console)
+			t.Fatalf("%s: not joined: %s\nworker probe: %s\npage console: %q\nworker console: %q", b.who, s, probeWorker(engineWorker(), pub.URL), console, wconsole)
 		}
 		time.Sleep(50 * time.Millisecond)
 	}
@@ -201,6 +225,27 @@ func classSession(t *testing.T, pw *playwright.Playwright, browserName, mode str
 	if v := b.eval(`() => localStorage.getItem("wctr-relay")`); v != nil {
 		t.Fatalf("%s: relay remembered after leaving: %v", b.who, v)
 	}
+}
+
+// probeWorker tells a CSP block from a TLS failure, from inside the engine
+// worker: it fetches the relay and listens for a CSP violation. A violation
+// event means connect-src refused it; a NetworkError without one means the
+// connection itself failed (an untrusted certificate, typically).
+func probeWorker(w playwright.Worker, relay string) string {
+	if w == nil {
+		return "no engine worker seen"
+	}
+	v, err := w.Evaluate(`async (relay) => {
+	  const out = { url: self.location.href };
+	  self.addEventListener("securitypolicyviolation", (e) => { out.csp = e.violatedDirective + " blocked " + e.blockedURI; });
+	  try { const r = await fetch(relay + "/", { mode: "cors" }); out.status = r.status; } catch (e) { out.fetch = String(e); }
+	  await new Promise((r) => setTimeout(r, 300));
+	  return JSON.stringify(out);
+	}`, relay)
+	if err != nil {
+		return "probe: " + err.Error()
+	}
+	return fmt.Sprint(v)
 }
 
 func nativeSession(t *testing.T, r *relay.Relay, code, name string) *driver.Session {
