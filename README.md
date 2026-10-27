@@ -135,7 +135,7 @@ trip, ~40–100 µs). Larger reads per call are the open item.
 
 **Join class.** With a teacher's
 [relay](https://github.com/go-wasmcontainers/relay), the page joins the
-class network: "Join class", the relay's address (`https://` only; the
+class network: "Join class", the relay's address (https only; the
 page reloads once), your name and the join code. A `class` network then
 appears (`wctr run --network class …`): your containers get the class's
 addresses and names (`web.<you>.<domain>`), reach your classmates' under

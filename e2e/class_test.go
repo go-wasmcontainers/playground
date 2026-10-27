@@ -131,7 +131,15 @@ func classSession(t *testing.T, pw *playwright.Playwright, browserName, mode str
 	must(page.Locator("#joincode").Fill(class.JoinCode))
 	t0 := time.Now()
 	must(page.Locator("#joinok").Click())
-	b.until("joined", `() => window.__playground.state.class.state === "joined"`, 30*time.Second)
+	for deadline := time.Now().Add(30 * time.Second); ; {
+		st, _ := page.Evaluate(`() => JSON.stringify(window.__playground.state.class)`)
+		if s, _ := st.(string); strings.Contains(s, `"state":"joined"`) {
+			break
+		} else if time.Now().After(deadline) || strings.Contains(s, `"state":"error"`) {
+			t.Fatalf("%s: not joined: %s\nconsole: %q", b.who, s, console)
+		}
+		time.Sleep(50 * time.Millisecond)
+	}
 	joinMs := time.Since(t0).Milliseconds()
 	var label string
 	label, _ = b.eval(`() => window.__playground.state.class.label`).(string)
