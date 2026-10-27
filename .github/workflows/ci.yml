@@ -94,6 +94,8 @@ jobs:
           - { target: FuzzFilter, pkg: ./internal/termfilter }
           # catalog.json, read by the engine worker and the dashboard.
           - { target: FuzzParseCatalog, pkg: ./internal/session }
+          # A relay origin typed by a learner, spliced into a CSP header.
+          - { target: FuzzCSPFor, pkg: ./internal/site }
           # Typed lines and keys are parsed by the engine's cli/lineedit,
           # fuzzed there (FuzzEditor, FuzzSplitPartial).
     steps:
