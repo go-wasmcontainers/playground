@@ -3,10 +3,10 @@ module github.com/go-wasmcontainers/playground
 go 1.27.3
 
 require (
-	github.com/go-wasmcontainers/dashboard v0.3.0
+	github.com/go-wasmcontainers/dashboard v0.4.1
 	github.com/go-wasmcontainers/engine v0.10.0
 	github.com/go-widgets/mvvm v0.15.0
-	github.com/go-widgets/webcanvas v0.4.1
+	github.com/go-widgets/webcanvas v0.5.0
 	github.com/klauspost/compress v1.20.0
 	github.com/playwright-community/playwright-go v0.5700.1
 	github.com/spf13/cobra v1.10.2
@@ -36,7 +36,7 @@ require (
 	github.com/go-stack/stack v1.8.1 // indirect
 	github.com/go-typeset/bidi v0.3.1 // indirect
 	github.com/go-widgets/painter v0.16.0 // indirect
-	github.com/go-widgets/toolkit v0.342.0 // indirect
+	github.com/go-widgets/toolkit v0.344.0 // indirect
 	github.com/inconshreveable/mousetrap v1.1.0 // indirect
 	github.com/sergeymakinen/go-bmp v1.0.0 // indirect
 	github.com/sergeymakinen/go-ico v1.0.0 // indirect

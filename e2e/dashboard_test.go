@@ -77,7 +77,18 @@ func (d dash) click(name string) {
 	if !ok {
 		d.t.Fatalf("%s: no %s on screen", d.who, name)
 	}
-	if err := d.page.Mouse().Click(float64(b.X+b.W/2), float64(b.Y+b.H/2)); err != nil {
+	// Boxes are in the canvas's backing-store pixels (dashboard v0.4.1:
+	// CSS px × devicePixelRatio); the mouse moves in CSS px.
+	dpr := 1.0
+	if v, err := d.page.Evaluate(`() => window.devicePixelRatio`); err == nil {
+		switch x := v.(type) {
+		case float64:
+			dpr = x
+		case int:
+			dpr = float64(x)
+		}
+	}
+	if err := d.page.Mouse().Click(float64(b.X+b.W/2)/dpr, float64(b.Y+b.H/2)/dpr); err != nil {
 		d.t.Fatal(err)
 	}
 }
@@ -144,7 +155,13 @@ type DashReport struct {
 func dashboard(t *testing.T, pw *playwright.Playwright, browserName, mode string) DashReport {
 	url := os.Getenv("E2E_URL")
 	if mode != "live" {
-		url, _ = serveCopy(t, mode == "headers")
+		url, _ = serveCopy(t, strings.HasPrefix(mode, "headers"))
+	}
+	// headers-dpr2: a HiDPI screen (the canvas's backing store is CSS px ×
+	// devicePixelRatio; clicks at the reported boxes must still land).
+	scale := 1.0
+	if strings.HasSuffix(mode, "-dpr2") {
+		scale = 2
 	}
 	bt := pw.Chromium
 	if browserName == "firefox" {
@@ -155,7 +172,7 @@ func dashboard(t *testing.T, pw *playwright.Playwright, browserName, mode string
 		t.Fatalf("launch %s: %v", browserName, err)
 	}
 	defer browser.Close()
-	ctx, err := browser.NewContext(playwright.BrowserNewContextOptions{Viewport: &playwright.Size{Width: 1280, Height: 800}})
+	ctx, err := browser.NewContext(playwright.BrowserNewContextOptions{Viewport: &playwright.Size{Width: 1280, Height: 800}, DeviceScaleFactor: playwright.Float(scale)})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -256,6 +273,7 @@ func TestDashboard(t *testing.T) {
 	cases := []struct{ browser, mode string }{
 		{"chromium", "service-worker"},
 		{"chromium", "headers"},
+		{"chromium", "headers-dpr2"},
 		{"firefox", "headers"},
 	}
 	if os.Getenv("E2E_URL") != "" {
