@@ -45,6 +45,8 @@ jobs:
               *github.com/go-wasmcontainers/playground/actions/workflows/*) continue ;;
               # Examples of a local server, not links.
               *127.0.0.1*|*localhost*) continue ;;
+              # Containers' names on a playground network (http://web/…).
+              http://web/*|http://web.*) continue ;;
             esac
             code=000
             for _ in 1 2 3; do
