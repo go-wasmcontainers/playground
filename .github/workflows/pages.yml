@@ -23,15 +23,19 @@ jobs:
       - uses: actions/setup-go@v7
         with: { go-version: '1.27.3' }
       - run: go version
-      - name: build the site
+      - name: build the site (outside the checkout)
         run: |
           version=$(go list -m -f '{{.Version}}' github.com/go-wasmcontainers/engine)
-          go run ./cmd/site build --out _site --pkgx --version "$version"
-          ls -la _site
+          go run ./cmd/site build --out "$RUNNER_TEMP/_site" --pkgx --version "$version"
+          ls -la "$RUNNER_TEMP/_site"
+      - name: the checkout is unchanged (the wasm binaries are stamped vcs.modified=false)
+        run: |
+          git status --porcelain --untracked-files=all > "$RUNNER_TEMP/status.txt"
+          if [ -s "$RUNNER_TEMP/status.txt" ]; then cat "$RUNNER_TEMP/status.txt"; echo "::error::the build changed the checkout"; exit 1; fi
       - uses: actions/upload-pages-artifact@v5
-        with: { path: _site }
+        with: { path: "${{ runner.temp }}/_site" }
       - uses: actions/upload-artifact@v7
-        with: { name: build-manifest, path: _site/build.json }
+        with: { name: build-manifest, path: "${{ runner.temp }}/_site/build.json" }
 
   deploy:
     needs: build
