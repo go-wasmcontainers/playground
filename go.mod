@@ -3,9 +3,9 @@ module github.com/go-wasmcontainers/playground
 go 1.27.3
 
 require (
-	github.com/go-wasmcontainers/dashboard v0.4.2
+	github.com/go-wasmcontainers/dashboard v0.5.0
 	github.com/go-wasmcontainers/engine v0.11.0
-	github.com/go-wasmcontainers/relay v0.2.1
+	github.com/go-wasmcontainers/relay v0.3.0
 	github.com/go-widgets/mvvm v0.15.0
 	github.com/go-widgets/webcanvas v0.5.0
 	github.com/klauspost/compress v1.20.0
@@ -16,6 +16,7 @@ require (
 
 require (
 	connectrpc.com/connect/v2 v2.0.2 // indirect
+	connectrpc.com/cors v0.1.0 // indirect
 	github.com/coder/websocket v1.8.15 // indirect
 	github.com/deckarep/golang-set/v2 v2.8.0 // indirect
 	github.com/docker/go-units v0.5.0 // indirect
@@ -33,7 +34,7 @@ require (
 	github.com/go-stack/stack v1.8.1 // indirect
 	github.com/go-typeset/bidi v0.3.1 // indirect
 	github.com/go-widgets/painter v0.16.0 // indirect
-	github.com/go-widgets/toolkit v0.345.1 // indirect
+	github.com/go-widgets/toolkit v0.345.2 // indirect
 	github.com/inconshreveable/mousetrap v1.1.0 // indirect
 	github.com/spf13/pflag v1.0.10 // indirect
 	github.com/tetratelabs/wazero v1.12.0 // indirect

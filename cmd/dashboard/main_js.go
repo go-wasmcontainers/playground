@@ -73,6 +73,7 @@ func main() {
 	app.Terminal.SetShell(sessionShell{sess}, sess.Completer())
 	w, h := g.Get("innerWidth").Int(), g.Get("innerHeight").Int()
 	scene = ui.New(app, q, w, h)
+	connectClass(g, worker, app, q)
 
 	g.Set("__dashboard", map[string]any{
 		"version": version,

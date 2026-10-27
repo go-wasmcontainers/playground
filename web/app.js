@@ -191,7 +191,7 @@
   const RELAY_RE = /^https:\/\/([a-z0-9.-]{1,253}|\[[0-9a-f:]{2,39}\])(:[0-9]{1,5})?$/;
   const relayOrigin = (s) => {
     try {
-      const u = new URL(String(s).trim());
+      const u = new URL(String(s).trim().replace(/^wss:\/\//i, "https://")); // wss://host names the same relay
       if (u.protocol !== "https:" || u.username || u.password || u.search || u.hash || (u.pathname !== "/" && u.pathname !== "")) return "";
       const o = "https://" + u.host.toLowerCase();
       return RELAY_RE.test(o) ? o : "";
@@ -282,7 +282,9 @@
     sessionStorage.removeItem("wctr-join-open");
     setTimeout(openJoin, 0);
   }
+  let lastClass = null;
   const onClass = (m) => {
+    lastClass = { t: "class", state: m.state, relay: m.relay, label: m.label, domain: m.domain, network: m.network, subnet: m.subnet, error: m.error };
     $("joinok").disabled = false;
     if (m.state === "joined") {
       state.class = { state: "joined", relay: m.relay, label: m.label, domain: m.domain, network: m.network, subnet: m.subnet };
@@ -308,6 +310,34 @@
     showClass();
   };
   showClass();
+  // The dashboard's side of "Join class" (go-wasmcontainers/dashboard
+  // v0.5.0, README "Join class"): it reads the relay, asks for another one
+  // through useRelay (stored, then the page reloads so the engine worker
+  // starts with that origin in its CSP; "" forgets it), reads the worker's
+  // last {t:"class"} report through status(), and posts {t:"join", code,
+  // name} and {t:"leave"} to window.__wctrEngine itself.
+  window.__wctrClass = {
+    relay,
+    useRelay(origin) {
+      const o = origin ? relayOrigin(origin) : "";
+      if (origin && !o) {
+        throw new Error("a relay is https://host[:port]");
+      }
+      try {
+        if (o) {
+          localStorage.setItem(RKEY, o);
+        } else {
+          localStorage.removeItem(RKEY);
+        }
+      } catch (e) {
+        throw new Error("this browser does not let the page remember the relay");
+      }
+      location.reload();
+    },
+    status() {
+      return lastClass;
+    },
+  };
 
   function start() {
     state.owner = true;
