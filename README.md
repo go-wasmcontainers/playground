@@ -153,9 +153,16 @@ session.
 - The relay's certificate must be one the browser trusts: a publicly
   trusted one (`wctr-relay serve --tls acme`), or the classroom CA
   (`wctr-relay ca export`) installed in the browser or the system. A page
-  cannot pin a CA itself. The relay must also allow the playground's origin
-  (`--origin`) and answer its CORS preflight (the e2e stands in for that
-  until the relay does).
+  cannot pin a CA itself; Firefox keeps its own certificate store, so
+  there the classroom CA goes in Firefox's settings (or an enterprise
+  policy), not only the system's. The relay must also allow the
+  playground's origin (`--origin`) and answer its CORS preflight for the
+  join calls, allowing `Content-Type`, `Connect-Protocol-Version`,
+  `Connect-Timeout-Ms` and `User-Agent` — Firefox sends the Connect
+  client's `User-Agent` (Chromium drops it), so a preflight without it
+  fails in Firefox only, as a bare "NetworkError" (measured: the same
+  worker's plain GET to the relay succeeded, with no CSP violation). The
+  e2e stands in for the relay's CORS until the relay has it.
 
 **Planned: `-p` in the browser.** `wctr run -p 8080:80 net serve` would
 make the service worker route `/playground/port/8080/…` to the container's

@@ -34,7 +34,9 @@ func cors(origin string, h http.Handler) http.Handler {
 			w.Header().Set("Vary", "Origin")
 			if r.Method == http.MethodOptions {
 				w.Header().Set("Access-Control-Allow-Methods", "POST")
-				w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Connect-Protocol-Version, Connect-Timeout-Ms")
+				// User-Agent too: the Connect client sets it, Chromium drops
+				// it, Firefox sends it, so its preflight asks for it.
+				w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Connect-Protocol-Version, Connect-Timeout-Ms, User-Agent")
 				w.WriteHeader(http.StatusNoContent)
 				return
 			}
