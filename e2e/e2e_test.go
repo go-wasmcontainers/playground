@@ -161,6 +161,11 @@ func session(t *testing.T, pw *playwright.Playwright, browserName, mode string) 
 		{"wctr run --rm nosuch", 125, []string{"Unable to find image"}},
 		{"docker ps", 127, []string{"wctr"}},
 		{`wctr run --rm lab esc '\e]52;c;ZXZpbA==\asafe \e]8;;javascript:alert(1)\e\link\e]8;;\e\ \e[6n\e[31mred'`, 0, []string{"safe link red"}},
+		// wasi-nn on the CPU backend (a host module beside
+		// wasi_snapshot_preview1, through the container worker's typed
+		// imports); no GPU backend in the browser yet, and it says so.
+		{"wctr run --rm mnist", 0, []string{"digit 7 (p=1.000)"}},
+		{"wctr run --rm mnist gpu", 1, []string{"unsupported operation"}},
 	}
 	// Networking: two containers by name on the default bridge, UDP, the
 	// network's DNS, and a measurement (the browser's socket wait path).

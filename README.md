@@ -82,8 +82,16 @@ compiling a 2.8 MB module from Cache Storage with `compileStreaming` takes
 (`?codecache=1` turns it on).
 
 Images: `hello`, `greet` (a CNCF wasm OCI artifact), `lab` (a toolbox:
-`echo env pwd ls cat write count sleep spin hog bench fs exit esc`), and
-pkgx `wasip1` bottles taken from `ghcr.io/go-pkgx/packages` at build time:
+`echo env pwd ls cat write count sleep spin hog bench fs exit esc`),
+`mnist` (reads a handwritten digit with **wasi-nn**: `wctr run --rm mnist`
+prints `digit 7 (p=1.000)`, in about 80 ms in Chromium; the engine worker
+serves `wasi_ephemeral_nn` with the pure-Go CPU backend of
+[go-wasmcontainers/gpu](https://github.com/go-wasmcontainers/gpu) v0.2.0,
+and `mnist gpu` fails with "unsupported operation" until a WebGPU backend
+lands. The model is MNIST-12 from the ONNX Model Zoo (MIT); the picture is
+picture 0 of the MNIST test set by Y. LeCun, C. Cortes and C. J. C. Burges
+(CC BY-SA 3.0). The image carries both notices at
+`/usr/share/doc/mnist/NOTICE`), and pkgx `wasip1` bottles taken from `ghcr.io/go-pkgx/packages` at build time:
 the Go ones `age` 1.3.2, `go-md2man` 2.0.7, `shfmt` 3.14.1, and the C ones
 `lua` 5.4.9, `sqlite3` 3.53.4 and `minigzip` (zlib 1.3.2), whose layers are
 `tar+zstd`, served as published. lua raises its errors with WebAssembly
