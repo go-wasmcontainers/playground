@@ -134,7 +134,7 @@ jobs:
         with: { go-version: '1.27.3' }
       # Node 26 hangs after unpacking a browser (seen locally); 22 does not.
       - uses: actions/setup-node@v7
-        with: { node-version: 22 }
+        with: { node-version: 26 }
       - run: go version && node --version
       - name: Playwright driver and browsers
         run: |
