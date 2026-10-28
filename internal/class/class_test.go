@@ -73,7 +73,7 @@ func TestJoinResumeLeave(t *testing.T) {
 	if _, err := c.Join(ctx, pub.URL, cl.JoinCode, "alice"); err == nil {
 		t.Fatal("joined twice")
 	}
-	ep, err := nets.Attach(ctx, NetworkName, "web")
+	ep, err := nets.Attach(ctx, NetworkName, "web", nil)
 	if err != nil || !ep.Addr().IsValid() {
 		t.Fatal(ep, err)
 	}

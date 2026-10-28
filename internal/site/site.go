@@ -82,7 +82,18 @@ var Images = []struct {
 	{Name: "lab", Description: "a toolbox: echo, env, pwd, ls, cat, write, count, sleep, spin, hog, bench, fs, exit", Index: true,
 		Files: map[string]string{"etc/motd": "Welcome to the go-wasmcontainers playground.\n"}},
 	{Name: "net", Description: "networking: serve (HTTP), get, bench, udp-echo, udp, lookup, dial — containers reach each other by name"},
+	{Name: "mnist", Description: "reads a handwritten digit with wasi-nn (MNIST-12, ONNX Model Zoo, MIT; picture from the MNIST test set, CC BY-SA 3.0)",
+		Files: map[string]string{"usr/share/doc/mnist/NOTICE": MnistNotice}},
 }
+
+// MnistNotice is where the mnist image's model and picture come from.
+const MnistNotice = `mnist: wasi-nn in a container (github.com/go-wasmcontainers/gpu v0.2.0 examples/mnist)
+
+mnist-12.onnx: ONNX Model Zoo, validated/vision/classification/mnist, MIT
+  License (see the model card).
+digit.png: picture 0 of the MNIST test set (label 7), Y. LeCun, C. Cortes,
+  C. J. C. Burges, CC BY-SA 3.0; extracted unmodified.
+`
 
 // Build assembles the site into o.Out.
 func Build(ctx context.Context, o Options) (*Manifest, error) {

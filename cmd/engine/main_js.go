@@ -34,8 +34,10 @@ import (
 	"github.com/go-wasmcontainers/engine/rootfs"
 	"github.com/go-wasmcontainers/engine/runtime/browser"
 	"github.com/go-wasmcontainers/engine/state"
+	"github.com/go-wasmcontainers/engine/wasi"
 
 	"github.com/go-wasmcontainers/dashboard/bridge"
+	"github.com/go-wasmcontainers/gpu/nn"
 
 	"github.com/go-wasmcontainers/playground/internal/class"
 	"github.com/go-wasmcontainers/playground/internal/console"
@@ -82,6 +84,10 @@ func main() {
 	v = "?" + strings.SplitN(strings.TrimPrefix(v, "?"), "&", 2)[0] // the build only, on assets
 	exec := browser.New(browser.Options{
 		WorkerURL: base + "container-worker.js" + v, DefaultMemoryLimitBytes: 256 << 20,
+		// wasi-nn (wasi_ephemeral_nn) on the pure-Go CPU backend: the
+		// mnist image. A GPU target fails with "unsupported operation"
+		// until the WebGPU backend lands.
+		HostModules: []wasi.HostModule{nn.NewModule()},
 		// Compiled modules across reloads; the URLs are never fetched.
 		CodeCache: codeCache, CodeCacheURL: base + "module-cache/",
 		OnCompile: func(s browser.CompileStat) {
