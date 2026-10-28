@@ -103,10 +103,10 @@ func (d dash) press(keys ...string) {
 }
 
 // view moves the navigation to a view: F6 then arrows (the views are
-// Containers, Images, Volumes, Terminal, in that order).
+// Containers, Images, Volumes, Networks, Terminal, in that order).
 func (d dash) view(name string) {
 	d.t.Helper()
-	order := []string{"Containers", "Images", "Volumes", "Terminal"}
+	order := []string{"Containers", "Images", "Volumes", "Networks", "Terminal"}
 	from := slices.Index(order, d.state().View)
 	to := slices.Index(order, name)
 	if from < 0 || to < 0 {

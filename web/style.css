@@ -60,8 +60,8 @@ main {
 #screen {
   display: none;
 }
-/* Join class: a line under the header; over the dashboard, a chip at the
-   bottom left (the dashboard will get its own Network view). */
+/* Join class: a line under the header of the terminal page; the dashboard
+   has its own (Networks view, through window.__wctrClass). */
 #classbar {
   display: flex;
   gap: 0.8em;
@@ -78,13 +78,7 @@ main {
   text-decoration: underline;
 }
 body.dash #classbar {
-  position: fixed;
-  z-index: 1;
-  left: 12px;
-  bottom: 12px;
-  background: rgba(15, 20, 25, 0.92);
-  border: 1px solid #253340;
-  border-radius: 6px;
+  display: none;
 }
 #classinfo[hidden], #joinerr[hidden], #joinstep1[hidden], #joinstep2[hidden] {
   display: none;

@@ -135,8 +135,10 @@ trip, ~40–100 µs). Larger reads per call are the open item.
 
 **Join class.** With a teacher's
 [relay](https://github.com/go-wasmcontainers/relay), the page joins the
-class network: "Join class", the relay's address (https only; the
-page reloads once), your name and the join code. A `class` network then
+class network: in the dashboard's **Networks** view (Alt+4), **Join class…**
+asks for the relay's address (https only; the page reloads once), then your
+name and the join code (on the `?ui=terminal` page, the "Join class" link
+under the header does the same). A `class` network then
 appears (`wctr run --network class …`): your containers get the class's
 addresses and names (`web.<you>.<domain>`), reach your classmates' under
 the teacher's firewall, and are reached by them. "Leave class" ends the
@@ -155,14 +157,18 @@ session.
   (`wctr-relay ca export`) installed in the browser or the system. A page
   cannot pin a CA itself; Firefox keeps its own certificate store, so
   there the classroom CA goes in Firefox's settings (or an enterprise
-  policy), not only the system's. The relay must also allow the
-  playground's origin (`--origin`) and answer its CORS preflight for the
-  join calls, allowing `Content-Type`, `Connect-Protocol-Version`,
-  `Connect-Timeout-Ms` and `User-Agent` — Firefox sends the Connect
-  client's `User-Agent` (Chromium drops it), so a preflight without it
-  fails in Firefox only, as a bare "NetworkError" (measured: the same
-  worker's plain GET to the relay succeeded, with no CSP violation). The
-  e2e stands in for the relay's CORS until the relay has it.
+  policy), not only the system's.
+- **The teacher runs the relay for the playground's origin**:
+  `wctr-relay serve --cors-origin https://go-wasmcontainers.github.io`
+  (relay v0.3.0 or later; repeatable, `*` refused). That allows the join
+  calls' CORS preflight and the data channel's Origin check. Without it,
+  joining fails as a bare "NetworkError" (in Firefox first: it sends the
+  Connect client's `User-Agent`, which the preflight must allow). The e2e
+  runs a real relay configured that way.
+- The page and the dashboard meet through `window.__wctrClass` (`relay`,
+  `useRelay(origin)`, `status()`), the protocol of the dashboard's README
+  ("Join class"); the e2e drives the dashboard's own dialog, one key at a
+  time, and checks the code is in no URL, storage, DOM or test hook.
 
 **Planned: `-p` in the browser.** `wctr run -p 8080:80 net serve` would
 make the service worker route `/playground/port/8080/…` to the container's

@@ -32,6 +32,8 @@ jobs:
         run: |
           git status --porcelain --untracked-files=all > "$RUNNER_TEMP/status.txt"
           if [ -s "$RUNNER_TEMP/status.txt" ]; then cat "$RUNNER_TEMP/status.txt"; echo "::error::the build changed the checkout"; exit 1; fi
+      - name: the published wasm is stamped from this commit, unmodified
+        run: go run github.com/go-fleettools/buildstamp/cmd/buildstamp@v0.1.0 check --revision "$GITHUB_SHA" "$RUNNER_TEMP/_site/engine.wasm" "$RUNNER_TEMP/_site/dashboard.wasm"
       - uses: actions/upload-pages-artifact@v5
         with: { path: "${{ runner.temp }}/_site" }
       - uses: actions/upload-artifact@v7

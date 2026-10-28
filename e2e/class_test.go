@@ -24,27 +24,6 @@ import (
 	"github.com/go-wasmcontainers/relay/server"
 )
 
-// cors answers the browser's preflight for the relay's Connect API. The
-// relay (v0.2.1) sends no CORS headers yet, which a page needs to call
-// JoinService from another origin; until it does, the test adds them.
-func cors(origin string, h http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if o := r.Header.Get("Origin"); o == origin {
-			w.Header().Set("Access-Control-Allow-Origin", o)
-			w.Header().Set("Vary", "Origin")
-			if r.Method == http.MethodOptions {
-				w.Header().Set("Access-Control-Allow-Methods", "POST")
-				// User-Agent too: the Connect client sets it, Chromium drops
-				// it, Firefox sends it, so its preflight asks for it.
-				w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Connect-Protocol-Version, Connect-Timeout-Ms, User-Agent")
-				w.WriteHeader(http.StatusNoContent)
-				return
-			}
-		}
-		h.ServeHTTP(w, r)
-	})
-}
-
 // TestClass joins a relay class from the page (the dialog: relay address,
 // reload, name and join code), runs a web server on the class network in
 // the browser, reaches it from a native session of the same class, and
@@ -66,26 +45,37 @@ func TestClass(t *testing.T) {
 	}
 }
 
-func classSession(t *testing.T, pw *playwright.Playwright, browserName, mode string) {
-	url, _ := serveCopy(t, mode == "headers")
-	pageOrigin := strings.TrimSuffix(url[:strings.Index(url[len("http://"):], "/")+len("http://")], "/")
-
+// startRelay serves a relay over TLS for a page at pageOrigin, with the
+// relay's own CORS allowlist (wctr-relay serve --cors-origin) as a teacher
+// runs it, and a class whose default group lets members reach each other.
+func startRelay(t *testing.T, pageOrigin string) (*httptest.Server, *relay.Relay, *v1.Class) {
+	t.Helper()
 	k, _ := auth.NewKeys()
 	r, err := relay.New(relay.Config{Keys: k})
 	if err != nil {
 		t.Fatal(err)
 	}
 	tok, _ := auth.RandomToken()
-	s, err := server.New(server.Config{Relay: r, AdminToken: tok, OriginPatterns: []string{strings.TrimPrefix(pageOrigin, "http://")}})
+	s, err := server.New(server.Config{Relay: r, AdminToken: tok, AllowedOrigins: []string{pageOrigin}})
 	if err != nil {
 		t.Fatal(err)
 	}
-	pub := httptest.NewTLSServer(cors(pageOrigin, s.Public()))
-	defer pub.Close()
+	pub := httptest.NewTLSServer(s.Public())
+	t.Cleanup(pub.Close)
 	class, err := r.CreateClass(relay.ClassSpec{Name: "net101", Template: v1.Template_TEMPLATE_NEUTRON_DEFAULT})
 	if err != nil {
 		t.Fatal(err)
 	}
+	return pub, r, class
+}
+
+func originOf(url string) string {
+	return strings.TrimSuffix(url[:strings.Index(url[len("http://"):], "/")+len("http://")], "/")
+}
+
+func classSession(t *testing.T, pw *playwright.Playwright, browserName, mode string) {
+	url, _ := serveCopy(t, mode == "headers")
+	pub, r, class := startRelay(t, originOf(url))
 
 	bt := pw.Chromium
 	if browserName == "firefox" {
