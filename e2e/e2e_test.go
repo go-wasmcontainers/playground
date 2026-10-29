@@ -42,7 +42,7 @@ func TestMain(m *testing.M) {
 	}
 	siteDir = filepath.Join(dir, "site")
 	ctx := context.Background()
-	if _, err := site.Build(ctx, site.Options{Root: "..", Out: siteDir, Pkgx: os.Getenv("E2E_PKGX") == "1", Version: "e2e", Log: os.Stderr}); err != nil {
+	if _, err := site.Build(ctx, site.Options{Root: "..", Out: siteDir, Pkgx: os.Getenv("E2E_PKGX") == "1", Remote: os.Getenv("E2E_REMOTE") == "1", Version: "e2e", Log: os.Stderr}); err != nil {
 		fmt.Fprintln(os.Stderr, "site build:", err)
 		os.Exit(1)
 	}
@@ -166,6 +166,10 @@ func session(t *testing.T, pw *playwright.Playwright, browserName, mode string) 
 		// imports); no GPU backend in the browser yet, and it says so.
 		{"wctr run --rm mnist", 0, []string{"digit 7 (p=1.000)"}},
 		{"wctr run --rm mnist gpu", 1, []string{"unsupported operation"}},
+		// wasi:webgpu without --gpu: no adapter, whatever the browser has
+		// (the GPU lane, gpu_test.go, runs them with one).
+		{"wctr run --rm compute", 2, []string{"no GPU adapter"}},
+		{"wctr run --rm triangle 1", 2, []string{"no GPU adapter"}},
 	}
 	// Networking: two containers by name on the default bridge, UDP, the
 	// network's DNS, and a measurement (the browser's socket wait path).

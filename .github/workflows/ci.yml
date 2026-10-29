@@ -146,6 +146,7 @@ jobs:
       - name: go test -tags e2e
         env:
           E2E_PKGX: "1"
+          E2E_REMOTE: "1"
           E2E_REPORT: ${{ runner.temp }}/e2e.json
           E2E_PERSIST_REPORT: ${{ runner.temp }}/persist.json
           E2E_DASH_REPORT: ${{ runner.temp }}/dashboard.json
@@ -166,6 +167,47 @@ jobs:
             ${{ runner.temp }}/e2e.json
             ${{ runner.temp }}/persist.json
             ${{ runner.temp }}/e2e.log
+
+  # The GPU images with a GPU (e2e/gpu_test.go): compute matches the CPU,
+  # triangle's frames change, no adapter without --gpu. macOS has a GPU,
+  # and a SwiftShader adapter is refused there; Linux has SwiftShader on
+  # Vulkan, the only setup in which headless Chromium presents a WebGPU
+  # canvas (go-wasmcontainers/gpu docs/DESIGN.md).
+  gpu:
+    name: GPU (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-latest
+            real: "1"
+            args: ""
+          - os: ubuntu-latest
+            real: ""
+            args: "--enable-features=Vulkan --use-vulkan=swiftshader --use-angle=swiftshader"
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
+        with: { go-version: '1.27.3' }
+      - uses: actions/setup-node@v7
+        with: { node-version: 22 }
+      - name: Playwright driver and Chromium
+        shell: bash
+        run: |
+          echo "PLAYWRIGHT_DRIVER_PATH=$RUNNER_TEMP/pwdriver" >> "$GITHUB_ENV"
+          echo "PLAYWRIGHT_NODEJS_PATH=$(command -v node)" >> "$GITHUB_ENV"
+          go run ./cmd/site playwright-driver --dir "$RUNNER_TEMP/pwdriver"
+          PLAYWRIGHT_DRIVER_PATH="$RUNNER_TEMP/pwdriver" PLAYWRIGHT_NODEJS_PATH="$(command -v node)" \
+            go run github.com/playwright-community/playwright-go/cmd/playwright install --with-deps chromium
+      - name: go test -tags e2e -run TestGPU
+        shell: bash
+        env:
+          E2E_GPU: "1"
+          E2E_GPU_REAL: ${{ matrix.real }}
+          E2E_GPU_ARGS: ${{ matrix.args }}
+        run: go test -tags e2e -count=1 -v -run '^TestGPU$' -timeout 20m ./e2e/ > "$RUNNER_TEMP/gpu.log" 2>&1; status=$?; tail -60 "$RUNNER_TEMP/gpu.log"; exit $status
 
   # The same images natively, for comparison: wazero through the engine,
   # and wasmtime.

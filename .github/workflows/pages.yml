@@ -26,7 +26,7 @@ jobs:
       - name: build the site (outside the checkout)
         run: |
           version=$(go list -m -f '{{.Version}}' github.com/go-wasmcontainers/engine)
-          go run ./cmd/site build --out "$RUNNER_TEMP/_site" --pkgx --version "$version"
+          go run ./cmd/site build --out "$RUNNER_TEMP/_site" --pkgx --remote --version "$version"
           ls -la "$RUNNER_TEMP/_site"
       - name: the checkout is unchanged (the wasm binaries are stamped vcs.modified=false)
         run: |

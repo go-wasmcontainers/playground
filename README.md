@@ -86,12 +86,44 @@ Images: `hello`, `greet` (a CNCF wasm OCI artifact), `lab` (a toolbox:
 `mnist` (reads a handwritten digit with **wasi-nn**: `wctr run --rm mnist`
 prints `digit 7 (p=1.000)`, in about 80 ms in Chromium; the engine worker
 serves `wasi_ephemeral_nn` with the pure-Go CPU backend of
-[go-wasmcontainers/gpu](https://github.com/go-wasmcontainers/gpu) v0.2.0,
-and `mnist gpu` fails with "unsupported operation" until a WebGPU backend
-lands. The model is MNIST-12 from the ONNX Model Zoo (MIT); the picture is
+[go-wasmcontainers/gpu](https://github.com/go-wasmcontainers/gpu) v0.5.1;
+`wctr run --rm --gpu mnist gpu` runs it on the page's WebGPU, and without
+`--gpu` the GPU target fails with "unsupported operation", it never falls
+back to the CPU. The model is MNIST-12 from the ONNX Model Zoo (MIT); the picture is
 picture 0 of the MNIST test set by Y. LeCun, C. Cortes and C. J. C. Burges
 (CC BY-SA 3.0). The image carries both notices at
-`/usr/share/doc/mnist/NOTICE`), and pkgx `wasip1` bottles taken from `ghcr.io/go-pkgx/packages` at build time:
+`/usr/share/doc/mnist/NOTICE`), and these:
+
+- `compute`: **wasi:webgpu** compute. `wctr run --rm --gpu compute` runs a
+  1M-float vector add and a 256x256 matrix product on the GPU, and checks
+  both against the CPU.
+- `triangle`: **wasi-gfx:surface**. `wctr run --rm --gpu triangle [frames]`
+  draws a spinning triangle on a surface. In the dashboard the surface is a
+  pane under **Surfaces**; the page acknowledges each frame, and the engine
+  paces the guest on those acknowledgements.
+
+GPU access is opt-in per container. A container without `--gpu`, or a
+browser without WebGPU, gets no adapter: these images print
+`no GPU adapter` and exit 2. Software (fallback) adapters are refused.
+
+- `shell`: [go-wasmcontainers/shell](https://github.com/go-wasmcontainers/shell)
+  0.1.0, mirrored verbatim from `ghcr.io` and pinned by digest
+  (`go run ./cmd/site pin REF` prints the digest to pin). It contains `sh`
+  and 42 coreutils. Programs started by the shell run as WASIX processes in
+  the browser:
+
+  ```console
+  $ wctr run -d --name c shell sleep 600
+  $ wctr exec c sh -c 'ls /bin | wc -l'
+  43
+  $ wctr exec -it c sh
+  ```
+
+  In the terminal, a `wctr exec -i` line gets what you type, Ctrl-C and
+  Ctrl-D included. `wctr build` and `wctr compose` are wired in as in
+  `cmd/wctr`.
+
+Last, pkgx `wasip1` bottles taken from `ghcr.io/go-pkgx/packages` at build time:
 the Go ones `age` 1.3.2, `go-md2man` 2.0.7, `shfmt` 3.14.1, and the C ones
 `lua` 5.4.9, `sqlite3` 3.53.4 and `minigzip` (zlib 1.3.2), whose layers are
 `tar+zstd`, served as published. lua raises its errors with WebAssembly
@@ -283,7 +315,7 @@ page load.
 ## Building and testing
 
 ```console
-$ go run ./cmd/site build --out _site --pkgx          # images + mirror, engine.wasm, the page
+$ go run ./cmd/site build --out _site --pkgx --remote # images + mirror (--remote: the pinned shell), engine.wasm, the page
 $ go run ./cmd/site serve --dir _site                  # http://127.0.0.1:8080/playground/
 $ go test ./...                                        # native: session transcript, filter, mirror
 $ go run ./cmd/site playwright-driver --dir /tmp/pwd   # once: driver from npm playwright-core
@@ -291,6 +323,18 @@ $ PLAYWRIGHT_DRIVER_PATH=/tmp/pwd PLAYWRIGHT_NODEJS_PATH=$(command -v node) \
   go run github.com/playwright-community/playwright-go/cmd/playwright install chromium firefox
 $ PLAYWRIGHT_DRIVER_PATH=/tmp/pwd PLAYWRIGHT_NODEJS_PATH=$(command -v node) go test -tags e2e ./e2e/
 ```
+
+The e2e has three opt-in parts:
+
+- `E2E_REMOTE=1` mirrors the shell image and runs `TestShell`: exec, a
+  pipeline and `exec -it` typed into the page.
+- `E2E_GPU=1` runs `TestGPU` in Chromium (channel `chromium`):
+  - `compute` matches the CPU;
+  - `triangle`'s frames reach the page and change;
+  - without `--gpu`, there is no adapter.
+- `E2E_GPU_REAL=1` also refuses a SwiftShader adapter. CI sets it on the
+  macOS lane. The Linux lane runs SwiftShader on Vulkan instead, with
+  `E2E_GPU_ARGS="--enable-features=Vulkan --use-vulkan=swiftshader --use-angle=swiftshader"`.
 
 The `pages` workflow publishes the site, then `cmd/site verify` waits until
 every file served at the live URL hashes like the build (Pages caches for
