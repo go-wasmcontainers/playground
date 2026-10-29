@@ -193,7 +193,7 @@ Suffix List):
 playground tab (this origin, isolated: the engine)
    ▲ BroadcastChannel, per-request ids bound to a nonce the playground issued
 view tab (this origin, not isolated, not frameable)
-   └─ iframe https://go-wasmcontainers-usercontent.github.io/shell.html?s=<session>#<nonce>
+   └─ iframe <usercontent origin>/shell.html?s=<session>#<nonce>
         └─ iframe /s/<session>/8080/…  ← the container's page; its requests go to
            the usercontent service worker → shell → view → engine → portmap.Virtual
 ```
