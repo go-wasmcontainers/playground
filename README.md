@@ -330,7 +330,7 @@ $ go run ./cmd/site serve --dir _site                  # http://127.0.0.1:8080/p
 $ go test ./...                                        # native: session transcript, filter, mirror
 $ go run ./cmd/site playwright-driver --dir /tmp/pwd   # once: driver from npm playwright-core
 $ PLAYWRIGHT_DRIVER_PATH=/tmp/pwd PLAYWRIGHT_NODEJS_PATH=$(command -v node) \
-  go run github.com/playwright-community/playwright-go/cmd/playwright install chromium firefox
+  go run github.com/mxschmitt/playwright-go/cmd/playwright install chromium firefox
 $ PLAYWRIGHT_DRIVER_PATH=/tmp/pwd PLAYWRIGHT_NODEJS_PATH=$(command -v node) go test -tags e2e ./e2e/
 ```
 
