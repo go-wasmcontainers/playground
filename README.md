@@ -178,10 +178,52 @@ session.
   ("Join class"); the e2e drives the dashboard's own dialog, one key at a
   time, and checks the code is in no URL, storage, DOM or test hook.
 
-**Planned: `-p` in the browser.** `wctr run -p 8080:80 net serve` would
-make the service worker route `/playground/port/8080/…` to the container's
-port 80 (an HTTP proxy through the engine worker), so a learner opens their
-web server in a tab or an iframe of the page. Not implemented yet.
+**Coming: `-p` in the browser, on an origin of its own.** `wctr run -p
+8080:80 net serve` will open the container's web pages in a tab — but
+**not on this origin**: a container's page here could read the
+playground's storage (the class session token) and script it, and a
+sandboxed page cannot be served by a service worker at all (an opaque
+origin has no active service worker, Service Workers §2.5.1; measured in
+Chromium: its stylesheets, scripts, images and `fetch` all bypass the
+worker). So containers' pages live on **another site**,
+`go-wasmcontainers-usercontent.github.io` (github.io is on the Public
+Suffix List):
+
+```
+playground tab (this origin, isolated: the engine)
+   ▲ BroadcastChannel, per-request ids bound to a nonce the playground issued
+view tab (this origin, not isolated, not frameable)
+   └─ iframe https://go-wasmcontainers-usercontent.github.io/shell.html?s=<session>#<nonce>
+        └─ iframe /s/<session>/8080/…  ← the container's page; its requests go to
+           the usercontent service worker → shell → view → engine → portmap.Virtual
+```
+
+- The **shell** (`internal/usercontent`, written by `site usercontent
+  --allow <playground origin>`; each `<org>-usercontent` Pages repository
+  runs it, so one implementation serves several playgrounds) talks to the
+  pinned origin only, accepts only messages carrying the session's nonce
+  (read from its URL fragment, then removed from it), refuses to run
+  outside that origin (`ancestorOrigins`, else the referrer; its service
+  worker adds `frame-ancestors` once installed, as Pages sends no
+  headers), and caches nothing.
+- **What a container may say** is decided in Go (`internal/portroute`,
+  fuzzed): methods, paths and header fields bounded; `Cookie`, `Host` and
+  forwarding fields from the page dropped, `X-Forwarded-Host/Proto/Prefix`
+  set; `Set-Cookie`, `Clear-Site-Data`, `Service-Worker-Allowed`,
+  hop-by-hop and the origin's own policies never reach the browser;
+  `Location` to `localhost:<port>` rewritten to that port's path, so an
+  application can send the browser to an identity provider in another
+  container. A service worker can neither see nor set cookies, so the
+  engine keeps a cookie jar per session (sessions work; `document.cookie`
+  in the container's page does not see them).
+- The shell is not a boundary against the container's own pages (they
+  share its origin); what they reach through it is HTTP to this session's
+  published ports, nothing of the playground.
+
+The shell and the policy are here and tested (`go test -tags e2e
+./internal/usercontent/`: three local origins in Chromium); the view tab
+and the engine worker's side follow with the engine release that has
+`portmap.Virtual`.
 
 ## How it works
 
