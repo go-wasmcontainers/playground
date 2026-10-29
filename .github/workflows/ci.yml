@@ -144,7 +144,7 @@ jobs:
           echo "PLAYWRIGHT_NODEJS_PATH=$(command -v node)" >> "$GITHUB_ENV"
           go run ./cmd/site playwright-driver --dir "$RUNNER_TEMP/pwdriver"
           PLAYWRIGHT_DRIVER_PATH="$RUNNER_TEMP/pwdriver" PLAYWRIGHT_NODEJS_PATH="$(command -v node)" \
-            go run github.com/playwright-community/playwright-go/cmd/playwright install --with-deps chromium firefox
+            go run github.com/mxschmitt/playwright-go/cmd/playwright install --with-deps chromium firefox
       - name: go test -tags e2e
         env:
           E2E_PKGX: "1"
