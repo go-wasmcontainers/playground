@@ -92,6 +92,8 @@ jobs:
         include:
           # Container output is attacker-controlled and reaches xterm.js.
           - { target: FuzzFilter, pkg: ./internal/termfilter }
+          # What a container's page relays and what a container answers.
+          - { target: FuzzRoute, pkg: ./internal/portroute }
           # catalog.json, read by the engine worker and the dashboard.
           - { target: FuzzParseCatalog, pkg: ./internal/session }
           # A relay origin typed by a learner, spliced into a CSP header.
@@ -150,6 +152,10 @@ jobs:
           E2E_PERSIST_REPORT: ${{ runner.temp }}/persist.json
           E2E_DASH_REPORT: ${{ runner.temp }}/dashboard.json
         run: go test -tags e2e -count=1 -v -timeout 25m ./e2e/ > "$RUNNER_TEMP/e2e.log" 2>&1; status=$?; tail -150 "$RUNNER_TEMP/e2e.log"; exit $status
+      # The usercontent shell, three local origins, Chromium (Playwright's
+      # Firefox runs no service workers).
+      - name: go test -tags e2e ./internal/usercontent/
+        run: go test -tags e2e -count=1 -v -timeout 5m ./internal/usercontent/ > "$RUNNER_TEMP/uc.log" 2>&1; status=$?; tail -40 "$RUNNER_TEMP/uc.log"; exit $status
       - name: measurements
         if: always()
         run: |
