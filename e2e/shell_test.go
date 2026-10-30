@@ -57,23 +57,53 @@ func TestShell(t *testing.T) {
 	}
 	b.must("wctr exec c sh -c 'exit 3'", 3)
 
-	// An interactive shell: what is typed is the container's.
+	// Interactive shells: what is typed is the container's. Into the
+	// running container (exec -it), then a container's own first process
+	// (run --rm -it, engine v0.30.0).
+	interactiveShell(t, b, "wctr exec -it c sh", "echo hi-$((40+2))", "hi-42")
+	b.must("wctr rm -f c", 0)
+	interactiveShell(t, b, "wctr run --rm -it shell", "echo hi", "hi")
+	// --rm: the container is gone once the shell exited.
+	if out := b.must("wctr ps -a", 0); strings.Contains(out, "shell") {
+		t.Fatalf("run --rm -it left its container:\n%s", out)
+	}
+}
+
+// interactiveShell types line into the terminal, waits for the shell,
+// types cmd and waits for want on a line of its own (not the echo of cmd),
+// then types exit 4: the line must end with status 4.
+func interactiveShell(t *testing.T, b tab, line, cmd, want string) {
+	t.Helper()
+	page := b.page
 	n := int(num(b.eval(`() => window.__playground.state.transcript.length`)))
-	if err := page.Keyboard().Type("wctr exec -it c sh"); err != nil {
+	before := len(b.screen())
+	if err := page.Keyboard().Type(line); err != nil {
 		t.Fatal(err)
 	}
 	page.Keyboard().Press("Enter")
 	time.Sleep(time.Second)
-	page.Keyboard().Type("echo hi-$((40+2))")
+	page.Keyboard().Type(cmd)
 	page.Keyboard().Press("Enter")
-	b.until("the shell did not answer", `() => window.__playground.text().includes("hi-42")`, time.Minute)
+	b.until(line+": the shell did not answer",
+		`() => /(^|\n)`+regexpQuote(want)+`[ \t]*(\n|$)/.test(window.__playground.text().slice(`+itoa(before)+`))`, time.Minute)
 	page.Keyboard().Type("exit 4")
 	page.Keyboard().Press("Enter")
-	b.until("exec -it did not end", `() => window.__playground.state.transcript.length > `+itoa(n), time.Minute)
+	b.until(line+" did not end", `() => window.__playground.state.transcript.length > `+itoa(n), time.Minute)
 	if code := int(num(b.eval(`() => window.__playground.state.transcript[` + itoa(n) + `].code`))); code != 4 {
-		t.Fatalf("exec -it exited %d, want 4:\n%s", code, b.screen())
+		t.Fatalf("%s exited %d, want 4:\n%s", line, code, b.screen())
 	}
-	b.must("wctr rm -f c", 0)
+}
+
+// regexpQuote escapes s for a JavaScript regular expression literal.
+func regexpQuote(s string) string {
+	var out strings.Builder
+	for _, r := range s {
+		if strings.ContainsRune(`\^$.|?*+()[]{}/-`, r) {
+			out.WriteByte('\\')
+		}
+		out.WriteRune(r)
+	}
+	return out.String()
 }
 
 func itoa(n int) string { return strconv.Itoa(n) }

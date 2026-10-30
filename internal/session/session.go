@@ -118,7 +118,7 @@ type Result struct {
 }
 
 // Interactive says whether a line runs a container with its input
-// attached (wctr run -i, wctr exec -i), read with wctr's own flags: then
+// attached (wctr run -i, exec -i, start -ai), read with wctr's own flags: then
 // what the user types, Ctrl-C and Ctrl-D included, is the container's.
 func (s *Session) Interactive(line string) bool {
 	words, err := lineedit.Split(line)
@@ -128,7 +128,7 @@ func (s *Session) Interactive(line string) bool {
 	root := cli.RootCmd(s.CLIOptions())
 	root.TraverseChildren = true
 	sub, rest, err := root.Traverse(words[1:])
-	if err != nil || sub == root || (sub.Name() != "run" && sub.Name() != "exec") {
+	if err != nil || sub == root || (sub.Name() != "run" && sub.Name() != "exec" && sub.Name() != "start") {
 		return false
 	}
 	if err := sub.ParseFlags(rest); err != nil {

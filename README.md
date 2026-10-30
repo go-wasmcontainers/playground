@@ -113,14 +113,16 @@ browser without WebGPU, gets no adapter: these images print
   the browser:
 
   ```console
+  $ wctr run --rm -it shell
   $ wctr run -d --name c shell sleep 600
   $ wctr exec c sh -c 'ls /bin | wc -l'
-  43
+  44
   $ wctr exec -it c sh
   ```
 
-  In the terminal, a `wctr exec -i` line gets what you type, Ctrl-C and
-  Ctrl-D included. `wctr build` and `wctr compose` are wired in as in
+  In the terminal, a line whose `wctr` flags say `-i` (`run -i`,
+  `exec -i`, `start -ai`) gets what you type, Ctrl-C and Ctrl-D included.
+  Ctrl-P Ctrl-Q detaches from `run -it` and leaves the container running. `wctr build` and `wctr compose` are wired in as in
   `cmd/wctr`.
 
 Last, pkgx `wasip1` bottles taken from `ghcr.io/go-pkgx/packages` at build time:
@@ -369,7 +371,8 @@ $ PLAYWRIGHT_DRIVER_PATH=/tmp/pwd PLAYWRIGHT_NODEJS_PATH=$(command -v node) go t
 The e2e has three opt-in parts:
 
 - `E2E_REMOTE=1` mirrors the shell image and runs `TestShell`: exec, a
-  pipeline and `exec -it` typed into the page.
+  pipeline, and `exec -it` and `run --rm -it shell` typed into the page
+  (`echo`, then `exit 4`, the status the line ends with).
 - `E2E_GPU=1` runs `TestGPU` in Chromium (channel `chromium`):
   - `compute` matches the CPU;
   - `triangle`'s frames reach the page and change;
