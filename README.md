@@ -97,10 +97,14 @@ picture 0 of the MNIST test set by Y. LeCun, C. Cortes and C. J. C. Burges
 - `compute`: **wasi:webgpu** compute. `wctr run --rm --gpu compute` runs a
   1M-float vector add and a 256x256 matrix product on the GPU, and checks
   both against the CPU.
-- `triangle`: **wasi-gfx:surface**. `wctr run --rm --gpu triangle [frames]`
+- `triangle`: **wasi-gfx:surface**. `wctr run --rm --gpu triangle [frames [input]]`
   draws a spinning triangle on a surface. In the dashboard the surface is a
   pane under **Surfaces**; the page acknowledges each frame, and the engine
-  paces the guest on those acknowledgements.
+  paces the guest on those acknowledgements. Click the pane to give it the
+  focus: its pointer presses and keys go to the guest. The dashboard sends
+  `{t:"input"}`, which the engine worker hands to `webgpu.SurfaceInput`. With
+  `input`, the guest prints what it receives: `pointer-down 80,80`, then
+  `key-down key-a "A" shift=true`.
 
 GPU access is opt-in per container. A container without `--gpu`, or a
 browser without WebGPU, gets no adapter: these images print
@@ -374,6 +378,8 @@ The e2e has three opt-in parts:
   - `compute` matches the CPU;
   - `triangle`'s frames reach the page and change;
   - without `--gpu`, there is no adapter.
+
+  It also runs `TestGPUSurfaceInput`. That test clicks a known point of the triangle's pane and types Shift+A. The guest must log `pointer-down`/`pointer-up` at the surface coordinates the pane maps the point to (letterbox included), then `key-a "A" shift=true`, down and up. It fails when the worker does not forward the input.
 - `E2E_GPU_REAL=1` makes a software adapter fail the test. CI sets it on
   the macOS lane, which runs on the Apple GPU. The Linux lane has only
   SwiftShader on Vulkan

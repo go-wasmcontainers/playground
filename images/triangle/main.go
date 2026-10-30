@@ -2,11 +2,14 @@
 // surface through wasi:webgpu and wasi-gfx:surface: in the playground the
 // surface is a pane of the dashboard. It draws a number of frames (120 by
 // default, or the first argument) and reports the rate the host paced it
-// to.
+// to; with "input" as the second argument it also prints the pointer
+// presses and releases and the keys the pane forwards to it.
 //
-// A copy of github.com/go-wasmcontainers/gpu v0.5.1 examples/triangle.
+// github.com/go-wasmcontainers/gpu v0.6.0 examples/triangle, which prints
+// the presses and key-downs; this copy also prints the releases
+// (pointer-up, key-up), which the playground's input e2e checks.
 //
-//	wctr run --rm --gpu triangle [frames]
+//	wctr run --rm --gpu triangle [frames [input]]
 package main
 
 import (
@@ -48,6 +51,7 @@ func main() {
 			frames = n
 		}
 	}
+	input := len(os.Args) > 2 && os.Args[2] == "input"
 	d, err := wasigpu.Open()
 	if errors.Is(err, wasigpu.ErrNoAdapter) {
 		fmt.Println("no GPU adapter")
@@ -72,9 +76,51 @@ func main() {
 		fail(err)
 	}
 	defer u.Drop()
+	// With "input", the pointer presses and releases and the keys on the
+	// surface's pane are printed as they arrive (read without blocking, once
+	// per frame; presses before releases within a frame).
+	var pointers []*wasigpu.PointerEvents
+	var keys []*wasigpu.KeyEvents
+	if input {
+		for _, kind := range []string{wasigpu.PointerDown, wasigpu.PointerUp} {
+			ev, err := s.Pointer(kind)
+			if err != nil {
+				fail(err)
+			}
+			defer ev.Drop()
+			pointers = append(pointers, ev)
+		}
+		for _, kind := range []string{wasigpu.KeyDown, wasigpu.KeyUp} {
+			ev, err := s.Keys(kind)
+			if err != nil {
+				fail(err)
+			}
+			defer ev.Drop()
+			keys = append(keys, ev)
+		}
+	}
+	names := [2]string{"down", "up"}
 	t0 := time.Now()
 	var b [16]byte
 	for f := 0; f < frames; f++ {
+		for i, ev := range pointers {
+			ps, err := ev.Poll()
+			if err != nil {
+				fail(err)
+			}
+			for _, p := range ps {
+				fmt.Printf("pointer-%s %g,%g\n", names[i], p.X, p.Y)
+			}
+		}
+		for i, ev := range keys {
+			ks, err := ev.Poll()
+			if err != nil {
+				fail(err)
+			}
+			for _, k := range ks {
+				fmt.Printf("key-%s %s %q shift=%v\n", names[i], k.Key, k.Text, k.Shift)
+			}
+		}
 		binary.LittleEndian.PutUint32(b[:], math.Float32bits(float32(f)*0.05))
 		if err := d.Write(u, 0, b[:]); err != nil {
 			fail(err)

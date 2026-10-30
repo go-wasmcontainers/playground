@@ -207,13 +207,16 @@ jobs:
           go run ./cmd/site playwright-driver --dir "$RUNNER_TEMP/pwdriver"
           PLAYWRIGHT_DRIVER_PATH="$RUNNER_TEMP/pwdriver" PLAYWRIGHT_NODEJS_PATH="$(command -v node)" \
             go run github.com/mxschmitt/playwright-go/cmd/playwright install --with-deps chromium
-      - name: go test -tags e2e -run TestGPU
+      # TestGPUSurfaceInput: a click and Shift+A on the triangle's pane reach
+      # the guest (dashboard -> worker -> webgpu.SurfaceInput -> guest log);
+      # it skips on a software adapter, where there is no guest to send to.
+      - name: go test -tags e2e -run 'TestGPU|TestGPUSurfaceInput'
         shell: bash
         env:
           E2E_GPU: "1"
           E2E_GPU_REAL: ${{ matrix.real }}
           E2E_GPU_ARGS: ${{ matrix.args }}
-        run: go test -tags e2e -count=1 -v -run '^TestGPU$' -timeout 20m ./e2e/ > "$RUNNER_TEMP/gpu.log" 2>&1 && status=0 || status=$?; tail -60 "$RUNNER_TEMP/gpu.log"; exit "$status"
+        run: go test -tags e2e -count=1 -v -run '^TestGPU(SurfaceInput)?$' -timeout 20m ./e2e/ > "$RUNNER_TEMP/gpu.log" 2>&1 && status=0 || status=$?; tail -60 "$RUNNER_TEMP/gpu.log"; exit "$status"
 
   # The same images natively, for comparison: wazero through the engine,
   # and wasmtime.
