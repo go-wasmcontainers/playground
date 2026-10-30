@@ -35,6 +35,9 @@ type Options struct {
 	Out string
 	// Pkgx adds the pkgx wasip1 pilots, fetched from ghcr.io.
 	Pkgx bool
+	// Remote adds the images pinned by digest (mirror.Remote: the shell),
+	// fetched from ghcr.io.
+	Remote bool
 	// Version is the engine version string compiled in.
 	Version string
 	// Log receives progress lines.
@@ -82,8 +85,10 @@ var Images = []struct {
 	{Name: "lab", Description: "a toolbox: echo, env, pwd, ls, cat, write, count, sleep, spin, hog, bench, fs, exit", Index: true,
 		Files: map[string]string{"etc/motd": "Welcome to the go-wasmcontainers playground.\n"}},
 	{Name: "net", Description: "networking: serve (HTTP), get, bench, udp-echo, udp, lookup, dial — containers reach each other by name"},
-	{Name: "mnist", Description: "reads a handwritten digit with wasi-nn (MNIST-12, ONNX Model Zoo, MIT; picture from the MNIST test set, CC BY-SA 3.0)",
+	{Name: "mnist", Description: "reads a handwritten digit with wasi-nn, on the CPU or (run --gpu, mnist gpu) WebGPU (MNIST-12, ONNX Model Zoo, MIT; picture from the MNIST test set, CC BY-SA 3.0)",
 		Files: map[string]string{"usr/share/doc/mnist/NOTICE": MnistNotice}},
+	{Name: "compute", Description: "wasi:webgpu compute: a 1M-float vector add and a 256x256 matrix product on the GPU, checked against the CPU (run --gpu)"},
+	{Name: "triangle", Description: "wasi:webgpu and wasi-gfx:surface: a spinning triangle in a dashboard pane, 120 frames or the first argument (run --gpu)"},
 }
 
 // MnistNotice is where the mnist image's model and picture come from.
@@ -157,6 +162,16 @@ func Build(ctx context.Context, o Options) (*Manifest, error) {
 				Created:     time.Date(2026, 10, 26, 0, 0, 0, 0, time.UTC),
 			})
 			logf("image %s: pkgx bottle %s, %d bytes", b.Name, b.Ref, len(bl.Layer))
+		}
+	}
+	if o.Remote {
+		for _, p := range mirror.Remote {
+			mi, err := mirror.FetchPinned(ctx, p, 100<<20)
+			if err != nil {
+				return nil, err
+			}
+			imgs = append(imgs, mirror.Image{Name: p.Name, Tags: p.Tags, Description: p.Description, Mirrored: mi})
+			logf("image %s: %s, pinned", p.Name, p.Ref)
 		}
 	}
 	if err := mirror.Write(o.Out, imgs); err != nil {

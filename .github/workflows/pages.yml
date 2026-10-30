@@ -26,7 +26,7 @@ jobs:
       - name: build the site (outside the checkout)
         run: |
           version=$(go list -m -f '{{.Version}}' github.com/go-wasmcontainers/engine)
-          go run ./cmd/site build --out "$RUNNER_TEMP/_site" --pkgx --version "$version"
+          go run ./cmd/site build --out "$RUNNER_TEMP/_site" --pkgx --remote --version "$version"
           ls -la "$RUNNER_TEMP/_site"
       - name: the checkout is unchanged (the wasm binaries are stamped vcs.modified=false)
         run: |
@@ -92,4 +92,4 @@ jobs:
         env:
           E2E_URL: https://go-wasmcontainers.github.io/playground/
           E2E_PKGX: "1"
-        run: go test -tags e2e -count=1 -v -run 'TestLive|TestDashboard' -timeout 15m ./e2e/ > "$RUNNER_TEMP/live.log" 2>&1; status=$?; tail -30 "$RUNNER_TEMP/live.log"; exit $status
+        run: go test -tags e2e -count=1 -v -run 'TestLive|TestDashboard' -timeout 15m ./e2e/ > "$RUNNER_TEMP/live.log" 2>&1 && status=0 || status=$?; tail -30 "$RUNNER_TEMP/live.log"; exit "$status"

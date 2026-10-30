@@ -8,6 +8,7 @@ package console
 import (
 	"context"
 	"fmt"
+	"io"
 	"strings"
 	"sync"
 	"time"
@@ -52,6 +53,9 @@ type Console struct {
 	in  chan string
 	mu  sync.Mutex
 	run context.CancelFunc // set while a line runs
+	// stdin is the running line's input, for wctr run -i and exec -i
+	// (nil otherwise).
+	stdin *stdin
 }
 
 // New starts a console; it prints the banner and the prompt.
@@ -89,6 +93,14 @@ func (c *Console) Resize(cols int) {
 
 func (c *Console) loop() {
 	for data := range c.in {
+		c.mu.Lock()
+		in := c.stdin
+		c.mu.Unlock()
+		if in != nil {
+			// An interactive container's: the bytes as typed.
+			in.put(data)
+			continue
+		}
 		for _, k := range lineedit.ParseKeys(data) {
 			c.key(k)
 		}
@@ -98,7 +110,7 @@ func (c *Console) loop() {
 func (c *Console) key(k lineedit.Key) {
 	c.mu.Lock()
 	if c.run != nil {
-		// No stdin for containers yet: only Ctrl-C reaches a running line.
+		// A line without input: only Ctrl-C reaches it.
 		if k.Code == lineedit.KeyCtrlC {
 			c.run()
 			c.o.Write("^C")
@@ -137,12 +149,25 @@ func (c *Console) key(k lineedit.Key) {
 func (c *Console) start(line string) {
 	ctx, cancel := context.WithCancel(context.Background())
 	c.run = cancel
+	var in *stdin
+	if c.o.Session.Interactive(line) {
+		in = newStdin()
+		c.stdin = in
+	}
 	go func() {
 		t0 := time.Now()
-		res := c.o.Session.Run(ctx, line, writer{c.o.Write})
+		var r io.Reader
+		if in != nil {
+			r = in
+		}
+		res := c.o.Session.RunIO(ctx, line, r, writer{c.o.Write})
 		cancel()
+		if in != nil {
+			in.close()
+		}
 		c.mu.Lock()
 		c.run = nil
+		c.stdin = nil
 		if res.Clear {
 			c.r.Forget()
 			c.o.Write("\x1b[H\x1b[2J")

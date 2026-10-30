@@ -18,6 +18,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/go-wasmcontainers/playground/internal/mirror"
 	"github.com/go-wasmcontainers/playground/internal/site"
 	"github.com/go-wasmcontainers/playground/internal/thirdparty"
 	"github.com/go-wasmcontainers/playground/internal/usercontent"
@@ -59,6 +60,21 @@ func RootCmd() *cobra.Command {
 	build.Flags().StringVar(&o.Root, "root", "", "playground module root (default: the working directory)")
 	build.Flags().BoolVar(&o.Pkgx, "pkgx", false, "add the pkgx wasip1 pilot bottles from ghcr.io")
 	build.Flags().StringVar(&o.Version, "version", "dev", "engine version shown by wctr version")
+	build.Flags().BoolVar(&o.Remote, "remote", false, "add the images pinned by digest (the shell) from ghcr.io")
+
+	pin := &cobra.Command{
+		Use:   "pin REFERENCE",
+		Short: "Print the digest a registry serves for a reference, to pin it in internal/mirror",
+		Args:  cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			d, err := mirror.Resolve(cmd.Context(), args[0])
+			if err != nil {
+				return err
+			}
+			fmt.Fprintln(cmd.OutOrStdout(), d)
+			return nil
+		},
+	}
 
 	var dir, addr, prefix string
 	var isolate bool
@@ -154,6 +170,6 @@ func RootCmd() *cobra.Command {
 	uc.Flags().BoolVar(&local, "local", false, "also accept a loopback http origin (tests)")
 	uc.MarkFlagRequired("allow")
 
-	root.AddCommand(build, serve, verify, tp, drv, uc)
+	root.AddCommand(build, pin, serve, verify, tp, drv, uc)
 	return root
 }

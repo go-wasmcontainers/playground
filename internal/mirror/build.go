@@ -45,6 +45,9 @@ type Image struct {
 	LayerZstd bool
 	Files     map[string][]byte // path -> content; *.wasm get mode 0755
 	Module    []byte
+	// Mirrored, instead of all of the above, publishes a pinned image
+	// verbatim (FetchPinned): same documents, same digest.
+	Mirrored *Mirrored
 	// Entrypoint, Cmd, Env and WorkingDir go into the config.
 	Entrypoint []string
 	Cmd        []string
@@ -143,6 +146,31 @@ func Write(dir string, images []Image) error {
 	var catalog []CatalogEntry
 	for _, img := range images {
 		w := writer{dir: dir, repo: img.Name}
+		if mi := img.Mirrored; mi != nil {
+			for d, b := range mi.Manifests {
+				if image.FromBytes(b) != d {
+					return fmt.Errorf("%s: manifest %s does not match its content", img.Name, d)
+				}
+				if err := w.put("manifests", string(d), b); err != nil {
+					return err
+				}
+			}
+			for d, b := range mi.Blobs {
+				if image.FromBytes(b) != d {
+					return fmt.Errorf("%s: blob %s does not match its content", img.Name, d)
+				}
+				if err := w.put("blobs", string(d), b); err != nil {
+					return err
+				}
+			}
+			for _, tag := range img.Tags {
+				if err := w.put("manifests", tag, mi.Top); err != nil {
+					return err
+				}
+			}
+			catalog = append(catalog, CatalogEntry{Name: img.Name, Tags: img.Tags, Description: img.Description, Digest: string(mi.Digest())})
+			continue
+		}
 		created := img.Created
 		if created.IsZero() {
 			created = time.Unix(0, 0).UTC()

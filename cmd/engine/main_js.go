@@ -8,9 +8,12 @@
 // editor (cli/lineedit), so editing, history and Tab completion are Go.
 //
 // Messages from the page: {t:"init", history, cols}, {t:"input", data}
-// (what the terminal received from the keyboard, raw), {t:"resize", cols}.
+// (what the terminal received from the keyboard, raw), {t:"resize", cols},
+// {t:"frame-ack", surface, seq}.
 // Messages to the page: {t:"ready", version, storage}, {t:"write", data}
-// (ANSI for the terminal), {t:"history", items}, {t:"done", line, code, ms}.
+// (ANSI for the terminal), {t:"history", items}, {t:"done", line, code, ms},
+// and the GPU surfaces: {t:"surface", op, surface, …} and {t:"frame",
+// surface, seq, width, height, bitmap}.
 // The dashboard's http.* messages (package bridge) carry the engine's API
 // to the canvas UI.
 package main
@@ -37,7 +40,8 @@ import (
 	"github.com/go-wasmcontainers/engine/wasi"
 
 	"github.com/go-wasmcontainers/dashboard/bridge"
-	"github.com/go-wasmcontainers/gpu/nn"
+	nnwebgpu "github.com/go-wasmcontainers/gpu/nn/webgpu"
+	"github.com/go-wasmcontainers/gpu/webgpu"
 
 	"github.com/go-wasmcontainers/playground/internal/class"
 	"github.com/go-wasmcontainers/playground/internal/console"
@@ -48,6 +52,40 @@ import (
 var version = "dev"
 
 func post(v map[string]any) { js.Global().Call("postMessage", js.ValueOf(v)) }
+
+// postSurface hands a GPU surface's events to the page, in the messages
+// the dashboard reads (dashboard README, "GPU surfaces"). A frame's
+// ImageBitmap is transferred, so the page owns it and must close it.
+func postSurface(e webgpu.SurfaceEvent) {
+	switch e.Op {
+	case "frame":
+		m := js.ValueOf(map[string]any{"t": "frame", "surface": e.Surface, "seq": float64(e.Seq),
+			"width": e.Width, "height": e.Height})
+		m.Set("bitmap", e.Bitmap)
+		js.Global().Call("postMessage", m, js.ValueOf([]any{e.Bitmap}))
+	case "open":
+		post(map[string]any{"t": "surface", "op": "open", "surface": e.Surface, "container": e.Container,
+			"width": e.Width, "height": e.Height})
+	case "resize":
+		post(map[string]any{"t": "surface", "op": "resize", "surface": e.Surface, "width": e.Width, "height": e.Height})
+	case "close":
+		post(map[string]any{"t": "surface", "op": "close", "surface": e.Surface})
+	}
+}
+
+// frameAck reads {t:"frame-ack", surface, seq}: surface a u32, seq an
+// integer from 1 to 2^53, as the dashboard sends them.
+func frameAck(data js.Value) (uint32, uint64, bool) {
+	s, q := data.Get("surface"), data.Get("seq")
+	if s.Type() != js.TypeNumber || q.Type() != js.TypeNumber {
+		return 0, 0, false
+	}
+	sf, qf := s.Float(), q.Float()
+	if sf < 0 || sf > 1<<32-1 || sf != float64(uint32(sf)) || qf < 1 || qf > 1<<53 || qf != float64(uint64(qf)) {
+		return 0, 0, false
+	}
+	return uint32(sf), uint64(qf), true
+}
 
 func main() {
 	href := js.Global().Get("location").Get("href").String()
@@ -84,10 +122,18 @@ func main() {
 	v = "?" + strings.SplitN(strings.TrimPrefix(v, "?"), "&", 2)[0] // the build only, on assets
 	exec := browser.New(browser.Options{
 		WorkerURL: base + "container-worker.js" + v, DefaultMemoryLimitBytes: 256 << 20,
-		// wasi-nn (wasi_ephemeral_nn) on the pure-Go CPU backend: the
-		// mnist image. A GPU target fails with "unsupported operation"
-		// until the WebGPU backend lands.
-		HostModules: []wasi.HostModule{nn.NewModule()},
+		// Host modules beside wasi_snapshot_preview1:
+		//  - wasi-nn (wasi_ephemeral_nn): the pure-Go CPU backend, and a
+		//    "gpu" target on this worker's WebGPU (the mnist image);
+		//  - wasi:webgpu and wasi-gfx:surface: compute and rendering on
+		//    this worker's WebGPU (the compute and triangle images). A
+		//    container without --gpu gets no adapter; fallback (software)
+		//    adapters are refused. Surfaces go to the page (postSurface),
+		//    whose frame-acks come back to webgpu.AckFrame;
+		//  - WASIX (wasix_32v1): processes, so a container's sh can start
+		//    programs.
+		HostModules: append(append([]wasi.HostModule{nnwebgpu.NewModule()},
+			webgpu.HostModules(webgpu.Browser{OnSurface: postSurface})...), wasi.WASIX),
 		// Compiled modules across reloads; the URLs are never fetched.
 		CodeCache: codeCache, CodeCacheURL: base + "module-cache/",
 		OnCompile: func(s browser.CompileStat) {
@@ -186,6 +232,10 @@ func main() {
 			return nil
 		}
 		switch data.Get("t").String() {
+		case "frame-ack":
+			if s, q, ok := frameAck(data); ok {
+				webgpu.AckFrame(s, q)
+			}
 		case "init":
 			if con != nil {
 				break

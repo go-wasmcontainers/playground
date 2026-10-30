@@ -388,6 +388,24 @@
             // full or disabled storage: history stays for this page only
           }
           break;
+        case "frame":
+          // A GPU surface's frame: the dashboard draws and acknowledges it;
+          // without one, nothing shows it, so it is closed and acknowledged
+          // here, and the guest is not slowed waiting for the page.
+          state.frames = (state.frames || 0) + 1;
+          if (!dash) {
+            // Tests look at the frames through this hook (gpu_test.go).
+            if (typeof window.__wctrFrameProbe === "function") {
+              try {
+                window.__wctrFrameProbe(m);
+              } catch (e) {
+                // a probe's failure is the test's to report
+              }
+            }
+            if (m.bitmap && typeof m.bitmap.close === "function") m.bitmap.close();
+            engine.postMessage({ t: "frame-ack", surface: m.surface, seq: m.seq });
+          }
+          break;
         case "compile":
           state.compiles.push({ source: m.source, bytes: m.bytes, ms: m.ms, compileMs: m.compileMs, error: m.error });
           break;

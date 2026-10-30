@@ -18,6 +18,8 @@ import (
 
 	"github.com/spf13/cobra"
 
+	buildcli "github.com/go-wasmcontainers/build/cli"
+	composecli "github.com/go-wasmcontainers/compose/cli"
 	"github.com/go-wasmcontainers/engine/api"
 	"github.com/go-wasmcontainers/engine/cli"
 	"github.com/go-wasmcontainers/engine/cli/lineedit"
@@ -57,6 +59,11 @@ func (s *Session) CLIOptions() cli.Options {
 		Client:              s.Client,
 		LookupEnv:           func(string) (string, bool) { return "", false },
 		NoCompletionCommand: true,
+		// wctr build and wctr compose, as cmd/wctr wires them.
+		Extra: []func(cli.Engine) *cobra.Command{
+			func(e cli.Engine) *cobra.Command { return buildcli.ForEngine(e) },
+			func(e cli.Engine) *cobra.Command { return composecli.Command(composecli.Options{Client: e.Client}) },
+		},
 		PullCandidates: func(context.Context) []cobra.Completion {
 			var out []cobra.Completion
 			for _, i := range s.Images {
@@ -110,8 +117,38 @@ type Result struct {
 	Clear bool
 }
 
-// Run runs one line, writing what it prints to out.
+// Interactive says whether a line runs a container with its input
+// attached (wctr run -i, wctr exec -i), read with wctr's own flags: then
+// what the user types, Ctrl-C and Ctrl-D included, is the container's.
+func (s *Session) Interactive(line string) bool {
+	words, err := lineedit.Split(line)
+	if err != nil || len(words) < 2 || words[0] != "wctr" {
+		return false
+	}
+	root := cli.RootCmd(s.CLIOptions())
+	root.TraverseChildren = true
+	sub, rest, err := root.Traverse(words[1:])
+	if err != nil || sub == root || (sub.Name() != "run" && sub.Name() != "exec") {
+		return false
+	}
+	if err := sub.ParseFlags(rest); err != nil {
+		return false
+	}
+	i, err := sub.Flags().GetBool("interactive")
+	return err == nil && i
+}
+
+// Run runs one line, writing what it prints to out; it reads no input.
 func (s *Session) Run(ctx context.Context, line string, out io.Writer) Result {
+	return s.RunIO(ctx, line, nil, out)
+}
+
+// RunIO is Run with an input: what `wctr run -i` and `wctr exec -i` send
+// to the container (nil: none).
+func (s *Session) RunIO(ctx context.Context, line string, in io.Reader, out io.Writer) Result {
+	if in == nil {
+		in = strings.NewReader("")
+	}
 	w := s.writer(out)
 	defer w.flush()
 	words, err := lineedit.Split(line)
@@ -130,6 +167,11 @@ func (s *Session) Run(ctx context.Context, line string, out io.Writer) Result {
 		return Result{Clear: true}
 	case "wctr":
 		cmd := cli.RootCmd(s.CLIOptions())
+		// As cmd/wctr: the root's flags are read before the subcommand,
+		// so each subcommand keeps its own short flags (compose's -f is
+		// --file, logs' -f is --follow).
+		cmd.TraverseChildren = true
+		cmd.SetIn(in)
 		cmd.SetOut(w)
 		cmd.SetErr(w)
 		cmd.SetArgs(words[1:])
