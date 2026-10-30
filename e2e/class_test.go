@@ -15,7 +15,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/playwright-community/playwright-go"
+	"github.com/mxschmitt/playwright-go"
 
 	"github.com/go-wasmcontainers/relay/auth"
 	"github.com/go-wasmcontainers/relay/driver"

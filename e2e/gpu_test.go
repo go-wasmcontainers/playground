@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/playwright-community/playwright-go"
+	"github.com/mxschmitt/playwright-go"
 )
 
 // TestGPU runs the GPU images with a GPU (E2E_GPU=1): compute matches the

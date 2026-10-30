@@ -4,6 +4,7 @@
 //	site serve  --dir _site [--addr 127.0.0.1:8080] [--isolate]
 //	site verify --url https://go-wasmcontainers.github.io/playground/ --manifest _site/build.json
 //	site thirdparty --dir web/vendor
+//	site usercontent --allow https://go-wasmcontainers.github.io --out _site
 package main
 
 import (
@@ -20,6 +21,7 @@ import (
 	"github.com/go-wasmcontainers/playground/internal/mirror"
 	"github.com/go-wasmcontainers/playground/internal/site"
 	"github.com/go-wasmcontainers/playground/internal/thirdparty"
+	"github.com/go-wasmcontainers/playground/internal/usercontent"
 )
 
 var osExit = os.Exit
@@ -146,9 +148,28 @@ func RootCmd() *cobra.Command {
 		},
 	}
 	drv.Flags().StringVar(&ddir, "dir", "", "driver directory (PLAYWRIGHT_DRIVER_PATH)")
-	drv.Flags().StringVar(&dver, "version", "1.57.0", "playwright-core version (must match playwright-go)")
+	drv.Flags().StringVar(&dver, "version", "1.62.1", "playwright-core version (must match playwright-go v0.6201.1)")
 	drv.MarkFlagRequired("dir")
 
-	root.AddCommand(build, pin, serve, verify, tp, drv)
+	var allow, ucOut string
+	var local bool
+	uc := &cobra.Command{
+		Use:   "usercontent",
+		Short: "Write the site of a usercontent origin: the shell that shows a container's port inside the playground at --allow",
+		Args:  cobra.NoArgs,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			if err := usercontent.Render(allow, ucOut, local); err != nil {
+				return err
+			}
+			fmt.Fprintf(cmd.OutOrStdout(), "%s: %d files, for %s\n", ucOut, len(usercontent.Files), allow)
+			return nil
+		},
+	}
+	uc.Flags().StringVar(&allow, "allow", "", "the playground's origin, the only page the shell talks to (https://host)")
+	uc.Flags().StringVar(&ucOut, "out", "_site", "output directory")
+	uc.Flags().BoolVar(&local, "local", false, "also accept a loopback http origin (tests)")
+	uc.MarkFlagRequired("allow")
+
+	root.AddCommand(build, pin, serve, verify, tp, drv, uc)
 	return root
 }

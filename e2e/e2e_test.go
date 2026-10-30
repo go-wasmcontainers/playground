@@ -6,7 +6,7 @@
 //
 //	go test -tags e2e ./e2e/
 //
-// (browsers: go run github.com/playwright-community/playwright-go/cmd/playwright install chromium firefox).
+// (browsers: go run github.com/mxschmitt/playwright-go/cmd/playwright install chromium firefox).
 // E2E_PKGX=1 adds the pkgx pilot images (network); E2E_REPORT=<file>
 // writes the measurements as JSON.
 package e2e
@@ -25,7 +25,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/playwright-community/playwright-go"
+	"github.com/mxschmitt/playwright-go"
 
 	"github.com/go-wasmcontainers/playground/internal/site"
 )

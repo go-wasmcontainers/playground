@@ -1,0 +1,15 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Container ports</title>
+<style>body{font:16px/1.5 system-ui,sans-serif;max-width:40rem;margin:3rem auto;padding:0 1rem}</style>
+</head>
+<body>
+<h1>Container ports</h1>
+<p>This site shows the web pages of containers running in <a href="{{ALLOW}}/">{{ALLOW}}</a>, each on its own origin so that a container's page can never reach the playground's data.</p>
+<p>There is nothing to see here directly: publish a port in the playground (<code>wctr run -p 8080:80 …</code>) and open it from there.</p>
+</body>
+</html>
