@@ -52,9 +52,36 @@
     }
   }
 
-  const pending = new Map(); // request id -> the service worker's port
+  // request id -> {port: the service worker's, deadline}. An entry leaves
+  // when the view ends it, when the service worker gives the request up
+  // ("abort", sw.js), or when nothing came for IDLE: without that, requests
+  // nobody answered would fill MAX_PENDING and every later one get a 503.
+  const pending = new Map();
+  const IDLE = 65000; // the service worker gives up after 60 s
   const frame = document.createElement("iframe");
   frame.title = "container";
+
+  // drop forgets a request, and tells the view so that the playground can
+  // forget it too.
+  const drop = (id) => {
+    const e = pending.get(id);
+    if (!e) {
+      return;
+    }
+    pending.delete(id);
+    e.port.onmessage = null;
+    parent.postMessage({ t: "abort", sid, id }, ALLOW);
+  };
+  const sweep = () => {
+    const now = Date.now();
+    for (const [id, e] of pending) {
+      if (e.deadline <= now) {
+        e.port.postMessage({ t: "error", status: 504 });
+        drop(id);
+      }
+    }
+  };
+  setInterval(sweep, 10000);
 
   // From the service worker: a request of the container's page.
   navigator.serviceWorker.addEventListener("message", (e) => {
@@ -63,11 +90,20 @@
     if (!port) {
       return;
     }
+    if (pending.size >= MAX_PENDING) {
+      sweep(); // room may be held by requests long given up
+    }
     if (!m || m.t !== "req" || m.sid !== sid || !ID.test(m.id || "") || pending.has(m.id) || pending.size >= MAX_PENDING) {
       port.postMessage({ t: "error", status: 503 });
       return;
     }
-    pending.set(m.id, port);
+    const id = m.id;
+    pending.set(id, { port, deadline: Date.now() + IDLE });
+    port.onmessage = (ev) => {
+      if (ev.data && ev.data.t === "abort") {
+        drop(id);
+      }
+    };
     const transfer = m.body instanceof ArrayBuffer ? [m.body] : [];
     parent.postMessage({ t: "req", sid, id: m.id, port: m.port, method: m.method, path: m.path, headers: m.headers, body: m.body || null }, ALLOW, transfer);
   });
@@ -93,17 +129,21 @@
       }
       return;
     }
-    const port = pending.get(m.id);
-    if (!port) {
+    const entry = pending.get(m.id);
+    if (!entry) {
       return;
     }
+    const port = entry.port;
     if (m.t === "head") {
+      entry.deadline = Date.now() + IDLE;
       port.postMessage({ t: "head", status: m.status, headers: m.headers });
     } else if (m.t === "chunk" && m.data instanceof ArrayBuffer) {
+      entry.deadline = Date.now() + IDLE;
       port.postMessage({ t: "chunk", data: m.data }, [m.data]);
     } else if (m.t === "end" || m.t === "error") {
       port.postMessage({ t: m.t, status: m.status });
       pending.delete(m.id);
+      port.onmessage = null;
     }
   });
 

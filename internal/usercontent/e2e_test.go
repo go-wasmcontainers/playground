@@ -29,7 +29,7 @@ const nonce = "NONCEnonceNONCEnonce123"
 // opens port 8080 when the shell is ready, and answers each request with a
 // small site, in two chunks, with a Set-Cookie the route must drop.
 const view = `<!doctype html><script>
-window.log = {ready: false, reqs: [], content: null};
+window.log = {ready: false, reqs: [], content: null, aborts: 0};
 const UC = %q, NONCE = %q, SID = %q;
 let shell;
 window.addEventListener("message", (e) => {
@@ -39,10 +39,12 @@ window.addEventListener("message", (e) => {
   if (e.source !== shell.contentWindow) return;
   if (m.t === "ready") {
     window.log.ready = true;
-    shell.contentWindow.postMessage({t: "open", nonce: window.openNonce || NONCE, port: 8080, path: "/index.html"}, UC);
+    shell.contentWindow.postMessage({t: "open", nonce: window.openNonce || NONCE, port: 8080, path: window.openPath || "/index.html"}, UC);
     return;
   }
+  if (m.t === "abort") { window.log.aborts++; return; }
   if (m.t !== "req") return;
+  if (m.path.startsWith("/x/")) return; // a request the playground never answers
   window.log.reqs.push(m.method + " " + m.path);
   const files = {
     "/index.html": ["text/html", '<!doctype html><link rel=stylesheet href="style.css"><script src="app.js"></scr' + 'ipt><img id=i src="pix.svg"><p id=p>x</p><script>' +
@@ -55,6 +57,12 @@ window.addEventListener("message", (e) => {
     "/app.js": ["text/javascript", "window.scriptRan = true;"],
     "/pix.svg": ["image/svg+xml", '<svg xmlns="http://www.w3.org/2000/svg" width="7" height="7"/>'],
     "/api": ["text/plain", "from-the-engine"],
+    // 300 requests nobody answers, more than the shell's 256 pending; once
+    // the service worker has given them up, a request must still go through.
+    "/hang.html": ["text/html", '<!doctype html><script>(async () => {' +
+      ' const rs = await Promise.all(Array.from({length: 300}, (_, i) => fetch("x/" + i).then((r) => r.status, () => 0)));' +
+      ' const after = await fetch("api").then((r) => r.status, () => 0);' +
+      ' top.postMessage({content: {timedOut: rs.filter((s) => s === 504).length, refused: rs.filter((s) => s === 503).length, after}}, "*"); })();</scr' + 'ipt>'],
   };
   const f = files[m.path.split("?")[0]];
   const w = shell.contentWindow;
@@ -100,6 +108,9 @@ func TestShellInChromium(t *testing.T) {
 		page := fmt.Sprintf(view, uc, nonce, sid)
 		if r.URL.Query().Get("bad") == "1" {
 			page = strings.Replace(page, "<script>", "<script>window.openNonce = 'WRONGnonceWRONGnonce123';", 1)
+		}
+		if r.URL.Query().Get("hang") == "1" {
+			page = strings.Replace(page, "<script>", "<script>window.openPath = '/hang.html';", 1)
 		}
 		fmt.Fprint(w, page)
 	})
@@ -199,6 +210,28 @@ func TestShellInChromium(t *testing.T) {
 	p = open(uc + "/shell.html?s=" + sid + "#" + nonce)
 	if txt, _ := p.TextContent("body"); !strings.Contains(txt, "Refused") {
 		t.Fatalf("top-level shell: %q", txt)
+	}
+
+	// Requests the playground never answers must not hold the shell's
+	// pending list: 300 of them, 256 pending at most, the rest refused; the
+	// service worker gives the pending ones up after 60 s and says so; a
+	// request after that goes through. Before the fix, the 256 stayed and it
+	// got 503 until the page reloaded.
+	p = open(play + "/view?hang=1")
+	got = wait(p, "window.log.content", 100*time.Second)
+	if got == nil {
+		l, _ := p.Evaluate("window.log")
+		t.Fatalf("the hanging page never reported: %v", l)
+	}
+	c = got.(map[string]any)
+	if fmt.Sprint(c["after"]) != "200" {
+		t.Fatalf("after 300 abandoned requests, a request got %v: %v", c["after"], c)
+	}
+	if fmt.Sprint(c["refused"]) != "44" || fmt.Sprint(c["timedOut"]) != "256" {
+		t.Fatalf("expected 256 timed out and 44 refused: %v", c)
+	}
+	if n, _ := p.Evaluate("window.log.aborts"); fmt.Sprint(n) != "256" {
+		t.Fatalf("the view was told of %v abandoned requests, want 256", n)
 	}
 	_ = os.Stderr
 }
