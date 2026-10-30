@@ -152,11 +152,11 @@ jobs:
           E2E_REPORT: ${{ runner.temp }}/e2e.json
           E2E_PERSIST_REPORT: ${{ runner.temp }}/persist.json
           E2E_DASH_REPORT: ${{ runner.temp }}/dashboard.json
-        run: go test -tags e2e -count=1 -v -timeout 25m ./e2e/ > "$RUNNER_TEMP/e2e.log" 2>&1; status=$?; tail -150 "$RUNNER_TEMP/e2e.log"; exit $status
+        run: go test -tags e2e -count=1 -v -timeout 25m ./e2e/ > "$RUNNER_TEMP/e2e.log" 2>&1 && status=0 || status=$?; tail -150 "$RUNNER_TEMP/e2e.log"; exit $status
       # The usercontent shell, three local origins, Chromium (Playwright's
       # Firefox runs no service workers).
       - name: go test -tags e2e ./internal/usercontent/
-        run: go test -tags e2e -count=1 -v -timeout 5m ./internal/usercontent/ > "$RUNNER_TEMP/uc.log" 2>&1; status=$?; tail -40 "$RUNNER_TEMP/uc.log"; exit $status
+        run: go test -tags e2e -count=1 -v -timeout 5m ./internal/usercontent/ > "$RUNNER_TEMP/uc.log" 2>&1 && status=0 || status=$?; tail -40 "$RUNNER_TEMP/uc.log"; exit $status
       - name: measurements
         if: always()
         run: |
@@ -213,7 +213,7 @@ jobs:
           E2E_GPU: "1"
           E2E_GPU_REAL: ${{ matrix.real }}
           E2E_GPU_ARGS: ${{ matrix.args }}
-        run: go test -tags e2e -count=1 -v -run '^TestGPU$' -timeout 20m ./e2e/ > "$RUNNER_TEMP/gpu.log" 2>&1; status=$?; tail -60 "$RUNNER_TEMP/gpu.log"; exit $status
+        run: go test -tags e2e -count=1 -v -run '^TestGPU$' -timeout 20m ./e2e/ > "$RUNNER_TEMP/gpu.log" 2>&1 && status=0 || status=$?; tail -60 "$RUNNER_TEMP/gpu.log"; exit $status
 
   # The same images natively, for comparison: wazero through the engine,
   # and wasmtime.
@@ -227,4 +227,4 @@ jobs:
       - uses: bytecodealliance/actions/wasmtime/setup@v1
       - run: wasmtime --version
       - name: go test -tags perf
-        run: go test -tags perf -count=1 -v ./perf/ > "$RUNNER_TEMP/perf.log" 2>&1; status=$?; tail -40 "$RUNNER_TEMP/perf.log"; grep '^    perf_test' "$RUNNER_TEMP/perf.log" >> "$GITHUB_STEP_SUMMARY" || true; exit $status
+        run: go test -tags perf -count=1 -v ./perf/ > "$RUNNER_TEMP/perf.log" 2>&1 && status=0 || status=$?; tail -40 "$RUNNER_TEMP/perf.log"; grep '^    perf_test' "$RUNNER_TEMP/perf.log" >> "$GITHUB_STEP_SUMMARY" || true; exit $status
