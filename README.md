@@ -374,9 +374,12 @@ The e2e has three opt-in parts:
   - `compute` matches the CPU;
   - `triangle`'s frames reach the page and change;
   - without `--gpu`, there is no adapter.
-- `E2E_GPU_REAL=1` also refuses a SwiftShader adapter. CI sets it on the
-  macOS lane. The Linux lane runs SwiftShader on Vulkan instead, with
-  `E2E_GPU_ARGS="--enable-features=Vulkan --use-vulkan=swiftshader --use-angle=swiftshader"`.
+- `E2E_GPU_REAL=1` makes a software adapter fail the test. CI sets it on
+  the macOS lane, which runs on the Apple GPU. The Linux lane has only
+  SwiftShader on Vulkan
+  (`E2E_GPU_ARGS="--enable-features=Vulkan --use-vulkan=swiftshader --use-angle=swiftshader"`).
+  The engine refuses that software adapter even with `--gpu`, and the
+  Linux lane checks the refusal.
 
 The `pages` workflow publishes the site, then `cmd/site verify` waits until
 every file served at the live URL hashes like the build (Pages caches for

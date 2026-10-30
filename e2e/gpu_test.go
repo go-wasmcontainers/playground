@@ -54,14 +54,26 @@ func TestGPU(t *testing.T) {
 	  const a = await navigator.gpu.requestAdapter();
 	  if (!a) return "no adapter";
 	  const i = a.info || {};
-	  return [i.vendor, i.architecture, i.device, i.description, a.isFallbackAdapter ? "fallback" : ""].join("|");
+	  // isFallbackAdapter moved to GPUAdapterInfo (Chrome 136); both read.
+	  const fb = i.isFallbackAdapter || a.isFallbackAdapter;
+	  return [i.vendor, i.architecture, i.device, i.description, fb ? "fallback" : ""].join("|");
 	}`).(string)
 	t.Logf("adapter: %s", info)
 	if strings.HasPrefix(info, "no ") {
 		t.Fatalf("no WebGPU in this browser: %s", info)
 	}
-	if os.Getenv("E2E_GPU_REAL") == "1" && (strings.Contains(strings.ToLower(info), "swiftshader") || strings.Contains(info, "fallback")) {
+	software := strings.Contains(strings.ToLower(info), "swiftshader") || strings.Contains(info, "fallback")
+	if os.Getenv("E2E_GPU_REAL") == "1" && software {
 		t.Fatalf("a software adapter on the GPU lane: %s", info)
+	}
+	if software {
+		// The engine refuses a software adapter even with --gpu: GPU work
+		// is never claimed from a CPU. That refusal is what this lane
+		// checks; rendering is checked where there is a GPU.
+		b.must("wctr run --rm --gpu compute", 2, "no GPU adapter")
+		b.must("wctr run --rm --gpu triangle 1", 2, "no GPU adapter")
+		b.must("wctr run --rm --gpu mnist gpu", 1, "unsupported operation")
+		return
 	}
 
 	// Each frame, scaled to 16x16, hashed: the frames must change.

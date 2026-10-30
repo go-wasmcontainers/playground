@@ -43,9 +43,17 @@ func TestShell(t *testing.T) {
 
 	b.must("wctr run --rm shell sh -c 'echo a | cat; exit 3'", 3, "a")
 	b.must("wctr run -d --name c shell sleep 600", 0)
+	// The pipeline counts what ls alone lists (sh, coreutils.wasm and one
+	// link per tool): two spawned programs joined by a pipe agree with one.
+	listed := 0
+	for _, l := range strings.Split(b.must("wctr exec c ls /bin", 0, "sh", "coreutils.wasm"), "\n") {
+		if f := strings.TrimSpace(l); f != "" && !strings.Contains(f, "wctr exec") && !strings.HasPrefix(f, "$") {
+			listed++
+		}
+	}
 	out := b.must("wctr exec c sh -c 'ls /bin | wc -l'", 0)
-	if !strings.Contains(out, "43") {
-		t.Fatalf("ls /bin | wc -l:\n%s", out)
+	if listed < 40 || !strings.Contains(out, "\n"+strconv.Itoa(listed)) {
+		t.Fatalf("ls /bin listed %d entries; ls /bin | wc -l:\n%s", listed, out)
 	}
 	b.must("wctr exec c sh -c 'exit 3'", 3)
 
