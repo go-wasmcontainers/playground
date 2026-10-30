@@ -55,12 +55,12 @@ github.com/go-wasmcontainers/compose v0.5.0 h1:cE+FhiazMA1d4YTqIe6swp519Y1xqsiFV
 github.com/go-wasmcontainers/compose v0.5.0/go.mod h1:C+jKqJdOXKsWMLni1XubZ9fyQsP8+TwLLCTFM5+HMFo=
 github.com/go-wasmcontainers/dashboard v0.6.0 h1:xhwhBapD6bfWD9BRGXMM/WOr/SYjlksR29lbvKMO7Ko=
 github.com/go-wasmcontainers/dashboard v0.6.0/go.mod h1:r6VoKSuzTmY6wap/oa3nu/CW3Haxe7Dfh/UTbxgFgx4=
-github.com/go-wasmcontainers/engine v0.27.2 h1:q8UCNLqrNs8nsZHgssw/GsFDaNUTk3xjxhNJ3lJshUY=
-github.com/go-wasmcontainers/engine v0.27.2/go.mod h1:l9TXdve2XhKc7tVpzf0jRYh7c7+DoSlgQmUKRzDXv4A=
+github.com/go-wasmcontainers/engine v0.29.1 h1:qDIFjYf3jW2F71XK8tVYjSJY3zzLPW9ELx5hbvjx5LA=
+github.com/go-wasmcontainers/engine v0.29.1/go.mod h1:dkn31HqTtebB2ccLhCqP6DfRoEKwqDqQEnLmIEFB75s=
 github.com/go-wasmcontainers/gpu v0.5.1 h1:CgKIQlRSsVI6kiHdmkE9LfXNFgf+O2Q3PAigxM+ZNiw=
 github.com/go-wasmcontainers/gpu v0.5.1/go.mod h1:R+uEcUf/IA8U3vyo9+zCASKclnASr0Z+9d6EDutXYNw=
-github.com/go-wasmcontainers/relay v0.3.0 h1:iY5htxtOihsaZtgzWI9WFJWQbEp6+3PvntEQHZI5ZT8=
-github.com/go-wasmcontainers/relay v0.3.0/go.mod h1:ntcr62LTzf4zLPbQzr4CYrK1X9wt8yXTo4geSABcYg8=
+github.com/go-wasmcontainers/relay v0.3.1 h1:KJBOwZ6L+XHB3VAWVx1n+0TAA4UJTnFwJOMS6wfbd9U=
+github.com/go-wasmcontainers/relay v0.3.1/go.mod h1:orl1CRgrYjvsy8pFIGVadebO7EE8x3pT92kAVvJp8Ok=
 github.com/go-widgets/mvvm v0.15.0 h1:VvZiLB7gm+5CIEeQH3GNI53ytUndzOznT/fJvaG8hOQ=
 github.com/go-widgets/mvvm v0.15.0/go.mod h1:ZJj5M8zDg/gdzcvdWnJgZj/fcV0qe84fALq+EQVzUOM=
 github.com/go-widgets/painter v0.16.0 h1:j8FFObisySQChY2JiXS7Di2Mo4cqufIc0PDUnoDPMiA=
@@ -78,8 +78,8 @@ github.com/hashicorp/hcl/v2 v2.25.0/go.mod h1:vR+FKETxoZAmRlHgFfKmuqivj+C4Izm/c6
 github.com/inconshreveable/mousetrap v1.1.0 h1:wN+x4NVGpMsO7ErUn/mUI3vEoE6Jt13X2s0bqwp9tc8=
 github.com/inconshreveable/mousetrap v1.1.0/go.mod h1:vpF70FUmC8bwa3OWnCshd2FqLfsEA9PFc4w1p2J65bw=
 github.com/klauspost/compress v1.4.1/go.mod h1:RyIbtBH6LamlWaDj8nUwkbUhJ87Yi3uG0guNDohfE1A=
-github.com/klauspost/compress v1.20.0 h1:a3C1ke2ohxFymNlb2HWAHjDeKCI90scRskErZkR0ezA=
-github.com/klauspost/compress v1.20.0/go.mod h1:LUdAzn7YLVvxLpc7y3V1m40wESHTgc1422pwwBSKYuI=
+github.com/klauspost/compress v1.20.3 h1:zWNoFqq/lSuYQRim3dUXlXeA0IqwuZGicdG5ZTfY5j4=
+github.com/klauspost/compress v1.20.3/go.mod h1:LUdAzn7YLVvxLpc7y3V1m40wESHTgc1422pwwBSKYuI=
 github.com/klauspost/cpuid v1.2.0/go.mod h1:Pj4uuM528wm8OyEC2QMXAi2YiTZ96dNQPGgoMS4s3ek=
 github.com/mitchellh/go-wordwrap v1.0.1 h1:TLuKupo69TCn6TQSyGxwI1EblZZEsQ0vMlAFQflz0v0=
 github.com/mitchellh/go-wordwrap v1.0.1/go.mod h1:R62XHJLzvMFRBbcrT7m7WgmE1eOyTSsCt+hzestvNj0=
