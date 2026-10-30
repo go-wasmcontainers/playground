@@ -3,12 +3,18 @@ package session
 import "testing"
 
 // TestInteractive: a line gets the terminal's input exactly when wctr's
-// own flags say -i, wherever they stand among the others. (Only exec has
-// -i in the engine today; run's lines follow when it does, with no change
-// here, since the flags are wctr's own.)
+// own flags say -i, wherever they stand among the others: exec, and run
+// and start since engine v0.30.0.
 func TestInteractive(t *testing.T) {
 	s := &Session{}
 	for line, want := range map[string]bool{
+		"wctr run --rm -it shell":               true,
+		"wctr run --name c -it shell":           true,
+		"wctr run -t shell":                     false,
+		"wctr run --rm shell sh -i":             false,
+		"wctr run -dit shell":                   true,
+		"wctr start -ai c":                      true,
+		"wctr start -a c":                       false,
 		"wctr exec -it c sh":                    true,
 		"wctr exec -ti c sh":                    true,
 		"wctr exec -i c sh":                     true,
