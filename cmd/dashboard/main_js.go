@@ -21,6 +21,7 @@ import (
 
 	"github.com/go-wasmcontainers/dashboard/bridge"
 	"github.com/go-wasmcontainers/dashboard/engine"
+	"github.com/go-wasmcontainers/dashboard/host"
 	"github.com/go-wasmcontainers/dashboard/ui"
 	"github.com/go-wasmcontainers/dashboard/vm"
 	"github.com/go-wasmcontainers/engine/api"
@@ -73,7 +74,10 @@ func main() {
 	app.Terminal.SetShell(sessionShell{sess}, sess.Completer())
 	w, h := g.Get("innerWidth").Int(), g.Get("innerHeight").Int()
 	scene = ui.New(app, q, w, h)
-	connectClass(g, worker, app, q)
+	// The page's side, the dashboard's one implementation: joining a class,
+	// and the GPU surfaces' frames (drawn, acknowledged) and input.
+	host.ConnectClass(g, worker, app, q)
+	host.ConnectSurfaces(worker, app, q, scene)
 
 	g.Set("__dashboard", map[string]any{
 		"version": version,

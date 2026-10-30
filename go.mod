@@ -5,12 +5,12 @@ go 1.27.3
 require (
 	github.com/go-wasmcontainers/build v0.4.0
 	github.com/go-wasmcontainers/compose v0.5.0
-	github.com/go-wasmcontainers/dashboard v0.6.0
+	github.com/go-wasmcontainers/dashboard v0.7.1-0.20261030134415-c8f6b0ff8f8c
 	github.com/go-wasmcontainers/engine v0.29.1
-	github.com/go-wasmcontainers/gpu v0.5.1
+	github.com/go-wasmcontainers/gpu v0.6.0
 	github.com/go-wasmcontainers/relay v0.3.1
 	github.com/go-widgets/mvvm v0.15.0
-	github.com/go-widgets/webcanvas v0.6.0
+	github.com/go-widgets/webcanvas v0.6.1-0.20261030082625-2597bb48bccf
 	github.com/klauspost/compress v1.20.3
 	github.com/mxschmitt/playwright-go v0.6201.1
 	github.com/spf13/cobra v1.10.2

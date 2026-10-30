@@ -87,6 +87,28 @@ func frameAck(data js.Value) (uint32, uint64, bool) {
 	return uint32(sf), uint64(qf), true
 }
 
+// surfaceInput hands a dashboard pane's pointer or key event to the GPU
+// surface's guest. The fields are read bounded (str); a surface that is not
+// a u32, or anything webgpu.SurfaceInput does not accept (an unknown kind,
+// a coordinate that is not finite or too large, text over 64 bytes), is
+// dropped there.
+func surfaceInput(data js.Value) {
+	sf := data.Get("surface").Float()
+	if sf < 0 || sf > 1<<32-1 || sf != float64(uint32(sf)) {
+		return
+	}
+	num := func(k string) float64 {
+		if v := data.Get(k); v.Type() == js.TypeNumber {
+			return v.Float()
+		}
+		return 0
+	}
+	webgpu.SurfaceInput(uint32(sf), webgpu.InputEvent{
+		Kind: str(data, "kind"), X: num("x"), Y: num("y"), Code: str(data, "code"), Text: str(data, "text"),
+		Alt: data.Get("alt").Truthy(), Ctrl: data.Get("ctrl").Truthy(), Meta: data.Get("meta").Truthy(), Shift: data.Get("shift").Truthy(),
+	})
+}
+
 func main() {
 	href := js.Global().Get("location").Get("href").String()
 	base := href[:strings.LastIndexByte(href, '/')+1]
@@ -266,6 +288,15 @@ func main() {
 				},
 			})
 		case "input":
+			// Two messages share the name: the terminal's keystrokes
+			// ({t:"input", data}) and, from the dashboard's surface panes,
+			// a pointer or key event for a GPU surface's guest ({t:"input",
+			// surface, kind, ...}; go-wasmcontainers/gpu docs/DESIGN.md,
+			// "Surface input"), which webgpu.SurfaceInput validates.
+			if data.Get("kind").Type() == js.TypeString && data.Get("surface").Type() == js.TypeNumber {
+				surfaceInput(data)
+				break
+			}
 			if con != nil {
 				con.Input(data.Get("data").String())
 			}
