@@ -57,6 +57,8 @@ type Image struct {
 	Index bool
 	// Created is the config's creation time.
 	Created time.Time
+	// Project and Version name the pkgx bottle the image comes from (catalog.json).
+	Project, Version string
 }
 
 // Catalog entry, written to catalog.json for the page's help.
@@ -65,6 +67,13 @@ type CatalogEntry struct {
 	Tags        []string `json:"tags"`
 	Description string   `json:"description"`
 	Digest      string   `json:"digest"`
+	// Project, Version and Bytes are set for images derived from the pkgx
+	// catalogue (the bottle's project, the version mirrored, the layer's
+	// compressed size): the page can show what an image is and what pulling it
+	// costs without fetching it. Readers that do not know them ignore them.
+	Project string `json:"project,omitempty"`
+	Version string `json:"version,omitempty"`
+	Bytes   int64  `json:"bytes,omitempty"`
 }
 
 type writer struct {
@@ -248,30 +257,39 @@ func Write(dir string, images []Image) error {
 				return err
 			}
 		}
-		catalog = append(catalog, CatalogEntry{Name: img.Name, Tags: img.Tags, Description: img.Description, Digest: string(top.Digest)})
+		catalog = append(catalog, CatalogEntry{Name: img.Name, Tags: img.Tags, Description: img.Description, Digest: string(top.Digest),
+			Project: img.Project, Version: img.Version, Bytes: int64(len(img.Layer))})
 	}
 	return os.WriteFile(filepath.Join(dir, "catalog.json"), mustJSON(catalog), 0o644)
 }
 
 // diffID is the digest of the uncompressed tar (the config's diff_id).
 func diffID(layer []byte, zst bool) (image.Digest, error) {
-	r, closeFn, err := decompress(layer, zst)
+	const max = 1 << 30
+	r, closeFn, err := decompress(layer, zst, max)
 	if err != nil {
 		return "", err
 	}
 	defer closeFn()
 	var raw bytes.Buffer
-	if _, err := raw.ReadFrom(io.LimitReader(r, 1<<30)); err != nil {
+	// One byte past the limit: an over-long layer is an error, not a layer
+	// silently cut short (which would give a diff_id for the wrong bytes).
+	if _, err := raw.ReadFrom(io.LimitReader(r, max+1)); err != nil {
 		return "", err
+	}
+	if raw.Len() > max {
+		return "", fmt.Errorf("layer unpacks to more than %d bytes", max)
 	}
 	return image.FromBytes(raw.Bytes()), nil
 }
 
-// decompress opens a gzip or zstd layer (build-time, trusted bottles; the
-// engine bounds what it unpacks on its side).
-func decompress(layer []byte, zst bool) (io.Reader, func(), error) {
+// decompress opens a gzip or zstd layer. A zstd decoder is bounded in memory
+// and window (a frame header can ask for gigabytes); the unpacked size of
+// either is bounded by the reader's caller (ScanTar, diffID).
+func decompress(layer []byte, zst bool, max int64) (io.Reader, func(), error) {
 	if zst {
-		zr, err := zstd.NewReader(bytes.NewReader(layer), zstd.WithDecoderConcurrency(1))
+		zr, err := zstd.NewReader(bytes.NewReader(layer), zstd.WithDecoderConcurrency(1),
+			zstd.WithDecoderMaxMemory(uint64(max)), zstd.WithDecoderMaxWindow(64<<20))
 		if err != nil {
 			return nil, nil, err
 		}
