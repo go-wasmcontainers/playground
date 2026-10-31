@@ -24,7 +24,7 @@ require (
 	filippo.io/bigmod v0.1.0 // indirect
 	filippo.io/edwards25519 v1.2.0 // indirect
 	github.com/Azure/go-ntlmssp v0.1.1 // indirect
-	github.com/agext/levenshtein v1.2.1 // indirect
+	github.com/agext/levenshtein v1.2.3 // indirect
 	github.com/anchore/go-lzo v0.1.1 // indirect
 	github.com/apparentlymart/go-textseg/v15 v15.0.0 // indirect
 	github.com/apparentlymart/go-textseg/v17 v17.0.1 // indirect
@@ -38,6 +38,7 @@ require (
 	github.com/docker/go-units v0.5.0 // indirect
 	github.com/dsnet/compress v0.0.2-0.20230904184137-39efe44ab707 // indirect
 	github.com/dustin/go-humanize v1.1.0 // indirect
+	github.com/ebitengine/purego v0.11.1 // indirect
 	github.com/go-asn1-ber/asn1-ber v1.5.8 // indirect
 	github.com/go-attest/sign v0.3.0 // indirect
 	github.com/go-authn/directory v0.15.0 // indirect
@@ -45,6 +46,7 @@ require (
 	github.com/go-authn/krl v0.6.1 // indirect
 	github.com/go-authn/oidc v0.4.3 // indirect
 	github.com/go-authn/revocation v0.6.6 // indirect
+	github.com/go-authn/rp v0.2.0 // indirect
 	github.com/go-authn/servercert v0.5.2 // indirect
 	github.com/go-authn/sshcert v0.1.9 // indirect
 	github.com/go-compressions/lzfse v0.4.1 // indirect
@@ -53,7 +55,9 @@ require (
 	github.com/go-encryptions/xts v0.0.0-20260911133109-312298263872 // indirect
 	github.com/go-encryptions/zfscrypt v0.0.0-20260927173133-ff7dd33bb415 // indirect
 	github.com/go-fde/apfs v0.0.0-20260912170739-6acb57fc9eb0 // indirect
-	github.com/go-fileshare/fileshare v0.31.2 // indirect
+	github.com/go-fileshare/explorer v0.4.0 // indirect
+	github.com/go-fileshare/fileshare v0.32.0 // indirect
+	github.com/go-fileshare/portal v0.3.2 // indirect
 	github.com/go-filesystems/apfs v0.3.0 // indirect
 	github.com/go-filesystems/btrfs v0.3.0 // indirect
 	github.com/go-filesystems/detect v0.3.0 // indirect
@@ -76,16 +80,21 @@ require (
 	github.com/go-filesystems/webdav v0.6.0 // indirect
 	github.com/go-filesystems/xfs v0.3.0 // indirect
 	github.com/go-filesystems/zfs v0.3.0 // indirect
+	github.com/go-freedesktop/x11 v0.3.0 // indirect
 	github.com/go-fsctl/btrfs v0.1.1 // indirect
 	github.com/go-fsctl/projquota v0.1.0 // indirect
 	github.com/go-fsctl/zfs v0.1.1 // indirect
 	github.com/go-gfx/gfx v0.36.1 // indirect
+	github.com/go-gtk/gtk4 v0.9.0 // indirect
 	github.com/go-icons/iconoir v0.3.0 // indirect
 	github.com/go-images/images v0.1.1-0.20261026203936-4ac989d310a1 // indirect
 	github.com/go-jose/go-jose/v4 v4.1.6 // indirect
 	github.com/go-ldap/ldap/v3 v3.4.15 // indirect
 	github.com/go-logr/logr v1.4.4 // indirect
 	github.com/go-logr/stdr v1.2.2 // indirect
+	github.com/go-macos/appkit v0.9.0 // indirect
+	github.com/go-macos/objc v0.11.2 // indirect
+	github.com/go-mswin/win32 v0.6.0 // indirect
 	github.com/go-net-health/endpoint v0.1.0 // indirect
 	github.com/go-opentype/fonts v0.14.0 // indirect
 	github.com/go-opentype/opentype v0.16.2-0.20261027113239-5e69589e9a5e // indirect
@@ -97,9 +106,13 @@ require (
 	github.com/go-volumes/gpt v0.3.0 // indirect
 	github.com/go-volumes/s3 v0.2.2 // indirect
 	github.com/go-volumes/safeio v0.0.0-20260831125406-d8f54b2890d4 // indirect
+	github.com/go-widgets/android v0.16.0 // indirect
+	github.com/go-widgets/mvvmtk v0.15.0 // indirect
 	github.com/go-widgets/painter v0.16.0 // indirect
 	github.com/go-widgets/toolkit v0.345.2 // indirect
+	github.com/go-widgets/window v0.89.1 // indirect
 	github.com/goccy/go-json v0.11.2 // indirect
+	github.com/godbus/dbus/v5 v5.2.2 // indirect
 	github.com/google/go-cmp v0.7.0 // indirect
 	github.com/google/uuid v1.6.0 // indirect
 	github.com/gorilla/securecookie v1.1.2 // indirect
@@ -175,6 +188,7 @@ require (
 	oras.land/oras-go/v2 v2.7.0 // indirect
 )
 
-replace github.com/go-fileshare/fileshare => ../go-fileshare-fileshare
-
-tool github.com/go-fileshare/fileshare
+tool (
+	github.com/go-fileshare/explorer
+	github.com/go-fileshare/fileshare
+)

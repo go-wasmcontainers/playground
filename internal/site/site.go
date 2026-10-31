@@ -74,6 +74,25 @@ func goBuild(root, pkg, out string, env []string, ldflags string, tags ...string
 	return nil
 }
 
+// ExplorerModule is the go-fileshare explorer, built into the site.
+const ExplorerModule = "github.com/go-fileshare/explorer"
+
+// ExplorerFiles are the explorer's page files, from its module's web/.
+var ExplorerFiles = map[string]string{"index.html": "explorer.html", "boot.js": "boot.js", "explorer.css": "explorer.css"}
+
+// moduleDir is where the go command keeps module mod, as root's go.mod
+// requires it.
+func moduleDir(root, mod string) (string, error) {
+	cmd := exec.Command("go", "list", "-m", "-f", "{{.Dir}}", mod)
+	cmd.Dir = root
+	cmd.Env = append(os.Environ(), "GOWORK=off")
+	out, err := cmd.Output()
+	if err != nil {
+		return "", fmt.Errorf("go list -m %s: %w", mod, err)
+	}
+	return strings.TrimSpace(string(out)), nil
+}
+
 func goRoot() (string, error) {
 	out, err := exec.Command("go", "env", "GOROOT").Output()
 	if err != nil {
@@ -275,6 +294,22 @@ func Build(ctx context.Context, o Options) (*Manifest, error) {
 	if err := goBuild(o.Root, "./cmd/dashboard", filepath.Join(o.Out, "dashboard.wasm"), []string{"GOOS=js", "GOARCH=wasm", "CGO_ENABLED=0"}, ld); err != nil {
 		return nil, err
 	}
+	// The go-fileshare explorer, a WebDAV client the ports bar opens on a
+	// published port (web/ports.js "explore"), at the version go.mod's tool
+	// directive pins. Its page becomes explorer.html; wasm_exec.js is shared,
+	// one toolchain building both.
+	if err := goBuild(o.Root, ExplorerModule, filepath.Join(o.Out, "explorer.wasm"), []string{"GOOS=js", "GOARCH=wasm", "CGO_ENABLED=0"}, "-s -w"); err != nil {
+		return nil, err
+	}
+	exDir, err := moduleDir(o.Root, ExplorerModule)
+	if err != nil {
+		return nil, err
+	}
+	for from, to := range ExplorerFiles {
+		if err := copyFile(filepath.Join(exDir, "web", from), filepath.Join(o.Out, to)); err != nil {
+			return nil, err
+		}
+	}
 	gr, err := goRoot()
 	if err != nil {
 		return nil, err
@@ -334,7 +369,9 @@ func Build(ctx context.Context, o Options) (*Manifest, error) {
 	// mirror is not part of the shell: pulled images live in IndexedDB.
 	shell := []string{""}
 	for _, k := range keys {
-		if k != "index.html" && k != "sw.js" && !strings.HasPrefix(k, "v2/") && !strings.HasSuffix(k, ".LICENSE") {
+		// explorer.wasm (16 MB) is fetched when somebody explores a port, not
+		// installed with the shell for everybody.
+		if k != "index.html" && k != "sw.js" && k != "explorer.wasm" && !strings.HasPrefix(k, "v2/") && !strings.HasSuffix(k, ".LICENSE") {
 			if strings.ContainsAny(k, `'\`) { // the list sits in a JS '…' literal
 				return nil, fmt.Errorf("%s: a shell file name may not contain a quote or a backslash", k)
 			}
@@ -435,8 +472,12 @@ var relayRE = regexp.MustCompile(`^https://([a-z0-9.-]{1,253}|\[[0-9a-f:]{2,39}\
 // started for a class (engine-worker.js?relay=https://host[:port]), whose
 // connect-src adds that one relay (https for joining, wss for the data
 // channel). A worker takes its CSP from its own response; the page keeps
-// 'self' only. web/sw.js applies the same rule.
+// 'self' only. The explorer's page (explorer.html) may be framed by the
+// playground, by nothing else. web/sw.js applies the same rule.
 func CSPFor(u *url.URL) string {
+	if strings.HasSuffix(u.Path, "/explorer.html") {
+		return strings.Replace(CSP, "frame-ancestors 'none'", "frame-ancestors 'self'", 1)
+	}
 	if !strings.HasSuffix(u.Path, "/engine-worker.js") {
 		return CSP
 	}

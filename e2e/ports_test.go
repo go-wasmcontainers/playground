@@ -94,6 +94,112 @@ func TestFileshare(t *testing.T) {
 	}
 }
 
+// TestFileshareExplorer is the go-fileshare explorer as the browser client of
+// the fileshare image: the ports bar's "explore :8080" asks for a user and a
+// password, and the explorer (explorer.html, in a frame of the playground)
+// lists the share through its bridge, which talks to the engine directly --
+// no view tab, no usercontent origin. The explorer draws on a canvas; what it
+// shows comes back through the bridge's state(json).
+func TestFileshareExplorer(t *testing.T) {
+	if os.Getenv("E2E_URL") != "" {
+		t.Skip("runs the fileshare image: a local build")
+	}
+	play := serve(t, true)
+	pw, err := playwright.Run()
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { pw.Stop() })
+	browser, err := pw.Chromium.Launch(playwright.BrowserTypeLaunchOptions{Headless: playwright.Bool(true), Timeout: playwright.Float(180000)})
+	if err != nil {
+		t.Fatalf("launch: %v", err)
+	}
+	t.Cleanup(func() { browser.Close() })
+	page, err := browser.NewPage()
+	if err != nil {
+		t.Fatal(err)
+	}
+	b := tab{t, page, "chromium/explorer"}
+	var console []string
+	page.OnConsole(func(m playwright.ConsoleMessage) { console = append(console, m.Type()+": "+m.Text()) })
+	t.Cleanup(func() {
+		if t.Failed() {
+			st, _ := page.Evaluate(`() => JSON.stringify(window.__wctrExplore)`)
+			t.Logf("explorer state: %v\nconsole:\n%s", st, strings.Join(console, "\n"))
+		}
+	})
+	if _, err := page.Goto(play + "?ui=terminal"); err != nil {
+		t.Fatal(err)
+	}
+	b.ready()
+	b.must("wctr run -d -p 8080:80 --name files fileshare", 0)
+	b.until("the ports bar lists 8080", `() => window.wctrPorts.state.ports.includes(8080)`, 30*time.Second)
+
+	explore := func(user, pass string) {
+		t.Helper()
+		if err := page.Locator("#portbar button", playwright.PageLocatorOptions{HasText: "explore :8080"}).Click(); err != nil {
+			t.Fatal(err)
+		}
+		for sel, v := range map[string]string{"#exploreuser": user, "#explorepass": pass} {
+			if err := page.Locator(sel).Fill(v); err != nil {
+				t.Fatal(err)
+			}
+		}
+		if err := page.Locator("#exploreform button[type=submit]").Click(); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	// A wrong password: the server refuses, and the explorer says so.
+	explore("alice", "nope")
+	b.until("the server refused a wrong password", `() => (window.__wctrExplore.calls || []).some((c) => c.status === 401)`, 90*time.Second)
+	if listed, _ := page.Evaluate(`() => ((window.__wctrExplore.explorer || {}).entries || []).length`); num(listed) != 0 {
+		t.Fatal("the explorer listed the server with a wrong password")
+	}
+	if pw, _ := page.Evaluate(`() => document.getElementById("explorepass").value`); pw != "" {
+		t.Fatal("the password stayed in the form")
+	}
+	if err := page.Locator("#explorerclose").Click(); err != nil {
+		t.Fatal(err)
+	}
+
+	// alice's: the server lists its share.
+	explore("alice", "playground")
+	b.until("the explorer lists the share", `() => JSON.stringify(((window.__wctrExplore.explorer || {}).entries) || []).includes("files")`, 90*time.Second)
+
+	// The bridge both ways: a PUT the explorer would send, read back.
+	got, err := page.Evaluate(`async () => {
+		const br = window.fileshareExplorerBridge;
+		const put = await br.request("PUT", "/files/from-the-explorer.txt", [["Content-Type", "text/plain"]], new TextEncoder().encode("written through the bridge"));
+		const back = await br.request("GET", "/files/from-the-explorer.txt", [], null);
+		const evil = await br.request("GET", "/files/README.txt", [["Authorization", "Basic " + btoa("mallory:x")]], null);
+		return {put: put.status, back: back.status, text: new TextDecoder().decode(back.body), evil: evil.status};
+	}`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	m := got.(map[string]any)
+	t.Logf("through the bridge: %v; calls %v", m, must(page.Evaluate(`() => window.__wctrExplore.calls.slice(-6)`)))
+	switch {
+	case num(m["put"]) != 201 || num(m["back"]) != 200 || m["text"] != "written through the bridge":
+		t.Fatalf("a PUT through the bridge did not land: %v", m)
+	case num(m["evil"]) != 200:
+		// The session's credentials replace whatever the frame sends.
+		t.Fatalf("the frame's own Authorization was not replaced: %v", m)
+	}
+
+	// Closing forgets the session: the bridge refuses after.
+	if err := page.Locator("#explorerclose").Click(); err != nil {
+		t.Fatal(err)
+	}
+	closed, _ := page.Evaluate(`async () => { try { await window.fileshareExplorerBridge.request("GET", "/files/", [], null); return "answered"; } catch (e) { return String(e); } }`)
+	if !strings.Contains(fmt.Sprint(closed), "closed") {
+		t.Fatalf("the bridge answered after close: %v", closed)
+	}
+}
+
+func must(v any, _ error) any { return v }
+
 // portTab is the playground tab of a port test, and the usercontent origin.
 type portTab struct {
 	tab

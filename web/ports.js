@@ -38,7 +38,12 @@ window.wctrPorts = (() => {
       btn.type = "button";
       btn.textContent = "open :" + p;
       btn.addEventListener("click", () => open(p));
-      b.append(btn, " ");
+      // A WebDAV server (the fileshare image): the go-fileshare explorer.
+      const ex = document.createElement("button");
+      ex.type = "button";
+      ex.textContent = "explore :" + p;
+      ex.addEventListener("click", () => window.wctrExplore && window.wctrExplore.ask(p));
+      b.append(btn, " ", ex, " ");
     }
   }
 
@@ -55,6 +60,11 @@ window.wctrPorts = (() => {
   }
 
   function onEngine(m) {
+    // The explorer's session and its answers are its own (explore.js).
+    if (window.wctrExplore && window.wctrExplore.owns(m)) {
+      window.wctrExplore.onEngine(m);
+      return;
+    }
     switch (m.t) {
       case "ports":
         draw(Array.isArray(m.items) ? m.items.filter((p) => Number.isInteger(p)) : []);
@@ -108,6 +118,9 @@ window.wctrPorts = (() => {
     state,
     attach(w) {
       engine = w;
+    },
+    engine() {
+      return engine;
     },
     refresh() {
       if (engine) engine.postMessage({ t: "ports", rid: "list" });

@@ -83,18 +83,46 @@ body.dash #classbar {
 #classinfo[hidden], #joinerr[hidden], #joinstep1[hidden], #joinstep2[hidden] {
   display: none;
 }
-#joindlg {
+#joindlg, #exploredlg {
   background: var(--bg);
   color: var(--fg);
   border: 1px solid #253340;
   border-radius: 6px;
   max-width: min(32em, calc(100vw - 32px));
 }
-#joindlg label {
+#joindlg label, #exploredlg label {
   display: block;
   margin: 0.6em 0;
 }
-#joindlg input {
+#exploredlg .hint {
+  color: var(--muted);
+}
+/* The explorer (explore.js): an overlay over either UI, its own frame. */
+#explorerbox {
+  position: fixed;
+  z-index: 2;
+  inset: 16px;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg);
+  border: 1px solid #253340;
+  border-radius: 6px;
+}
+#explorerbox[hidden] {
+  display: none;
+}
+.explorerbar {
+  display: flex;
+  justify-content: space-between;
+  padding: 4px 8px;
+  border-bottom: 1px solid #253340;
+}
+#explorerframe {
+  flex: 1;
+  border: 0;
+  width: 100%;
+}
+#joindlg input, #exploredlg input {
   display: block;
   width: 100%;
   box-sizing: border-box;

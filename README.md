@@ -366,6 +366,31 @@ from inside the container's page:
 - with alice's: a PROPFIND of the share (207) lists README.txt, which reads;
 - a PUT lands (201) and reads back.
 
+**explore :8080** opens the [go-fileshare explorer](https://github.com/go-fileshare/explorer)
+(v0.4.0, built into the site as `explorer.wasm`, fetched only when used) as a
+browser client of the server:
+- It asks for a user and a password first. They are sent as HTTP Basic with
+  each request, and they stay in the page's memory. They are dropped when the
+  explorer closes; nothing is stored.
+- The explorer runs in a frame of the playground, in its bridge mode. Its
+  requests go straight to the engine, on a relay session of their own, with no
+  view tab and no usercontent origin.
+- The explorer is the site's own code, not the container's, and it draws on a
+  canvas. Nothing the container answers becomes HTML in the playground.
+- `explorer.html` is the only page that may be framed, and only by the
+  playground (`frame-ancestors 'self'`; everything else keeps `'none'`).
+- The session's credentials replace any `Authorization` header the frame
+  sends.
+- A download is read whole, up to the route's 256 MiB bound, and saved under
+  a sanitised name.
+
+`TestFileshareExplorer` checks:
+- a wrong password: 401, and the explorer says the server refused the login;
+- alice's: the server lists its share;
+- through the bridge, a PUT (201) reads back;
+- a frame-supplied `Authorization` is replaced;
+- after close, the bridge refuses.
+
 ## How it works
 
 ```

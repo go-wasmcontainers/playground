@@ -18,6 +18,20 @@
   <nav><a id="switch" href="?ui=terminal">terminal only</a> · <a href="https://go-wasmcontainers.github.io/docs/" rel="noopener">docs</a> · <a href="https://github.com/go-wasmcontainers/playground" rel="noopener">source</a></nav>
 </header>
 <div id="portbar" hidden></div>
+<dialog id="exploredlg" aria-labelledby="exploretitle">
+  <form id="exploreform" method="dialog" autocomplete="off">
+    <h2 id="exploretitle">Explore a WebDAV server</h2>
+    <p id="exploreport"></p>
+    <label>User <input id="exploreuser" autocomplete="off" spellcheck="false"></label>
+    <label>Password <input id="explorepass" type="password" autocomplete="off"></label>
+    <p class="hint">Sent to the container only, with each request, from this tab. Kept in this page's memory until the explorer closes. (The fileshare image: alice, playground.)</p>
+    <menu><button id="explorecancel" type="button">Cancel</button> <button type="submit">Explore</button></menu>
+  </form>
+</dialog>
+<section id="explorerbox" hidden aria-label="File explorer">
+  <div class="explorerbar"><span id="explorertitle"></span> <button id="explorerclose" type="button">close</button></div>
+  <iframe id="explorerframe" title="File explorer"></iframe>
+</section>
 <div id="classbar"><button id="joinbtn" type="button">Join class</button><span id="classinfo" hidden></span></div>
 <dialog id="joindlg" aria-labelledby="jointitle">
   <form id="joinform" method="dialog" autocomplete="off">
@@ -42,6 +56,7 @@
 <script src="vendor/addon-fit.js?v={{BUILD}}"></script>
 <script src="wasm_exec.js?v={{BUILD}}"></script>
 <script src="ports.js?v={{BUILD}}"></script>
+<script src="explore.js?v={{BUILD}}"></script>
 <script src="app.js?v={{BUILD}}"></script>
 </body>
 </html>
