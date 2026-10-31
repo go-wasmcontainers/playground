@@ -31,6 +31,10 @@ const CSP = "default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; style-src
 // the value is spliced into the header, so only a plain host passes.
 const RELAY_RE = /^https:\/\/([a-z0-9.-]{1,253}|\[[0-9a-f:]{2,39}\])(:[0-9]{1,5})?$/;
 function cspFor(url) {
+  // The explorer (explore.js) is framed by the playground, and by it only.
+  if (url.pathname.endsWith("/explorer.html")) {
+    return CSP.replace("frame-ancestors 'none'", "frame-ancestors 'self'");
+  }
   if (url.pathname.endsWith("/engine-worker.js")) {
     const r = url.searchParams.get("relay");
     if (r && RELAY_RE.test(r)) {

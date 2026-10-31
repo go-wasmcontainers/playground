@@ -32,8 +32,11 @@ const (
 	MaxResponse    = 256 << 20 // a response body
 )
 
-// Methods are the methods relayed.
-var Methods = map[string]bool{"GET": true, "HEAD": true, "POST": true, "PUT": true, "PATCH": true, "DELETE": true, "OPTIONS": true}
+// Methods are the methods relayed: HTTP's, and WebDAV's (RFC 4918 §9), so
+// that a WebDAV server in a container -- go-fileshare's, say -- has a client
+// in its own page. Each reaches only that container's port, as GET does.
+var Methods = map[string]bool{"GET": true, "HEAD": true, "POST": true, "PUT": true, "PATCH": true, "DELETE": true, "OPTIONS": true,
+	"PROPFIND": true, "PROPPATCH": true, "MKCOL": true, "COPY": true, "MOVE": true, "LOCK": true, "UNLOCK": true}
 
 // ErrRefused is a request the route does not relay.
 var ErrRefused = errors.New("refused")

@@ -17,6 +17,15 @@ func TestCSPFor(t *testing.T) {
 	if got := CSPFor(u("/playground/index.html?relay=https://relay.example")); got != CSP {
 		t.Errorf("the page got a relay: %s", got)
 	}
+	// The explorer: framed by the playground only; nothing else changes.
+	if got := CSPFor(u("/playground/explorer.html?relay=https://relay.example")); got != strings.Replace(CSP, "frame-ancestors 'none'", "frame-ancestors 'self'", 1) || got == CSP {
+		t.Errorf("explorer.html: %s", got)
+	}
+	for _, p := range []string{"/playground/explorer.html.js", "/playground/explorer.wasm", "/playground/view.html"} {
+		if got := CSPFor(u(p)); got != CSP {
+			t.Errorf("%s may be framed: %s", p, got)
+		}
+	}
 	got := CSPFor(u("/playground/engine-worker.js?v=abc&relay=https://relay.example:8443"))
 	if !strings.Contains(got, "connect-src 'self' https://relay.example:8443 wss://relay.example:8443;") {
 		t.Errorf("engine worker: %s", got)
