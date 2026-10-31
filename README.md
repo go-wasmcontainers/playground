@@ -324,6 +324,30 @@ the playground and the usercontent site on two local origins. The container's
 page shows, an 8 MiB body arrives whole, the nonce leaves the URL, and the
 view is not isolated. With the engine's relay disabled, the test fails.
 
+### A file server in the tab: the `fileshare` image
+
+```console
+$ wctr run -d -p 8080:80 --name files fileshare
+```
+
+The image is [go-fileshare/fileshare](https://github.com/go-fileshare/fileshare),
+built for `wasip1` and serving WebDAV only (6.5 MB gzip):
+- one share, `files`, with a README in it;
+- one person: user `alice`, password `playground`. The password is a demo,
+  written into the image on purpose, since nothing the share holds belongs to
+  anybody;
+- plaintext WebDAV, because TLS ends at the browser's origin and the hop to
+  the container is the engine's, in memory.
+
+**open :8080** shows the server's page, and the route relays WebDAV's methods
+(`PROPFIND`, `MKCOL`, `COPY`, `MOVE`, `LOCK`…; RFC 4918) as well as HTTP's, so
+a WebDAV client in the page works. `e2e/ports_test.go` `TestFileshare` checks,
+from inside the container's page:
+- without credentials: 401 with a `Basic` challenge;
+- with a wrong password: 401;
+- with alice's: a PROPFIND of the share (207) lists README.txt, which reads;
+- a PUT lands (201) and reads back.
+
 ## How it works
 
 ```

@@ -13,7 +13,10 @@
 const ALLOW = "{{ALLOW}}";
 const ID = /^[A-Za-z0-9_-]{22,64}$/;
 const ROUTE = /^\/s\/([A-Za-z0-9_-]{22,64})\/([0-9]{1,5})(\/.*)?$/;
-const METHODS = new Set(["GET", "HEAD", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"]);
+// HTTP's and WebDAV's (RFC 4918 §9): the same list as internal/portroute
+// Methods (checked there by a test).
+const METHODS = new Set(["GET", "HEAD", "POST", "PUT", "PATCH", "DELETE", "OPTIONS",
+  "PROPFIND", "PROPPATCH", "MKCOL", "COPY", "MOVE", "LOCK", "UNLOCK"]);
 const MAX_BODY = 16 << 20;
 const MAX_RESPONSE = 256 << 20;
 const HEAD_TIMEOUT = 60000;

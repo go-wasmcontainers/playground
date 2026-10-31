@@ -52,10 +52,13 @@ type Manifest struct {
 	Files map[string]string `json:"files"`
 }
 
-func goBuild(root, pkg, out string, env []string, ldflags string) error {
+func goBuild(root, pkg, out string, env []string, ldflags string, tags ...string) error {
 	args := []string{"build", "-trimpath", "-o", out}
 	if ldflags != "" {
 		args = append(args, "-ldflags="+ldflags)
+	}
+	if len(tags) > 0 {
+		args = append(args, "-tags="+strings.Join(tags, ","))
 	}
 	cmd := exec.Command("go", append(args, pkg)...)
 	cmd.Dir = root
@@ -75,11 +78,16 @@ func goRoot() (string, error) {
 	return strings.TrimSpace(string(out)), nil
 }
 
-// Images are the playground's own images, built from images/<name>.
+// Images are the playground's own images, built from images/<name> -- or
+// from Pkg, a main package of a module go.mod requires as a tool, with Tags.
+// Args follow the module in the entrypoint.
 var Images = []struct {
 	Name, Description string
 	Artifact, Index   bool
 	Files             map[string]string
+	Pkg               string
+	Tags              []string
+	Args              []string
 }{
 	{Name: "hello", Description: "prints a greeting and exits"},
 	{Name: "greet", Description: "greets $NAME (a CNCF wasm OCI artifact)", Artifact: true},
@@ -90,7 +98,46 @@ var Images = []struct {
 		Files: map[string]string{"usr/share/doc/mnist/NOTICE": MnistNotice}},
 	{Name: "compute", Description: "wasi:webgpu compute: a 1M-float vector add and a 256x256 matrix product on the GPU, checked against the CPU (run --gpu)"},
 	{Name: "triangle", Description: "wasi:webgpu and wasi-gfx:surface: a spinning triangle in a dashboard pane, 120 frames or the first argument (run --gpu)"},
+	{Name: "fileshare", Description: "the go-fileshare server, WebDAV only: wctr run -d -p 8080:80 fileshare, open :8080, user alice, password playground",
+		Pkg: "github.com/go-fileshare/fileshare", Tags: FileshareTags,
+		Args: []string{"--config", "/etc/fileshare/fileshare.hcl"},
+		Files: map[string]string{
+			"etc/fileshare/fileshare.hcl": FileshareConfig,
+			// A demo password, written down on purpose: the image is public
+			// and so is the playground; nothing it guards is anybody's.
+			"etc/fileshare/alice.pw": "playground\n",
+			"srv/files/README.txt":   FileshareReadme,
+		}},
 }
+
+// FileshareTags build fileshare as a WebAssembly container serving WebDAV
+// only (go-fileshare/fileshare README, "As a WebAssembly container").
+var FileshareTags = []string{"nosql", "noopenpubkey", "nosmb", "nonfs", "nos3", "nosftp", "nogrpc", "nopartitioned", "noprovisioner"}
+
+// FileshareConfig is the fileshare image's configuration: one person, one
+// directory share, WebDAV. TLS ends in front of the container -- the browser's
+// HTTPS origin, then the engine's in-memory hop -- hence plaintext.
+const FileshareConfig = `name = "PLAYGROUND"
+
+user "alice" { password_file = "/etc/fileshare/alice.pw" }
+
+share "files" {
+  directory = "/srv/files"
+}
+
+serve "webdav" {
+  addr      = ":80"
+  plaintext = true
+}
+`
+
+// FileshareReadme is the one file the share starts with.
+const FileshareReadme = `This is a go-fileshare share, served by fileshare as a WebAssembly
+container in your browser tab. Nothing here leaves the tab.
+
+Mount it, browse it, or upload to it over WebDAV: user alice, password
+playground. Changes are the container's, and go with it.
+`
 
 // MnistNotice is where the mnist image's model and picture come from.
 const MnistNotice = `mnist: wasi-nn in a container (github.com/go-wasmcontainers/gpu v0.2.0 examples/mnist)
@@ -126,7 +173,11 @@ func Build(ctx context.Context, o Options) (*Manifest, error) {
 	wasip1 := []string{"GOOS=wasip1", "GOARCH=wasm", "CGO_ENABLED=0"}
 	for _, im := range Images {
 		bin := filepath.Join(tmp, im.Name+".wasm")
-		if err := goBuild(o.Root, "./images/"+im.Name, bin, wasip1, "-s -w"); err != nil {
+		pkg := im.Pkg
+		if pkg == "" {
+			pkg = "./images/" + im.Name
+		}
+		if err := goBuild(o.Root, pkg, bin, wasip1, "-s -w", im.Tags...); err != nil {
 			return nil, err
 		}
 		mod, err := os.ReadFile(bin)
@@ -142,7 +193,7 @@ func Build(ctx context.Context, o Options) (*Manifest, error) {
 			for p, c := range im.Files {
 				mi.Files[p] = []byte(c)
 			}
-			mi.Entrypoint = []string{"/bin/" + im.Name + ".wasm"}
+			mi.Entrypoint = append([]string{"/bin/" + im.Name + ".wasm"}, im.Args...)
 		}
 		imgs = append(imgs, mi)
 		logf("image %s: %d bytes of wasm", im.Name, len(mod))
