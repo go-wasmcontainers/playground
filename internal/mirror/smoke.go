@@ -160,7 +160,9 @@ func (w Wasmtime) Run(ctx context.Context, img Image, module []byte, pr Probe) R
 	if err := os.WriteFile(f, module, 0o644); err != nil {
 		return Result{Exit: -1, Err: err.Error()}
 	}
-	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
+	// Generous: wasmtime compiles the whole module before it runs (gosec's is
+	// 20 MB) and a shared CI runner is slow; a 30 s limit killed it there.
+	ctx, cancel := context.WithTimeout(ctx, wasmtimeTimeout)
 	defer cancel()
 	// An empty directory preopened as "/", as the engine preopens its root
 	// file system: without it a program that opens a relative path (a config
@@ -176,7 +178,10 @@ func (w Wasmtime) Run(ctx context.Context, img Image, module []byte, pr Probe) R
 	err = cmd.Run()
 	res := Result{Stdout: out.String(), Stderr: errb.String()}
 	if err != nil {
-		if ee, ok := err.(*exec.ExitError); ok {
+		if ctx.Err() != nil {
+			// Killed by the deadline (ExitCode is -1): say so, it is not an exit.
+			res.Exit, res.Err = -1, "wasmtime timed out after "+wasmtimeTimeout.String()
+		} else if ee, ok := err.(*exec.ExitError); ok {
 			res.Exit = ee.ExitCode()
 		} else {
 			res.Exit, res.Err = -1, err.Error()
@@ -184,6 +189,8 @@ func (w Wasmtime) Run(ctx context.Context, img Image, module []byte, pr Probe) R
 	}
 	return res
 }
+
+const wasmtimeTimeout = 3 * time.Minute
 
 // ExtractFile reads one regular file out of an image's layer, bounded.
 func ExtractFile(img Image, p string, lim Limits) ([]byte, error) {
