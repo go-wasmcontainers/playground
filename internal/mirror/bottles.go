@@ -24,6 +24,8 @@ type Derived struct {
 	Images   []Image
 	Findings []Finding
 	Catalog  bottle.Catalog
+	// LayerBytes is the sum of the images' layers, each image counted.
+	LayerBytes int64
 }
 
 // Bottles builds the mirror's pkgx images from the signed wasip1/wasm
@@ -110,7 +112,14 @@ func Bottles(ctx context.Context, lim Limits, reserved map[string]bool, log io.W
 	if len(named) > lim.MaxImages {
 		return nil, fmt.Errorf("%d images, the limit is %d (catalog.json is read up to 1000 entries): raise Limits.MaxImages on purpose, the mirror does not truncate", len(named), lim.MaxImages)
 	}
-	d := &Derived{Catalog: cat}
+	var total int64
+	for _, e := range named {
+		total += int64(len(layers[e.Project].Layer))
+	}
+	if total > lim.MaxSiteBytes {
+		return nil, fmt.Errorf("the %d images need %d bytes of layers (%d MiB), the budget is %d MiB: GitHub Pages refuses a site over 1 GB; raise Limits.MaxSiteBytes on purpose or drop the largest (README: size strategy)", len(named), total, total>>20, lim.MaxSiteBytes>>20)
+	}
+	d := &Derived{Catalog: cat, LayerBytes: total}
 	for _, e := range named {
 		bl := layers[e.Project]
 		bin := path.Dir(bl.Wasm[e.Binary])

@@ -9,6 +9,7 @@ import (
 	"os"
 	"os/exec"
 	"strings"
+	"time"
 
 	"github.com/spf13/cobra"
 
@@ -29,14 +30,33 @@ func main() {
 func RootCmd() *cobra.Command {
 	root := &cobra.Command{Use: "mirror", Short: "Inspect and smoke-test the pkgx bottles the playground mirrors", SilenceUsage: true, SilenceErrors: true}
 
-	root.AddCommand(&cobra.Command{
+	var untilImages int
+	var every, waitMax time.Duration
+	inspect := &cobra.Command{
 		Use:   "inspect",
 		Short: "Derive the images from the signed catalogue and list what each bottle holds",
 		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			der, err := mirror.Bottles(cmd.Context(), mirror.DefaultBottleLimits, nil, cmd.ErrOrStderr())
-			if err != nil {
-				return err
+			deadline := time.Now().Add(waitMax)
+			var der *mirror.Derived
+			for {
+				var err error
+				der, err = mirror.Bottles(cmd.Context(), mirror.DefaultBottleLimits, nil, cmd.ErrOrStderr())
+				if err != nil {
+					return err
+				}
+				if len(der.Images) >= untilImages {
+					break
+				}
+				if time.Now().Add(every).After(deadline) {
+					return fmt.Errorf("%d image(s) after %s, wanted %d", len(der.Images), waitMax, untilImages)
+				}
+				fmt.Fprintf(cmd.ErrOrStderr(), "mirror: %d image(s), waiting for %d\n", len(der.Images), untilImages)
+				select {
+				case <-time.After(every):
+				case <-cmd.Context().Done():
+					return cmd.Context().Err()
+				}
 			}
 			for _, im := range der.Images {
 				fmt.Fprintf(cmd.OutOrStdout(), "%-24s %s:%s  %d bytes  %s\n", im.Name, im.Project, im.Version, len(im.Layer), im.ModulePath)
@@ -44,10 +64,14 @@ func RootCmd() *cobra.Command {
 			for _, f := range der.Findings {
 				fmt.Fprintf(cmd.OutOrStdout(), "finding %-30s %-22s %s\n", f.Project, f.Kind, f.Detail)
 			}
-			fmt.Fprintf(cmd.OutOrStdout(), "%d image(s), %d finding(s)\n", len(der.Images), len(der.Findings))
+			fmt.Fprintf(cmd.OutOrStdout(), "%d image(s), %d finding(s), %d bytes of layers (%d MiB, each image counted)\n", len(der.Images), len(der.Findings), der.LayerBytes, der.LayerBytes>>20)
 			return nil
 		},
-	})
+	}
+	inspect.Flags().IntVar(&untilImages, "until-images", 0, "keep re-deriving until at least this many images (waits for a catalogue run)")
+	inspect.Flags().DurationVar(&every, "every", 2*time.Minute, "pause between derivations with --until-images")
+	inspect.Flags().DurationVar(&waitMax, "wait", 30*time.Minute, "give up after this long with --until-images")
+	root.AddCommand(inspect)
 
 	var (
 		out, specFile, only, summary string

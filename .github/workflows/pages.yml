@@ -28,10 +28,13 @@ jobs:
       - uses: actions/setup-go@v7
         with: { go-version: '1.27.3' }
       - run: go version
+      # wasmtime: the build smoke-tests every pkgx image against it and marks
+      # the clean ones "checked" in catalog.json.
+      - uses: bytecodealliance/actions/wasmtime/setup@v1
       - name: build the site (outside the checkout)
         run: |
           version=$(go list -m -f '{{.Version}}' github.com/go-wasmcontainers/engine)
-          go run ./cmd/site build --out "$RUNNER_TEMP/_site" --pkgx --remote --version "$version"
+          go run ./cmd/site build --out "$RUNNER_TEMP/_site" --pkgx --smoke internal/mirror/testdata/smoke.json --remote --version "$version"
           ls -la "$RUNNER_TEMP/_site"
       - name: the checkout is unchanged (the wasm binaries are stamped vcs.modified=false)
         run: |

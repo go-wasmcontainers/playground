@@ -58,7 +58,8 @@ func RootCmd() *cobra.Command {
 	}
 	build.Flags().StringVar(&o.Out, "out", "_site", "output directory (replaced)")
 	build.Flags().StringVar(&o.Root, "root", "", "playground module root (default: the working directory)")
-	build.Flags().BoolVar(&o.Pkgx, "pkgx", false, "add the pkgx wasip1 pilot bottles from ghcr.io")
+	build.Flags().BoolVar(&o.Pkgx, "pkgx", false, "add every pkgx wasip1/wasm bottle the signed catalogue lists, from ghcr.io")
+	build.Flags().StringVar(&o.SmokeSpec, "smoke", "", "with --pkgx: smoke-test each image under the engine and wasmtime (on PATH) with this spec, and mark the clean ones \"checked\" in catalog.json")
 	build.Flags().StringVar(&o.Version, "version", "dev", "engine version shown by wctr version")
 	build.Flags().BoolVar(&o.Remote, "remote", false, "add the images pinned by digest (the shell) from ghcr.io")
 

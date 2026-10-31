@@ -39,6 +39,10 @@ type Options struct {
 	// Remote adds the images pinned by digest (mirror.Remote: the shell),
 	// fetched from ghcr.io.
 	Remote bool
+	// SmokeSpec, with Pkgx, is the path of a mirror.Spec JSON: every pkgx
+	// image is run under the engine and under wasmtime (which must be on
+	// PATH) and catalog.json says which ones came out clean ("checked").
+	SmokeSpec string
 	// Version is the engine version string compiled in.
 	Version string
 	// Log receives progress lines.
@@ -160,6 +164,31 @@ func Build(ctx context.Context, o Options) (*Manifest, error) {
 		der, err := mirror.Bottles(ctx, mirror.DefaultBottleLimits, reserved, o.Log)
 		if err != nil {
 			return nil, err
+		}
+		if o.SmokeSpec != "" {
+			raw, err := os.ReadFile(o.SmokeSpec)
+			if err != nil {
+				return nil, err
+			}
+			var spec mirror.Spec
+			dec := json.NewDecoder(bytes.NewReader(raw))
+			dec.DisallowUnknownFields()
+			if err := dec.Decode(&spec); err != nil {
+				return nil, fmt.Errorf("%s: %w", o.SmokeSpec, err)
+			}
+			wtBin, err := exec.LookPath("wasmtime")
+			if err != nil {
+				return nil, fmt.Errorf("--smoke needs wasmtime on PATH: %w", err)
+			}
+			_, sf := mirror.SmokeImages(ctx, der.Images, spec, mirror.Native{EngineWASI: true}, mirror.Wasmtime{Bin: wtBin}, mirror.DefaultBottleLimits)
+			der.Findings = append(der.Findings, sf...)
+			clean := 0
+			for _, im := range der.Images {
+				if im.Checked != nil && *im.Checked {
+					clean++
+				}
+			}
+			logf("smoke: %d of %d pkgx images checked (clean under the engine and wasmtime)", clean, len(der.Images))
 		}
 		imgs = append(imgs, der.Images...)
 		for _, f := range der.Findings {

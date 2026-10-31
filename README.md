@@ -136,11 +136,15 @@ reads pkgx's signed catalogue (`go-pkgx.dev/catalog`, `bottle.FetchCatalog`,
 which verifies the signature), keeps the projects whose `versions` is not
 empty for `wasip1/wasm`, and mirrors the newest version of each, so a bottle
 published tomorrow is an image after the next build with no code change. At
-the time of writing that is 8 images from 7 bottles: `age`, `go-md2man`,
-`shfmt` (Go) and `lua`, `luac`, `sqlite3`, `minigzip`, `simdjson-minify` (C; the layers are
+the time of writing that is 43 images from 41 bottles (30 Go projects such as
+`yq`, `gojq`, `jj`, `shfmt`, `actionlint`, `age`, and C ones such as `lua`,
+`luac`, `sqlite3`, `zstd`, `lz4`, `brotli`, `simdjson-minify`; the C layers are
 `tar+zstd`, served as published). The page's `wctr images` and the dashboard's
 Images view list whatever `catalog.json` holds, and each entry names its
-`project`, `version` and layer `bytes`.
+`project`, `version`, layer `bytes` and `checked`: `true` when the build ran
+the image under the engine and wasmtime and nothing failed or differed (40 of
+43 today), `false` when it is only mirrored (the three named expected
+cases in `internal/mirror/testdata/smoke.json`: `yq`, `gnostic`, `tomlv`).
 
 The rules, each tested in `internal/mirror`:
 
@@ -167,6 +171,20 @@ The rules, each tested in `internal/mirror`:
   `findings.json`, and costs only itself.
 - **Page cost**: one `catalog.json` (about 330 bytes per image, read up to 1 MiB
   and 1000 entries), then an image's blobs only when a command uses it.
+- **Site size**: GitHub Pages refuses a site over 1 GB. The mirror publishes the
+  bottles' compressed layers, once per image (every image has its own `/v2`
+  repository). Measured on 2026-10-31 with 43 images: 112 MB of `v2/`, 167 MB
+  for the whole site (engine 29 MB, dashboard 25 MB), about 2.6 MB per image, so
+  roughly 300 images would reach the ceiling. (The 441 MB figure is the
+  modules unpacked, which is not what is served.) `Limits.MaxSiteBytes`, 700 MiB
+  of layers, is a hard error well under it. If the set outgrows it: first drop the
+  largest layers (`gosec` is 20 MB), then shard the mirror across a second Pages
+  site (a second origin: the page's CSP allows its own origin only, so this
+  needs a policy change), or serve blobs from a release asset (which needs CORS,
+  which release downloads do not send).
+- **Not deterministic**: a tag can serve different bytes over time
+  (`simdjson` 5.0.5, go-pkgx/packages#393). The mirror keeps no per-version cache
+  and the smoke compares behaviour on the bytes it fetched, never a digest.
 
 `go run ./cmd/mirror smoke --require-wasmtime --spec internal/mirror/testdata/smoke.json`
 runs every derived image under the engine (wazero) and under wasmtime with

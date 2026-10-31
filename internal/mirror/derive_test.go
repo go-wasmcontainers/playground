@@ -71,6 +71,9 @@ func TestDerive(t *testing.T) {
 	if got[0].Ref() != "ghcr.io/go-pkgx/packages/a.org:3.0" {
 		t.Errorf("ref %s", got[0].Ref())
 	}
+	if r := (Candidate{Project: "github.com/BurntSushi/toml", Version: "1.6.0"}).Ref(); r != "ghcr.io/go-pkgx/packages/github.com/burntsushi/toml:1.6.0" {
+		t.Errorf("mixed-case project: ref %s", r)
+	}
 }
 
 func TestDeriveEmptyAndLimit(t *testing.T) {

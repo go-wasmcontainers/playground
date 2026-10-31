@@ -105,6 +105,17 @@ func TestBottlesFailures(t *testing.T) {
 	if _, err := Bottles(ctx, lim, nil, nil); err == nil {
 		t.Errorf("image limit not enforced")
 	}
+	// Site size budget: a bottle that gives two images is counted twice.
+	fakeWorld(t, bottle.CatalogProject{Project: "a.org", Versions: []string{"1"}, Provides: []string{"a", "b"}})
+	d, err = Bottles(ctx, DefaultBottleLimits, nil, nil)
+	if err != nil || d.LayerBytes != 2*int64(len("layer-a.org")) {
+		t.Errorf("layer bytes: %+v %v", d, err)
+	}
+	lim = DefaultBottleLimits
+	lim.MaxSiteBytes = 10
+	if _, err := Bottles(ctx, lim, nil, nil); err == nil || !strings.Contains(err.Error(), "budget") {
+		t.Errorf("size budget not enforced: %v", err)
+	}
 	// Catalogue failure.
 	fakeWorld(t)
 	catalogSource = func(string, string) (bottle.Catalog, error) { return bottle.Catalog{}, errors.New("bad signature") }
