@@ -25,8 +25,9 @@ terminal alone, on xterm.js, stays at
 > semantics and exit codes as the native engine, tested by typing them into
 > the page in Chromium and Firefox. Images and containers survive a reload;
 > the page works offline. Containers talk to each other over TCP and UDP,
-> by name ([Networking](#networking)). No shell (one `wctr` command per
-> line), no stdin yet.
+> by name ([Networking](#networking)). One `wctr` command per line; the
+> `shell` image gives a shell, and a line with `exec -i` gets what you type
+> (v0.4.0). No `-p` yet.
 
 ## Try
 
@@ -400,9 +401,10 @@ live Firefox run.
 
 ## Limitations
 
-- One `wctr` command per line, no shell, no pipes; containers have no
-  stdin. Networks stay inside the page (no Internet, no published ports
-  yet).
+- One `wctr` command per line, with no pipes in that line (the `shell` image
+  has `sh`); a container's stdin is typed into with `-i` (see Images).
+  Networks stay inside the page (no Internet, no published ports yet: the
+  usercontent origin is deployed, `-p` is not live).
 - A running container's writes are stored every 2 s: a reload loses at
   most the last 2 s of them. Storage is best effort unless the browser
   grants `persist()`: under disk pressure it may evict the whole origin.
