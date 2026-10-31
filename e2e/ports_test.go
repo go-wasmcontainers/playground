@@ -3,6 +3,7 @@
 package e2e
 
 import (
+	"fmt"
 	"net"
 	"net/http"
 	"net/url"
@@ -23,6 +24,88 @@ import (
 // view embeds the shell, whose service worker relays the container's page
 // through the view and the playground tab to the engine, and back.
 func TestPublishedPort(t *testing.T) {
+	b, view, content := portView(t, "wctr run -d -p 8080:80 --name web net serve", playwright.BrowserNewContextOptions{})
+	deadline := time.Now().Add(30 * time.Second)
+	var text string
+	for time.Now().Before(deadline) {
+		if f := content(); f != nil {
+			text, _ = f.TextContent("body")
+			if strings.Contains(text, "hello  from ") {
+				break
+			}
+		}
+		time.Sleep(100 * time.Millisecond)
+	}
+	if !strings.Contains(text, "hello  from ") {
+		st, _ := view.Evaluate(`() => window.__wctrView`)
+		t.Fatalf("the container's page never showed: %q; view %v", text, st)
+	}
+	publishedPortRest(t, b, view, content)
+}
+
+// TestFileshare is the go-fileshare server in the browser: the fileshare image
+// (go-fileshare/fileshare built for wasip1, WebDAV only) publishes 8080, the
+// view opens it, and the browser is the client. Without credentials the server
+// challenges; with alice's, the share lists, a file reads, a PUT lands and
+// reads back -- all through the usercontent route, nothing over a network.
+func TestFileshare(t *testing.T) {
+	b, view, content := portView(t, "wctr run -d -p 8080:80 --name files fileshare", playwright.BrowserNewContextOptions{})
+	_ = b
+	var f playwright.Frame
+	deadline := time.Now().Add(60 * time.Second)
+	for f == nil && time.Now().Before(deadline) {
+		f = content()
+		time.Sleep(100 * time.Millisecond)
+	}
+	if f == nil {
+		st, _ := view.Evaluate(`() => window.__wctrView`)
+		t.Fatalf("the container's page never opened; view %v", st)
+	}
+	got, err := f.Evaluate(`async () => {
+		const auth = {Authorization: "Basic " + btoa("alice:playground")};
+		const anon = await fetch("files/README.txt");
+		const wrong = await fetch("files/README.txt", {headers: {Authorization: "Basic " + btoa("alice:nope")}});
+		const list = await fetch("files/", {method: "PROPFIND", headers: {...auth, Depth: "1"}});
+		const listing = await list.text();
+		const readme = await fetch("files/README.txt", {headers: auth});
+		const put = await fetch("files/from-the-browser.txt", {method: "PUT", headers: auth, body: "written by the page"});
+		const back = await fetch("files/from-the-browser.txt", {headers: auth});
+		return {anon: anon.status, challenge: anon.headers.get("WWW-Authenticate") || "", wrong: wrong.status,
+			list: list.status, listed: listing.includes("README.txt"),
+			readme: readme.status, readmeText: (await readme.text()).slice(0, 40),
+			put: put.status, back: back.status, backText: await back.text()};
+	}`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	m := got.(map[string]any)
+	t.Logf("fileshare in the browser: %v", m)
+	switch {
+	case num(m["anon"]) != 401 || !strings.HasPrefix(fmt.Sprint(m["challenge"]), "Basic"):
+		t.Fatalf("no challenge without credentials: %v", m)
+	case num(m["wrong"]) != 401:
+		t.Fatalf("a wrong password was accepted: %v", m)
+	case num(m["list"]) != 207 || m["listed"] != true:
+		t.Fatalf("PROPFIND did not list the share: %v", m)
+	case num(m["readme"]) != 200 || !strings.HasPrefix(fmt.Sprint(m["readmeText"]), "This is a go-fileshare share"):
+		t.Fatalf("README.txt: %v", m)
+	case num(m["put"]) != 201 || num(m["back"]) != 200 || m["backText"] != "written by the page":
+		t.Fatalf("a PUT did not land: %v", m)
+	}
+}
+
+// portTab is the playground tab of a port test, and the usercontent origin.
+type portTab struct {
+	tab
+	uc string
+}
+
+// portView serves the playground and a usercontent site on two local
+// origins, runs line (which publishes 8080) in the playground's terminal,
+// opens the port from the ports bar, and returns the playground tab, the view
+// tab once its shell is ready, and a finder for the container's page frame.
+func portView(t *testing.T, line string, ctxOpts playwright.BrowserNewContextOptions) (portTab, playwright.Page, func() playwright.Frame) {
+	t.Helper()
 	if os.Getenv("E2E_URL") != "" {
 		t.Skip("a deployed site: its usercontent origin is the public one")
 	}
@@ -54,13 +137,13 @@ func TestPublishedPort(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer pw.Stop()
+	t.Cleanup(func() { pw.Stop() })
 	browser, err := pw.Chromium.Launch(playwright.BrowserTypeLaunchOptions{Headless: playwright.Bool(true), Timeout: playwright.Float(180000)})
 	if err != nil {
 		t.Fatalf("launch: %v", err)
 	}
-	defer browser.Close()
-	ctx, err := browser.NewContext()
+	t.Cleanup(func() { browser.Close() })
+	ctx, err := browser.NewContext(ctxOpts)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -73,8 +156,8 @@ func TestPublishedPort(t *testing.T) {
 		t.Fatal(err)
 	}
 	b.ready()
-	b.must("wctr run -d -p 8080:80 --name web net serve", 0)
-	b.until("the ports bar lists 8080", `() => window.wctrPorts.state.ports.includes(8080)`, 15*time.Second)
+	b.must(line, 0)
+	b.until("the ports bar lists 8080", `() => window.wctrPorts.state.ports.includes(8080)`, 30*time.Second)
 
 	view, err := ctx.ExpectPage(func() error { return page.Locator("#portbar button").First().Click() })
 	if err != nil {
@@ -98,22 +181,11 @@ func TestPublishedPort(t *testing.T) {
 		}
 		return nil
 	}
-	deadline := time.Now().Add(30 * time.Second)
-	var text string
-	for time.Now().Before(deadline) {
-		if f := content(); f != nil {
-			text, _ = f.TextContent("body")
-			if strings.Contains(text, "hello  from ") {
-				break
-			}
-		}
-		time.Sleep(100 * time.Millisecond)
-	}
-	if !strings.Contains(text, "hello  from ") {
-		st, _ := view.Evaluate(`() => window.__wctrView`)
-		t.Fatalf("the container's page never showed: %q; view %v", text, st)
-	}
+	return portTab{b, uc}, view, content
+}
 
+// publishedPortRest is the rest of TestPublishedPort, once the page showed.
+func publishedPortRest(t *testing.T, b portTab, view playwright.Page, content func() playwright.Frame) {
 	// A body in many chunks, and how fast the route is: 8 MiB from the
 	// container, through every hop, measured in the content frame.
 	f := content()
