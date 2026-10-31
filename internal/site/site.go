@@ -333,6 +333,18 @@ func hashTree(dir string) (*Manifest, error) {
 const CSP = "default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; " +
 	"connect-src 'self'; worker-src 'self'; img-src 'self' data:; object-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'"
 
+// ViewCSP is the view tab's (view.html): it runs no WebAssembly and
+// fetches nothing; it embeds the usercontent shell -- the default origin,
+// or a loopback one for a local build -- and nothing may embed it. It is not
+// cross-origin isolated (no COEP: the shell, of another site, sends no
+// CORP), which is why it is a tab of its own and not the playground's.
+const ViewCSP = "default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' data:; " +
+	"frame-src https://go-wasmcontainers-usercontent.github.io http://localhost:* http://127.0.0.1:*; " +
+	"object-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'"
+
+// IsView reports the view tab's page.
+func IsView(u *url.URL) bool { return strings.HasSuffix(u.Path, "/view.html") }
+
 // relayRE is the relay origin the engine worker may connect to: what
 // class.Origin returns (https, a host, an optional port), nothing more —
 // it is spliced into a CSP header, so nothing that could end a source
@@ -367,7 +379,11 @@ func Handler(dir, prefix string, isolate bool) http.Handler {
 			http.NotFound(w, r)
 			return
 		}
-		if isolate {
+		switch {
+		case isolate && IsView(r.URL):
+			w.Header().Set("Cross-Origin-Opener-Policy", "same-origin")
+			w.Header().Set("Content-Security-Policy", ViewCSP)
+		case isolate:
 			w.Header().Set("Cross-Origin-Opener-Policy", "same-origin")
 			w.Header().Set("Cross-Origin-Embedder-Policy", "require-corp")
 			w.Header().Set("Cross-Origin-Resource-Policy", "same-origin")

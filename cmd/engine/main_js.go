@@ -9,7 +9,7 @@
 //
 // Messages from the page: {t:"init", history, cols}, {t:"input", data}
 // (what the terminal received from the keyboard, raw), {t:"resize", cols},
-// {t:"frame-ack", surface, seq}.
+// {t:"frame-ack", surface, seq}, and the published ports' (ports_js.go).
 // Messages to the page: {t:"ready", version, storage}, {t:"write", data}
 // (ANSI for the terminal), {t:"history", items}, {t:"done", line, code, ms},
 // and the GPU surfaces: {t:"surface", op, surface, …} and {t:"frame",
@@ -34,6 +34,7 @@ import (
 	"github.com/go-wasmcontainers/engine/container"
 	"github.com/go-wasmcontainers/engine/daemon"
 	"github.com/go-wasmcontainers/engine/image"
+	"github.com/go-wasmcontainers/engine/portmap"
 	"github.com/go-wasmcontainers/engine/rootfs"
 	"github.com/go-wasmcontainers/engine/runtime/browser"
 	"github.com/go-wasmcontainers/engine/state"
@@ -46,6 +47,7 @@ import (
 	"github.com/go-wasmcontainers/playground/internal/class"
 	"github.com/go-wasmcontainers/playground/internal/console"
 	"github.com/go-wasmcontainers/playground/internal/idbstore"
+	"github.com/go-wasmcontainers/playground/internal/portrelay"
 	"github.com/go-wasmcontainers/playground/internal/session"
 )
 
@@ -141,6 +143,12 @@ func main() {
 				"compileMs": float64(s.Compile.Microseconds()) / 1000, "error": s.Error})
 		},
 	})
+	// Published ports: in memory, reached by the view tab's route
+	// (ports_js.go, internal/portrelay).
+	ports := portmap.NewVirtual()
+	tr := ports.Transport()
+	tr.DisableCompression = true // the container's encoding goes to the browser as it is
+	portRelay := &portrelay.Relay{Transport: tr, Published: ports.Ports}
 	lim := image.DefaultLimits
 	lim.MaxImageBytes = 256 << 20
 	lim.MaxBlobBytes = 128 << 20
@@ -162,6 +170,7 @@ func main() {
 			MaxLogBytes:      4 << 20,
 			MaxContainers:    64,
 			Store:            store,
+			Ports:            ports,
 		},
 		MaxLowers: 8,
 	})
@@ -228,7 +237,7 @@ func main() {
 	var con *console.Console
 	js.Global().Set("onmessage", js.FuncOf(func(_ js.Value, a []js.Value) any {
 		data := a[0].Get("data")
-		if bridgeHandle(data) {
+		if bridgeHandle(data) || portMessage(portRelay, ports.Ports, data) {
 			return nil
 		}
 		switch data.Get("t").String() {

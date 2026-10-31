@@ -42,7 +42,7 @@ const uc = "http://localhost:9999"
 
 // container is an HTTP server published on port 8080 of a Virtual, as a
 // container's `-p 8080:80` is in a browser.
-func container(t *testing.T, h http.Handler) *Relay {
+func container(t testing.TB, h http.Handler) *Relay {
 	t.Helper()
 	v := portmap.NewVirtual()
 	l, err := v.Listen(context.Background(), "tcp", netip.MustParseAddrPort("127.0.0.1:8080"))
@@ -169,11 +169,18 @@ func TestOpenRefuses(t *testing.T) {
 	if o, err := Origin(""); err != nil || o != DefaultUsercontent {
 		t.Errorf("the default: %q %v", o, err)
 	}
+	// Full: the oldest session gives way (a view that died never closed it).
 	r.MaxSessions = 2
-	r.Open(8080, uc)
-	r.Open(8080, uc)
-	if _, _, err := r.Open(8080, uc); !errors.Is(err, ErrFull) {
-		t.Errorf("a third session: %v", err)
+	first, _, _ := r.Open(8080, uc)
+	second, _, _ := r.Open(8080, uc)
+	third, _, err := r.Open(8080, uc)
+	if err != nil || r.Sessions() != 2 {
+		t.Fatalf("a third session: %v, %d sessions", err, r.Sessions())
+	}
+	for sid, want := range map[string]bool{first: false, second: true, third: true} {
+		if _, ok := r.Nonce(sid); ok != want {
+			t.Errorf("session %s kept %v, want %v", sid, ok, want)
+		}
 	}
 }
 
@@ -202,6 +209,43 @@ func TestAbortAndClose(t *testing.T) {
 	if r.Sessions() != 0 {
 		t.Fatalf("%d sessions after Close", r.Sessions())
 	}
+}
+
+// FuzzRelay relays arbitrary requests of a container's page to a container
+// that sets cookies and echoes what it got: no panic, and neither the
+// container's Set-Cookie nor the page's own Cookie ever crosses.
+func FuzzRelay(f *testing.F) {
+	for _, s := range [][5]string{
+		{"GET", "/login", "Cookie", "forged=1", ""},
+		{"POST", "/whoami?x=1", "Content-Type", "text/plain", "body"},
+		{"GET", "/redirect", "X-Forwarded-Host", "evil", ""},
+		{"OPTIONS", "/%2e%2e/", "Host", "evil:1", ""},
+	} {
+		f.Add(s[0], s[1], s[2], s[3], []byte(s[4]))
+	}
+	mux := http.NewServeMux()
+	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		http.SetCookie(w, &http.Cookie{Name: "c", Value: "1"})
+		w.Write([]byte("got-cookie=" + r.Header.Get("Cookie") + ";host=" + r.Host))
+	})
+	r := container(f, mux)
+	sid, _, err := r.Open(8080, uc)
+	if err != nil {
+		f.Fatal(err)
+	}
+	f.Fuzz(func(t *testing.T, method, path, name, value string, body []byte) {
+		a := &answer{}
+		r.Serve(context.Background(), sid, uc, id1, 8080, method, path, [][2]string{{name, value}}, body, a)
+		if a.field("Set-Cookie") != "" {
+			t.Fatalf("Set-Cookie reached the browser: %v", a.header)
+		}
+		// Only the handler's answers say what crossed (ServeMux answers a
+		// path it cleans with its own redirect page).
+		got := a.body.String()
+		if strings.HasPrefix(got, "got-cookie=") && (strings.Contains(got, "forged") || !strings.HasSuffix(got, ";host=localhost:8080")) {
+			t.Fatalf("the page's Cookie or Host crossed: %q", got)
+		}
+	})
 }
 
 func TestMaxRequests(t *testing.T) {

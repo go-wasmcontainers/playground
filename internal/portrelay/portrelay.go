@@ -44,7 +44,7 @@ const (
 // Errors a caller can tell apart.
 var (
 	ErrSession = errors.New("no such session")
-	ErrFull    = errors.New("too many sessions or requests")
+	ErrFull    = errors.New("too many requests")
 	ErrPort    = errors.New("that port is not published")
 )
 
@@ -84,11 +84,13 @@ type Relay struct {
 
 	mu       sync.Mutex
 	sessions map[string]*session
+	seq      uint64 // the order sessions were opened in
 }
 
 type session struct {
 	nonce, usercontent string
 	port               uint16
+	seq                uint64
 	jar                *cookiejar.Jar
 	client             *http.Client
 	reqs               map[string]context.CancelFunc
@@ -119,12 +121,25 @@ func (r *Relay) Open(port uint16, usercontent string) (sid, nonce string, err er
 	if r.sessions == nil {
 		r.sessions = map[string]*session{}
 	}
-	if len(r.sessions) >= or(r.MaxSessions, DefaultMaxSessions) {
-		return "", "", fmt.Errorf("%w: %d sessions", ErrFull, len(r.sessions))
+	// A view tab that died without saying so (a crash: no pagehide) never
+	// closes its session: when full, the oldest gives way, rather than no
+	// port opening again until the playground reloads.
+	for len(r.sessions) >= or(r.MaxSessions, DefaultMaxSessions) {
+		oldest := ""
+		for id, s := range r.sessions {
+			if oldest == "" || s.seq < r.sessions[oldest].seq {
+				oldest = id
+			}
+		}
+		for _, cancel := range r.sessions[oldest].reqs {
+			cancel()
+		}
+		delete(r.sessions, oldest)
 	}
+	r.seq++
 	sid, nonce = randomID(), randomID()
 	r.sessions[sid] = &session{
-		nonce: nonce, usercontent: uc, port: port, jar: jar, reqs: map[string]context.CancelFunc{},
+		nonce: nonce, usercontent: uc, port: port, jar: jar, reqs: map[string]context.CancelFunc{}, seq: r.seq,
 		client: &http.Client{
 			Transport: r.Transport,
 			Jar:       jar,

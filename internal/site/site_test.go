@@ -52,6 +52,21 @@ func TestBuildServeVerify(t *testing.T) {
 		t.Fatal(resp, err)
 	}
 	resp.Body.Close()
+	// The view tab: not isolated (it embeds the usercontent shell), not
+	// frameable; the service worker says the same, word for word.
+	resp, err = http.Get(srv.URL + "/playground/view.html")
+	if err != nil || resp.StatusCode != 200 || resp.Header.Get("Cross-Origin-Embedder-Policy") != "" || resp.Header.Get("Content-Security-Policy") != ViewCSP {
+		t.Fatalf("view.html: %v %v", resp, err)
+	}
+	resp.Body.Close()
+	for _, want := range []string{`"view.html"`, `"view.js"`, `"ports.js"`} {
+		if !bytes.Contains(sw, []byte(want)) {
+			t.Errorf("sw.js shell lacks %s", want)
+		}
+	}
+	if !bytes.Contains(bytes.ReplaceAll(sw, []byte("\" +\n  \""), nil), []byte(ViewCSP)) {
+		t.Error("sw.js VIEW_CSP differs from site.ViewCSP")
+	}
 	if r, _ := http.Get(srv.URL + "/elsewhere"); r.StatusCode != 404 {
 		t.Fatal("served outside the prefix")
 	}

@@ -94,6 +94,8 @@ jobs:
           - { target: FuzzFilter, pkg: ./internal/termfilter }
           # What a container's page relays and what a container answers.
           - { target: FuzzRoute, pkg: ./internal/portroute }
+          # The relay to a container's port: no cookie crosses either way.
+          - { target: FuzzRelay, pkg: ./internal/portrelay }
           # catalog.json, read by the engine worker and the dashboard.
           - { target: FuzzParseCatalog, pkg: ./internal/session }
           # A relay origin typed by a learner, spliced into a CSP header.

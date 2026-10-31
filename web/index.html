@@ -17,6 +17,7 @@
   <span id="notice" role="status" hidden></span>
   <nav><a id="switch" href="?ui=terminal">terminal only</a> · <a href="https://go-wasmcontainers.github.io/docs/" rel="noopener">docs</a> · <a href="https://github.com/go-wasmcontainers/playground" rel="noopener">source</a></nav>
 </header>
+<div id="portbar" hidden></div>
 <div id="classbar"><button id="joinbtn" type="button">Join class</button><span id="classinfo" hidden></span></div>
 <dialog id="joindlg" aria-labelledby="jointitle">
   <form id="joinform" method="dialog" autocomplete="off">
@@ -40,6 +41,7 @@
 <script src="vendor/xterm.js?v={{BUILD}}"></script>
 <script src="vendor/addon-fit.js?v={{BUILD}}"></script>
 <script src="wasm_exec.js?v={{BUILD}}"></script>
+<script src="ports.js?v={{BUILD}}"></script>
 <script src="app.js?v={{BUILD}}"></script>
 </body>
 </html>
