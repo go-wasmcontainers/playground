@@ -105,13 +105,32 @@ async function proxy(req, sid, port, path) {
     let total = 0;
     let settled = false;
     const done = () => ch.port1.close();
+    // abort gives the request up: the shell is told, so that it forgets it
+    // (its pending list is bounded) and tells the playground.
+    const abort = () => {
+      try {
+        ch.port1.postMessage({ t: "abort" });
+      } catch (err) {} // already closed
+      done();
+    };
     const timer = setTimeout(() => {
       if (!settled) {
         settled = true;
         resolve(page(504, "The container did not answer."));
-        done();
+        abort();
       }
     }, HEAD_TIMEOUT);
+    // After the head, a body that stops coming is given up the same way.
+    let idle = null;
+    const stillComing = () => {
+      clearTimeout(idle);
+      idle = setTimeout(() => {
+        if (ctrl) {
+          ctrl.error(new Error("the container's answer stopped"));
+        }
+        abort();
+      }, HEAD_TIMEOUT);
+    };
     ch.port1.onmessage = (e) => {
       const m = e.data || {};
       if (m.t === "head" && !settled) {
@@ -120,7 +139,7 @@ async function proxy(req, sid, port, path) {
         const status = Number(m.status);
         if (!Number.isInteger(status) || status < 200 || status > 599) {
           resolve(page(502, "The container's answer was not valid."));
-          done();
+          abort();
           return;
         }
         const h = new Headers();
@@ -136,26 +155,32 @@ async function proxy(req, sid, port, path) {
         const empty = req.method === "HEAD" || status === 204 || status === 205 || status === 304;
         const stream = empty ? null : new ReadableStream({
           start(c) { ctrl = c; },
-          cancel() { done(); },
+          cancel() { clearTimeout(idle); abort(); }, // the page stopped reading
         });
         resolve(new Response(stream, { status, headers: h }));
         if (empty) {
-          done();
+          abort(); // nothing more is read: the rest of the answer is not wanted
+        } else {
+          stillComing();
         }
       } else if (m.t === "chunk" && ctrl && m.data instanceof ArrayBuffer) {
         total += m.data.byteLength;
         if (total > MAX_RESPONSE) {
+          clearTimeout(idle);
           ctrl.error(new Error("response too large"));
-          done();
+          abort();
           return;
         }
         ctrl.enqueue(new Uint8Array(m.data));
+        stillComing();
       } else if (m.t === "end") {
+        clearTimeout(idle);
         if (ctrl) {
           ctrl.close();
         }
         done();
       } else if (m.t === "error") {
+        clearTimeout(idle);
         if (!settled) {
           settled = true;
           clearTimeout(timer);
