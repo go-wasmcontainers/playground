@@ -123,10 +123,14 @@ func Bottles(ctx context.Context, lim Limits, reserved map[string]bool, log io.W
 			Description: desc,
 			Layer:       bl.Layer,
 			LayerZstd:   bl.Zstd,
-			Entrypoint:  []string{bl.Wasm[e.Binary]},
-			Env:         []string{"PATH=" + bin + ":/usr/local/bin:/usr/bin:/bin"},
-			Created:     time.Date(2026, 10, 26, 0, 0, 0, 0, time.UTC),
-			Project:     e.Project, Version: e.Version,
+			// The bare binary name: the engine resolves it on PATH (trying
+			// name.wasm) and passes it as argv[0], so a program that prints
+			// its name says "lua", not "/lua.org/v5.4.9/bin/lua.wasm".
+			Entrypoint: []string{e.Binary},
+			ModulePath: bl.Wasm[e.Binary],
+			Env:        []string{"PATH=" + bin + ":/usr/local/bin:/usr/bin:/bin"},
+			Created:    time.Date(2026, 10, 26, 0, 0, 0, 0, time.UTC),
+			Project:    e.Project, Version: e.Version,
 		})
 		logf("image %s: pkgx bottle %s:%s, %d bytes", e.Name, e.Project, e.Version, len(bl.Layer))
 	}

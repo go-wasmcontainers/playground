@@ -114,7 +114,8 @@ func TestExpose(t *testing.T) {
 	for _, e := range got {
 		names = append(names, e.Name)
 	}
-	if want := []string{"lua", "luac"}; !reflect.DeepEqual(names, want) {
+	// provides is a hint: every module is an image, listed names first.
+	if want := []string{"lua", "luac", "helper"}; !reflect.DeepEqual(names, want) {
 		t.Errorf("images %v, want %v", names, want)
 	}
 	kinds := map[string]int{}
@@ -123,6 +124,13 @@ func TestExpose(t *testing.T) {
 	}
 	if kinds["provides-without-module"] != 2 || kinds["module-not-provided"] != 1 {
 		t.Errorf("findings %v", fs)
+	}
+	// Under the cap, unlisted modules are dropped before listed ones.
+	capped := DefaultBottleLimits
+	capped.MaxBinaries = 2
+	got, _ = Expose(Candidate{Project: "lua.org", Version: "5", Provides: []string{"luac", "lua"}}, wasm, capped)
+	if len(got) != 2 || got[0].Name != "lua" || got[1].Name != "luac" {
+		t.Errorf("cap: %v", got)
 	}
 	// provides empty: the modules are the images (zlib's minigzip).
 	got, fs = Expose(Candidate{Project: "zlib.net", Version: "1"}, map[string]string{"minigzip": "/bin/minigzip.wasm"}, DefaultBottleLimits)

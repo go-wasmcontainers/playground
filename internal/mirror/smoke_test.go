@@ -20,7 +20,7 @@ func (f fakeExec) Run(_ context.Context, _ Image, _ []byte, p Probe) Result {
 }
 
 func TestSmokeAndCompare(t *testing.T) {
-	img := Image{Name: "sqlite3", Project: "sqlite.org", Version: "3", Entrypoint: []string{"/bin/sqlite3.wasm"}}
+	img := Image{Name: "sqlite3", Project: "sqlite.org", Version: "3", Entrypoint: []string{"sqlite3"}, ModulePath: "/bin/sqlite3.wasm"}
 	// ExtractFile needs a real layer; build one.
 	layer, err := TarGz(map[string][]byte{"bin/sqlite3.wasm": []byte("\x00asm")}, img.Created)
 	if err != nil {

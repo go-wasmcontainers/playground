@@ -93,8 +93,8 @@ func (n Native) Run(ctx context.Context, img Image, _ []byte, pr Probe) Result {
 	e := wazero.New(wazero.Options{EngineWASI: n.EngineWASI})
 	defer e.Close(ctx)
 	var out, errb bytes.Buffer
-	p, err := e.Start(ctx, runtime.Spec{FS: fs.Clone(rootfs.Quota{}), Path: img.Entrypoint[0],
-		Args: append([]string{path.Base(img.Entrypoint[0])}, pr.Args...), Env: []string{"PWD=/"},
+	p, err := e.Start(ctx, runtime.Spec{FS: fs.Clone(rootfs.Quota{}), Path: img.ModulePath,
+		Args: append([]string{img.Entrypoint[0]}, pr.Args...), Env: []string{"PWD=/"},
 		Stdin: strings.NewReader(pr.Stdin), Stdout: &out, Stderr: &errb, Timeout: 30 * time.Second, MemoryLimitBytes: 512 << 20})
 	if err != nil {
 		return Result{Exit: -1, Err: "start: " + err.Error()}
@@ -115,15 +115,13 @@ func (w Wasmtime) Run(ctx context.Context, img Image, module []byte, pr Probe) R
 		return Result{Exit: -1, Err: err.Error()}
 	}
 	defer os.RemoveAll(dir)
-	// Named like the entrypoint: wasmtime's argv[0] is the file name, and a
-	// program that prints it (lua's usage) must not differ for that reason.
-	f := filepath.Join(dir, path.Base(img.Entrypoint[0]))
+	f := filepath.Join(dir, path.Base(img.ModulePath))
 	if err := os.WriteFile(f, module, 0o644); err != nil {
 		return Result{Exit: -1, Err: err.Error()}
 	}
 	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
 	defer cancel()
-	cmd := exec.CommandContext(ctx, w.Bin, append([]string{"run", "--env", "PWD=/", f}, pr.Args...)...)
+	cmd := exec.CommandContext(ctx, w.Bin, append([]string{"run", "--argv0", img.Entrypoint[0], "--env", "PWD=/", f}, pr.Args...)...)
 	cmd.Stdin = strings.NewReader(pr.Stdin)
 	var out, errb bytes.Buffer
 	cmd.Stdout, cmd.Stderr = &out, &errb
@@ -173,7 +171,7 @@ func Smoke(ctx context.Context, img Image, probes []Probe, engine Executor, wt E
 	var module []byte
 	if wt != nil {
 		var err error
-		if module, err = ExtractFile(img, img.Entrypoint[0], lim); err != nil {
+		if module, err = ExtractFile(img, img.ModulePath, lim); err != nil {
 			rep.Diffs = append(rep.Diffs, "extract: "+err.Error())
 			wt = nil
 		}
