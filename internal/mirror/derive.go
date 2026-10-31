@@ -29,15 +29,20 @@ const Registry = "ghcr.io/go-pkgx/packages"
 // do. Both are untrusted input: the catalogue is signed, a layer is only
 // digest-checked against a manifest the registry served.
 type Limits struct {
-	MaxProjects int           // projects the catalogue may name for this platform
-	MaxLayer    int64         // compressed bytes of one bottle
-	MaxUnpacked int64         // decompressed bytes of one bottle (bomb limit)
-	MaxEntries  int           // tar entries of one bottle
-	MaxBinaries int           // images exposed per bottle
-	MaxImages   int           // images in the whole mirror (catalog.json is read up to 1000)
-	Parallel    int           // concurrent bottle fetches
-	Catalog     time.Duration // timeout of the catalogue fetch
-	Total       time.Duration // timeout of the whole derivation
+	MaxProjects int   // projects the catalogue may name for this platform
+	MaxLayer    int64 // compressed bytes of one bottle
+	MaxUnpacked int64 // decompressed bytes of one bottle (bomb limit)
+	MaxEntries  int   // tar entries of one bottle
+	MaxBinaries int   // images exposed per bottle
+	MaxImages   int   // images in the whole mirror (catalog.json is read up to 1000)
+	// MaxSiteBytes bounds the layers the mirror publishes, counted once per
+	// image (each image has its own /v2 repository, so a bottle that gives two
+	// images is stored twice). GitHub Pages refuses a site over 1 GB; the
+	// engine, the page and the first-party images take some of it.
+	MaxSiteBytes int64
+	Parallel     int           // concurrent bottle fetches
+	Catalog      time.Duration // timeout of the catalogue fetch
+	Total        time.Duration // timeout of the whole derivation
 }
 
 // DefaultBottleLimits are the limits the site build uses.
@@ -48,9 +53,12 @@ var DefaultBottleLimits = Limits{
 	MaxEntries:  20000,
 	MaxBinaries: 8,
 	MaxImages:   900,
-	Parallel:    6,
-	Catalog:     3 * time.Minute,
-	Total:       30 * time.Minute,
+	// 700 MiB: the Pages ceiling is 1 GB (1000 MB); the rest is the engine,
+	// the dashboard, the first-party and pinned images.
+	MaxSiteBytes: 700 << 20,
+	Parallel:     6,
+	Catalog:      3 * time.Minute,
+	Total:        30 * time.Minute,
 }
 
 // Candidate is one project the catalogue says is published for wasip1/wasm,
@@ -63,7 +71,12 @@ type Candidate struct {
 }
 
 // Ref is the registry reference of the candidate's bottle.
-func (c Candidate) Ref() string { return Registry + "/" + c.Project + ":" + c.Version }
+// The repository path is lowercased, as the registry requires and as
+// bottle's OCIClient.repoName does (oci.go:198-201): BurntSushi/toml is
+// github.com/burntsushi/toml.
+func (c Candidate) Ref() string {
+	return Registry + "/" + strings.ToLower(c.Project) + ":" + c.Version
+}
 
 // Finding is a difference worth telling the bottle's owner about. Findings
 // are listed, never dropped.

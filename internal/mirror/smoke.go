@@ -55,9 +55,12 @@ type SmokeReport struct {
 type Probe struct {
 	Args  []string `json:"args"`
 	Stdin string   `json:"stdin,omitempty"`
+	// AllowEmpty accepts exit 0 with no output (a validator that prints
+	// nothing for a valid input: xmlwf).
+	AllowEmpty bool `json:"allow_empty,omitempty"`
 }
 
-// DefaultProbes are run for an image with no probes of its own: --version, then
+// DefaultProbes are run for every image, before its own probes: --version, then
 // --help. Both are always run (a module may answer one only).
 var DefaultProbes = []Probe{{Args: []string{"--version"}}, {Args: []string{"--help"}}}
 
@@ -67,6 +70,44 @@ var DefaultProbes = []Probe{{Args: []string{"--version"}}, {Args: []string{"--he
 type Spec struct {
 	Probes   map[string][]Probe     `json:"probes"`
 	Expected map[string]Expectation `json:"expected"`
+	// Varying names images whose published bytes are known to change under the
+	// same tag (two build hosts publish it: go-pkgx/packages#393). The smoke
+	// compares behaviour of the bytes it fetched, never their digest, and the
+	// mirror keeps no per-(project, version) cache that could take a change for
+	// corruption. It is not a finding.
+	Varying map[string]string `json:"varying,omitempty"`
+}
+
+// SmokeImages smoke-tests the pkgx images (those with a Project) and sets
+// each one's Checked: true only for a clean pass (every probe passes under the
+// engine, no difference from wasmtime) of an image the spec does not list as
+// expected. It returns the reports and a finding per image that is not clean.
+func SmokeImages(ctx context.Context, imgs []Image, spec Spec, engine, wt Executor, lim Limits) ([]SmokeReport, []Finding) {
+	var reps []SmokeReport
+	var fs []Finding
+	for i := range imgs {
+		if imgs[i].Project == "" {
+			continue
+		}
+		r := Smoke(ctx, imgs[i], spec.Probes[imgs[i].Name], engine, wt, lim)
+		reps = append(reps, r)
+		_, expected := spec.Expected[imgs[i].Name]
+		clean := r.Verdict == "ok" && len(r.Diffs) == 0 && !expected
+		imgs[i].Checked = &clean
+		if clean {
+			continue
+		}
+		kind := "smoke-" + r.Verdict
+		if r.Verdict == "ok" {
+			kind = "smoke-diff"
+		}
+		detail := strings.Join(r.Diffs, "; ")
+		if e, ok := spec.Expected[imgs[i].Name]; ok {
+			kind, detail = "smoke-expected", e.Verdict+": "+e.Reason
+		}
+		fs = append(fs, Finding{Project: imgs[i].Project, Image: imgs[i].Name, Kind: kind, Detail: detail})
+	}
+	return reps, fs
 }
 
 // Executor runs a module once. Tests replace it.
@@ -121,7 +162,14 @@ func (w Wasmtime) Run(ctx context.Context, img Image, module []byte, pr Probe) R
 	}
 	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
 	defer cancel()
-	cmd := exec.CommandContext(ctx, w.Bin, append([]string{"run", "--argv0", img.Entrypoint[0], "--env", "PWD=/", f}, pr.Args...)...)
+	// An empty directory preopened as "/", as the engine preopens its root
+	// file system: without it a program that opens a relative path (a config
+	// file) gets EBADF under wasmtime and not under the engine.
+	root := filepath.Join(dir, "root")
+	if err := os.Mkdir(root, 0o755); err != nil {
+		return Result{Exit: -1, Err: err.Error()}
+	}
+	cmd := exec.CommandContext(ctx, w.Bin, append([]string{"run", "--dir", root + "::/", "--argv0", img.Entrypoint[0], "--env", "PWD=/", f}, pr.Args...)...)
 	cmd.Stdin = strings.NewReader(pr.Stdin)
 	var out, errb bytes.Buffer
 	cmd.Stdout, cmd.Stderr = &out, &errb
@@ -164,9 +212,9 @@ func ExtractFile(img Image, p string, lim Limits) ([]byte, error) {
 // Smoke runs img under the engine and, when wt is not nil, under wasmtime, and
 // compares them byte for byte.
 func Smoke(ctx context.Context, img Image, probes []Probe, engine Executor, wt Executor, lim Limits) SmokeReport {
-	if len(probes) == 0 {
-		probes = DefaultProbes
-	}
+	// The spec's probes are added to the defaults, never instead of them: the
+	// defaults still compare the engine with wasmtime on every image.
+	probes = append(append([]Probe(nil), DefaultProbes...), probes...)
 	rep := SmokeReport{Image: img.Name, Project: img.Project, Version: img.Version, Verdict: "fail"}
 	var module []byte
 	if wt != nil {
@@ -176,11 +224,19 @@ func Smoke(ctx context.Context, img Image, probes []Probe, engine Executor, wt E
 			wt = nil
 		}
 	}
-	for _, pr := range probes {
+	anyDefault, specFail := false, false
+	for i, pr := range probes {
 		args := pr.Args
-		run := Run{Args: args, Stdin: pr.Stdin, Engine: engine.Run(ctx, img, module, pr)}
-		if run.Engine.Exit == 0 && run.Engine.Err == "" && (run.Engine.Stdout != "" || run.Engine.Stderr != "") {
-			rep.Verdict = "ok"
+		if pr.Stdin != "" {
+			args = append(append([]string(nil), args...), "<stdin")
+		}
+		run := Run{Args: pr.Args, Stdin: pr.Stdin, Engine: engine.Run(ctx, img, module, pr)}
+		pass := run.Engine.Exit == 0 && run.Engine.Err == "" && (run.Engine.Stdout != "" || run.Engine.Stderr != "" || pr.AllowEmpty)
+		if i < len(DefaultProbes) {
+			anyDefault = anyDefault || pass
+		} else if !pass {
+			specFail = true
+			rep.Diffs = append(rep.Diffs, fmt.Sprintf("%s: the probe does not pass under the engine (exit %d, err %q)", strings.Join(args, " "), run.Engine.Exit, run.Engine.Err))
 		}
 		if wt != nil {
 			r := wt.Run(ctx, img, module, pr)
@@ -188,6 +244,15 @@ func Smoke(ctx context.Context, img Image, probes []Probe, engine Executor, wt E
 			rep.Diffs = append(rep.Diffs, Compare(args, run.Engine, r)...)
 		}
 		rep.Runs = append(rep.Runs, run)
+	}
+	// An image with probes of its own is ok when they all pass (lua answers
+	// -v, not --version); one without, when --version or --help does.
+	if len(probes) > len(DefaultProbes) {
+		if !specFail {
+			rep.Verdict = "ok"
+		}
+	} else if anyDefault {
+		rep.Verdict = "ok"
 	}
 	return rep
 }

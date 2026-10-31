@@ -61,6 +61,8 @@ type Image struct {
 	Project, Version string
 	// ModulePath is the path of the module in the layer (not in the config).
 	ModulePath string
+	// Checked is copied to catalog.json (see CatalogEntry).
+	Checked *bool
 }
 
 // Catalog entry, written to catalog.json for the page's help.
@@ -76,6 +78,11 @@ type CatalogEntry struct {
 	Project string `json:"project,omitempty"`
 	Version string `json:"version,omitempty"`
 	Bytes   int64  `json:"bytes,omitempty"`
+	// Checked is set for pkgx images that went through the engine-vs-wasmtime
+	// smoke at build time: true when every probe passed and nothing differed
+	// from wasmtime, false when the image was only mirrored (a failure or a
+	// difference, or a named expectation). Absent: not smoke-tested.
+	Checked *bool `json:"checked,omitempty"`
 }
 
 type writer struct {
@@ -260,7 +267,7 @@ func Write(dir string, images []Image) error {
 			}
 		}
 		catalog = append(catalog, CatalogEntry{Name: img.Name, Tags: img.Tags, Description: img.Description, Digest: string(top.Digest),
-			Project: img.Project, Version: img.Version, Bytes: int64(len(img.Layer))})
+			Project: img.Project, Version: img.Version, Bytes: int64(len(img.Layer)), Checked: img.Checked})
 	}
 	return os.WriteFile(filepath.Join(dir, "catalog.json"), mustJSON(catalog), 0o644)
 }

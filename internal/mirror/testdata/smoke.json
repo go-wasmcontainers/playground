@@ -1,9 +1,39 @@
 {
   "probes": {
-    "lua": [{"args": ["-v"]}],
+    "lua": [{"args": ["-v"]}, {"args": ["-e", "print(1+1)"]}],
     "luac": [{"args": ["-v"]}],
     "minigzip": [{"args": [], "stdin": "hello"}],
-    "sqlite3": [{"args": ["--version"]}, {"args": [":memory:"], "stdin": "select 6*7 as answer, 'x' as s;\n"}]
+    "sqlite3": [{"args": [":memory:"], "stdin": "select 6*7 as answer, 'x' as s;\n"}],
+    "yq": [{"args": ["."], "stdin": "a: 1\nb: [1, 2]\n"}],
+    "gojq": [{"args": ["."], "stdin": "{\"a\":[1,2]}"}],
+    "kube-score": [{"args": ["version"]}],
+    "jq":[{"args": ["."], "stdin": "{\"a\":[1,2]}"}],
+    "jj": [{"args": ["a.b"], "stdin": "{\"a\":{\"b\":42}}"}],
+    "tomljson": [{"args": [], "stdin": "a = 1\n[t]\nb = \"x\"\n"}],
+    "json2yaml": [{"args": [], "stdin": "{\"a\":[1,2]}"}],
+    "hcl2json": [{"args": [], "stdin": "a = 1\nb {\n  c = \"x\"\n}\n"}],
+    "hclfmt": [{"args": ["-version"]}, {"args": [], "stdin": "a   = 1\n"}],
+    "misspell": [{"args": [], "stdin": "this is teh test\n"}],
+    "gofumpt": [{"args": [], "stdin": "package a\nfunc  f( ){}\n"}],
+    "shfmt": [{"args": [], "stdin": "if true;then echo hi;fi\n"}],
+    "yamlfmt": [{"args": ["-in"], "stdin": "a:   1\nb: [1,   2]\n"}],
+    "xurls": [{"args": [], "stdin": "see https://example.com/x for details\n"}],
+    "go-md2man": [{"args": [], "stdin": "# Title\n\ntext\n"}],
+    "mmark": [{"args": [], "stdin": "# Title\n\ntext\n"}],
+    "zstd": [{"args": ["-c"], "stdin": "hello hello hello\n"}],
+    "lz4": [{"args": ["-c"], "stdin": "hello hello hello\n"}],
+    "brotli": [{"args": ["-c"], "stdin": "hello hello hello\n"}],
+    "bzip2": [{"args": ["-c"], "stdin": "hello hello hello\n"}],
+    "xmlwf": [{"args": [], "stdin": "<a><b/></a>", "allow_empty": true}],
+    "pcre2grep": [{"args": ["a"], "stdin": "a\nb\n"}],
+    "simdjson-minify": [{"args": [], "stdin": "{ \"a\" : [ 1 , 2 ] }"}]
   },
-  "expected": {}
+  "varying": {
+    "simdjson-minify": "5.0.5 is published by two build hosts under one tag (go-pkgx/packages#393): the bytes change over time, so only behaviour is compared"
+  },
+  "expected": {
+    "tomlv": {"verdict": "fail", "reason": "tomlv only reads named files and the smoke test has no file input; --version and --help exit 1 under both runtimes"},
+    "yq": {"verdict": "diff", "reason": "with stdin a pipe, the engine's host reports a character device (the isatty path of sqlite3): yq prints eval usage where wasmtime evaluates the input"},
+    "gnostic": {"verdict": "diff", "reason": "gnostic calls os.Exit(-1) for --version: the engine reports exit 4294967295, wasmtime traps (exit status outside [0..126)) and exits 1"}
+  }
 }

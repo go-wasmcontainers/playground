@@ -51,6 +51,22 @@ func TestSmokeAndCompare(t *testing.T) {
 	}
 }
 
+func TestSmokeSpecProbes(t *testing.T) {
+	img := Image{Name: "lua", Entrypoint: []string{"lua"}, ModulePath: "/bin/lua.wasm"}
+	// lua rejects --version and --help but answers -v: ok through its own probe.
+	eng := fakeExec{"engine", map[string]Result{"--version": {Exit: 1, Stderr: "bad"}, "--help": {Exit: 1, Stderr: "bad"}, "-v": {Stdout: "Lua 5.4\n"}}}
+	r := Smoke(context.Background(), img, []Probe{{Args: []string{"-v"}}}, eng, nil, DefaultBottleLimits)
+	if r.Verdict != "ok" || len(r.Runs) != 3 {
+		t.Errorf("own probe passes: %+v", r)
+	}
+	// A real-input probe that fails fails the image even when --version works.
+	eng.res["--version"] = Result{Stdout: "v1\n"}
+	r = Smoke(context.Background(), img, []Probe{{Args: []string{"."}, Stdin: "x"}}, eng, nil, DefaultBottleLimits)
+	if r.Verdict != "fail" || len(r.Diffs) != 1 {
+		t.Errorf("failing probe: %+v", r)
+	}
+}
+
 func TestSpecFileAndMarkdown(t *testing.T) {
 	b, err := os.ReadFile("testdata/smoke.json")
 	if err != nil {
