@@ -246,14 +246,13 @@ type Exposed struct {
 
 // Expose decides which images a bottle gives, and how they are named.
 //
-// Rule (documented in the README): every name in the project's `provides`
-// that has a regular file bin/<name>.wasm in the bottle is an image, at most
-// Limits.MaxBinaries of them, in sorted order. All of a bottle's images share
-// the same layer (every binary of the bottle is in each image's /bin); only the
-// entrypoint differs. A provides entry without a module, and a module in bin/
-// that provides does not list, are findings. A module that provides does not
-// list becomes an image only when no provides entry has a module (zlib.net:
-// provides is empty and the module is minigzip).
+// Rule (documented in the README): every regular file bin/<name>.wasm in the
+// bottle is an image, at most Limits.MaxBinaries of them (names in `provides`
+// first, then sorted). `provides` is a hint only: it is wrong in both
+// directions on wasip1/wasm (go-pkgx/bk#376). A provides name without a module,
+// and a module provides does not list, are findings. All of a bottle's images
+// share the same layer (every binary is in each image's /bin); only the
+// entrypoint differs.
 //
 // Names are the binary names. When several projects give the same name the
 // project whose last path segment equals it keeps it (else the smallest project
@@ -263,16 +262,26 @@ func Expose(c Candidate, wasm map[string]string, lim Limits) ([]Exposed, []Findi
 	var out []Exposed
 	var fs []Finding
 	provided := map[string]bool{}
-	names := append([]string(nil), c.Provides...)
-	sort.Strings(names)
-	for _, n := range names {
-		if provided[n] {
-			continue
-		}
+	for _, n := range c.Provides {
 		provided[n] = true
-		if _, ok := wasm[n]; !ok {
-			fs = append(fs, Finding{Project: c.Project, Kind: "provides-without-module", Detail: fmt.Sprintf("provides %q but the bottle has no bin/%s.wasm", n, n)})
-			continue
+	}
+	// On wasip1/wasm `provides` is copied from the host recipe and is wrong in
+	// both directions (go-pkgx/bk#376): the bottle's modules are the authority.
+	// Every bin/<n>.wasm is an image; the names `provides` lists come first, so
+	// the per-bottle cap drops unlisted modules before listed ones.
+	var mods []string
+	for b := range wasm {
+		mods = append(mods, b)
+	}
+	sort.Slice(mods, func(i, j int) bool {
+		if provided[mods[i]] != provided[mods[j]] {
+			return provided[mods[i]]
+		}
+		return mods[i] < mods[j]
+	})
+	for _, n := range mods {
+		if !provided[n] {
+			fs = append(fs, Finding{Project: c.Project, Kind: "module-not-provided", Detail: fmt.Sprintf("bin/%s.wasm is in the bottle but not in provides", n)})
 		}
 		if !imageRE.MatchString(n) {
 			fs = append(fs, Finding{Project: c.Project, Kind: "bad-image-name", Detail: fmt.Sprintf("binary %q is not a usable image name", n)})
@@ -284,22 +293,15 @@ func Expose(c Candidate, wasm map[string]string, lim Limits) ([]Exposed, []Findi
 		}
 		out = append(out, Exposed{Name: n, Project: c.Project, Version: c.Version, Binary: n, Summary: c.Summary})
 	}
-	var extra []string
-	for b := range wasm {
-		if !provided[b] {
-			extra = append(extra, b)
+	var missing []string
+	for n := range provided {
+		if _, ok := wasm[n]; !ok {
+			missing = append(missing, n)
 		}
 	}
-	sort.Strings(extra)
-	fromProvides := len(out)
-	for _, b := range extra {
-		fs = append(fs, Finding{Project: c.Project, Kind: "module-not-provided", Detail: fmt.Sprintf("bin/%s.wasm is in the bottle but not in provides", b)})
-		// A bottle none of whose provides has a module (zlib: provides is
-		// empty, the module is the minigzip example) would give no image at
-		// all: its modules are then the images. Still a finding for go-pkgx.
-		if fromProvides == 0 && len(out) < lim.MaxBinaries && imageRE.MatchString(b) {
-			out = append(out, Exposed{Name: b, Project: c.Project, Version: c.Version, Binary: b, Summary: c.Summary})
-		}
+	sort.Strings(missing)
+	for _, n := range missing {
+		fs = append(fs, Finding{Project: c.Project, Kind: "provides-without-module", Detail: fmt.Sprintf("provides %q but the bottle has no bin/%s.wasm", n, n)})
 	}
 	return out, fs
 }

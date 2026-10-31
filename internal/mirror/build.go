@@ -59,6 +59,8 @@ type Image struct {
 	Created time.Time
 	// Project and Version name the pkgx bottle the image comes from (catalog.json).
 	Project, Version string
+	// ModulePath is the path of the module in the layer (not in the config).
+	ModulePath string
 }
 
 // Catalog entry, written to catalog.json for the page's help.

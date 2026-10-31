@@ -39,7 +39,7 @@ func RootCmd() *cobra.Command {
 				return err
 			}
 			for _, im := range der.Images {
-				fmt.Fprintf(cmd.OutOrStdout(), "%-24s %s:%s  %d bytes  %s\n", im.Name, im.Project, im.Version, len(im.Layer), im.Entrypoint[0])
+				fmt.Fprintf(cmd.OutOrStdout(), "%-24s %s:%s  %d bytes  %s\n", im.Name, im.Project, im.Version, len(im.Layer), im.ModulePath)
 			}
 			for _, f := range der.Findings {
 				fmt.Fprintf(cmd.OutOrStdout(), "finding %-30s %-22s %s\n", f.Project, f.Kind, f.Detail)

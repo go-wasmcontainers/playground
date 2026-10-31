@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/go-pkgx/bottle"
@@ -35,12 +36,12 @@ func TestPageCostGrowsWithTheCatalogueOnly(t *testing.T) {
 	}
 	// Every provides name has a module in the fake bottle.
 	fetchBottle = func(_ context.Context, ref string, _ Limits) (*BottleLayer, error) {
+		var i int
+		fmt.Sscanf(strings.TrimPrefix(ref, Registry+"/example"), "%d", &i)
 		w := map[string]string{}
-		for i := 0; i < 400; i++ {
-			for _, s := range []string{"a", "b"} {
-				n := fmt.Sprintf("tool%03d%s", i, s)
-				w[n] = "/x/bin/" + n + ".wasm"
-			}
+		for _, s := range []string{"a", "b"} {
+			n := fmt.Sprintf("tool%03d%s", i, s)
+			w[n] = "/x/bin/" + n + ".wasm"
 		}
 		return &BottleLayer{Layer: layer, Wasm: w}, nil
 	}

@@ -132,8 +132,8 @@ reads pkgx's signed catalogue (`go-pkgx.dev/catalog`, `bottle.FetchCatalog`,
 which verifies the signature), keeps the projects whose `versions` is not
 empty for `wasip1/wasm`, and mirrors the newest version of each, so a bottle
 published tomorrow is an image after the next build with no code change. At
-the time of writing that is 7 images from 6 bottles: `age`, `go-md2man`,
-`shfmt` (Go) and `lua`, `luac`, `sqlite3`, `minigzip` (C; the layers are
+the time of writing that is 8 images from 7 bottles: `age`, `go-md2man`,
+`shfmt` (Go) and `lua`, `luac`, `sqlite3`, `minigzip`, `simdjson-minify` (C; the layers are
 `tar+zstd`, served as published). The page's `wctr images` and the dashboard's
 Images view list whatever `catalog.json` holds, and each entry names its
 `project`, `version` and layer `bytes`.
@@ -143,10 +143,13 @@ The rules, each tested in `internal/mirror`:
 - **Version**: the highest by numeric components, then rebuild counter
   (`1.8.2_1` &gt; `1.8.2`), then raw string; the catalogue's order is not trusted;
   a string that is not version-shaped or not an OCI tag is skipped.
-- **Names**: an image per name in the project's `provides` that has a
-  `bin/<name>.wasm` in the bottle (`lua` gives `lua` and `luac`), all sharing the
-  bottle's layer; if no `provides` name has a module, the bottle's modules are
-  the images (zlib gives `minigzip`). A name taken by another project goes to the
+- **Names**: an image per `bin/<name>.wasm` in the bottle (`lua` gives `lua`
+  and `luac`), all sharing the bottle's layer, at most 8 per bottle, names in
+  `provides` first. `provides` is only a hint: on wasip1/wasm it is copied from
+  the host recipe and wrong both ways (go-pkgx/bk#376), so a name without a
+  module, and a module it does not list, are findings. An image's entrypoint is
+  the bare binary name, resolved on `PATH`, so argv[0] is `lua`, not the module
+  file. A name taken by another project goes to the
   project whose last path segment equals it, else the smallest project name; the
   others become `<project-with-dashes>-<name>`. A first-party image keeps its name.
 - **Dependencies are ignored**: a `wasip1` module is statically linked, and the

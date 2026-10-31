@@ -61,7 +61,7 @@ func TestBottlesGrowWithTheCatalogue(t *testing.T) {
 		t.Fatalf("%d images", len(d.Images))
 	}
 	b2 := d.Images[2]
-	if b2.Name != "b2" || b2.Version != "2.1" || b2.Tags[0] != "2.1" || b2.Tags[1] != "latest" || b2.Entrypoint[0] != "/b.org/bin/b2.wasm" || !strings.HasPrefix(b2.Env[0], "PATH=/b.org/bin:") {
+	if b2.Name != "b2" || b2.Version != "2.1" || b2.Tags[0] != "2.1" || b2.Tags[1] != "latest" || b2.Entrypoint[0] != "b2" || b2.ModulePath != "/b.org/bin/b2.wasm" || !strings.HasPrefix(b2.Env[0], "PATH=/b.org/bin:") {
 		t.Errorf("b2: %+v", b2)
 	}
 
