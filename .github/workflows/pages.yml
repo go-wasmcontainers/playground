@@ -6,6 +6,11 @@ name: pages
 on:
   push:
     branches: [main]
+  # Daily: the pkgx images are derived from the signed catalogue at build
+  # time, so a bottle published since the last push appears without one.
+  # The build is deterministic; an unchanged catalogue redeploys the same files.
+  schedule:
+    - cron: '17 4 * * *'
   workflow_dispatch:
 
 permissions:
