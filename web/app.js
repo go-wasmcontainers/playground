@@ -352,15 +352,21 @@
     window.__wctrBuild = build;
     // The dashboard's bridge listens on the worker too (addEventListener);
     // its http.* messages are not this page's.
+    window.wctrPorts.attach(engine);
     engine.onmessage = (e) => {
       const m = e.data;
       if (!m || typeof m.t !== "string" || m.t.startsWith("http.")) return;
+      if (m.t === "ports" || m.t.startsWith("port-")) {
+        window.wctrPorts.onEngine(m); // published ports (ports.js)
+        return;
+      }
       switch (m.t) {
         case "ready":
           say("engine " + m.version + " ready · images and containers stored in " + m.storage);
           state.restored = { restored: m.restored, stopped: m.stopped, repaired: m.repaired };
           state.engineReadyMs = performance.now() - state.t0;
           state.ready = true;
+          window.wctrPorts.refresh(); // restored containers may publish ports
           if (dash) {
             if (m.restored > 0 || m.repaired > 0) {
               let n = "Restored " + m.restored + " container(s) from your last visit";
@@ -411,6 +417,7 @@
           break;
         case "done":
           state.transcript.push({ line: m.line, code: m.code, ms: m.ms });
+          window.wctrPorts.refresh(); // a command may have published or freed a port
           if (m.code === 0 && /^\s*wctr\s+(pull|run)\b/.test(m.line)) askPersist();
           break;
         case "fatal":

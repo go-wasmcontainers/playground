@@ -253,8 +253,9 @@ session.
   ("Join class"); the e2e drives the dashboard's own dialog, one key at a
   time, and checks the code is in no URL, storage, DOM or test hook.
 
-**Coming: `-p` in the browser, on an origin of its own.** `wctr run -p
-8080:80 net serve` will open the container's web pages in a tab — but
+**`-p` in the browser, on an origin of its own.** After `wctr run -d -p
+8080:80 net serve`, the bar above the terminal shows **open :8080**,
+which opens the container's web pages in a tab of their own. They are
 **not on this origin**: a container's page here could read the
 playground's storage (the class session token) and script it, and a
 sandboxed page cannot be served by a service worker at all (an opaque
@@ -295,10 +296,26 @@ view tab (this origin, not isolated, not frameable)
   share its origin); what they reach through it is HTTP to this session's
   published ports, nothing of the playground.
 
-The shell and the policy are here and tested (`go test -tags e2e
-./internal/usercontent/`: three local origins in Chromium); the view tab
-and the engine worker's side follow with the engine release that has
-`portmap.Virtual`.
+- The **engine** publishes ports in memory (engine `portmap.Virtual`) and
+  issues a **session** per opened port (`internal/portrelay`). A session
+  is a random id naming the port's pages (`/s/<sid>/<port>/`) and a nonce
+  for the shell, bound to that one port and to the usercontent origin. A
+  request for a session it did not issue, or for another port, is refused.
+  Each session has its own cookie jar.
+- The **view tab** (`view.html`) is this origin, not cross-origin isolated
+  (it embeds the shell, of another site) and not frameable. It takes the
+  nonce out of its URL at once, and relays between the shell and the
+  playground tab over a `BroadcastChannel`. The playground tab answers only
+  for the sessions it opened, so two playground tabs never answer for each
+  other. Closing the view ends the session.
+- **Measured** in Chromium (`e2e/ports_test.go`): 8 MiB from a container to
+  the page, through the service worker, shell, view, playground tab, engine
+  and back, in 32 ms (about 265 MB/s, M4 Max, under load).
+
+Tested end to end: `go test -tags e2e -run TestPublishedPort ./e2e/`, with
+the playground and the usercontent site on two local origins. The container's
+page shows, an 8 MiB body arrives whole, the nonce leaves the URL, and the
+view is not isolated. With the engine's relay disabled, the test fails.
 
 ## How it works
 

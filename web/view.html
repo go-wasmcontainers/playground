@@ -1,0 +1,18 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<!-- The service worker sends this as a header too, with frame-ancestors 'none' (a meta cannot). -->
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' data:; frame-src https://go-wasmcontainers-usercontent.github.io http://localhost:* http://127.0.0.1:*; object-src 'none'; base-uri 'none'; form-action 'none'">
+<meta name="referrer" content="no-referrer">
+<title>wctr: a container's port</title>
+<link rel="stylesheet" href="view.css">
+</head>
+<body>
+<header><strong>wctr</strong> <span id="what">a published port</span> <span id="status" role="status">connecting…</span></header>
+<main id="main"></main>
+<noscript>This tab shows a container's web pages and needs JavaScript.</noscript>
+<script src="view.js"></script>
+</body>
+</html>

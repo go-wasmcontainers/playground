@@ -41,6 +41,26 @@ function cspFor(url) {
   return CSP;
 }
 
+// The view tab (view.html) embeds the usercontent shell, of another site,
+// which sends no CORP: it is not isolated (no COEP), and nothing may embed
+// it. The same rule as internal/site ViewCSP (tested there).
+const VIEW_CSP = "default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' data:; " +
+  "frame-src https://go-wasmcontainers-usercontent.github.io http://localhost:* http://127.0.0.1:*; " +
+  "object-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'";
+const isView = (url) => url.pathname.endsWith("/view.html");
+
+function viewHeaders(res) {
+  if (res.status === 0) {
+    return res;
+  }
+  const h = new Headers(res.headers);
+  h.set("Cross-Origin-Opener-Policy", "same-origin");
+  h.delete("Cross-Origin-Embedder-Policy");
+  h.set("Content-Security-Policy", VIEW_CSP);
+  h.set("X-Content-Type-Options", "nosniff");
+  return new Response(res.body, { status: res.status, statusText: res.statusText, headers: h });
+}
+
 function isolate(res, csp) {
   if (res.status === 0) {
     return res;
@@ -75,7 +95,7 @@ self.addEventListener("install", (e) => {
           if (!res.ok) {
             throw new Error(p + ": HTTP " + res.status);
           }
-          await cache.put(shellURL(p), isolate(res));
+          await cache.put(shellURL(p), p === "view.html" ? viewHeaders(res) : isolate(res));
         }),
       );
       // The very first worker has no page running an older build: it takes
@@ -124,6 +144,12 @@ self.addEventListener("fetch", (e) => {
   e.respondWith(
     (async () => {
       const cache = await caches.open(CACHE);
+      // The view tab: this build's copy, whatever the query, with its own
+      // headers (not the playground's page, which every other navigation is).
+      if (isView(url)) {
+        const hit = await cache.match(shellURL("view.html"));
+        return hit || viewHeaders(await fetch(req));
+      }
       // The page itself: this build's copy, whatever the query.
       let key = req.url;
       if (req.mode === "navigate" || url.pathname === new URL(self.registration.scope).pathname ||
