@@ -55,8 +55,8 @@ github.com/go-wasmcontainers/build v0.4.0 h1:g4aDR3CBe/vVPrBUfW1hRJHDqWAyA4EmaJv
 github.com/go-wasmcontainers/build v0.4.0/go.mod h1:XPYM+KFCU/HImvOB8y+5Gccg0CG0cBnW2tjWjjAkUXM=
 github.com/go-wasmcontainers/compose v0.5.0 h1:cE+FhiazMA1d4YTqIe6swp519Y1xqsiFVNaYuPnx1EI=
 github.com/go-wasmcontainers/compose v0.5.0/go.mod h1:C+jKqJdOXKsWMLni1XubZ9fyQsP8+TwLLCTFM5+HMFo=
-github.com/go-wasmcontainers/dashboard v0.7.1-0.20261031195211-de71ca3b80f7 h1:hUzJNgKxCJJaMYSDB4xujs+m6QeIf0FFnKUxpMYXRjs=
-github.com/go-wasmcontainers/dashboard v0.7.1-0.20261031195211-de71ca3b80f7/go.mod h1:IEjXRNLufM4rbvQLOi0pI6YZBPV8Nz1ztPNSP++RUfI=
+github.com/go-wasmcontainers/dashboard v0.8.0 h1:POyji82qJcMqOPBoN/GWH3nztKNlCduz/Z2bSSeN4vk=
+github.com/go-wasmcontainers/dashboard v0.8.0/go.mod h1:IEjXRNLufM4rbvQLOi0pI6YZBPV8Nz1ztPNSP++RUfI=
 github.com/go-wasmcontainers/engine v0.30.0 h1:4/eupbusv064o2h9CiI0kdmn/RgT4fPSv4mxvj/O7q0=
 github.com/go-wasmcontainers/engine v0.30.0/go.mod h1:dkn31HqTtebB2ccLhCqP6DfRoEKwqDqQEnLmIEFB75s=
 github.com/go-wasmcontainers/gpu v0.6.0 h1:sS10vOukHm08ZxCztNZpUR0VhsBqVZghBg4lGkrH9q0=
