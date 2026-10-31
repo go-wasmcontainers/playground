@@ -98,6 +98,8 @@ jobs:
           - { target: FuzzParseCatalog, pkg: ./internal/session }
           # A relay origin typed by a learner, spliced into a CSP header.
           - { target: FuzzCSPFor, pkg: ./internal/site }
+          # A pkgx bottle's tar is untrusted: paths, links and size.
+          - { target: FuzzScanTar, pkg: ./internal/mirror }
           # Typed lines and keys are parsed by the engine's cli/lineedit,
           # fuzzed there (FuzzEditor, FuzzSplitPartial).
     steps:
@@ -214,6 +216,31 @@ jobs:
           E2E_GPU_REAL: ${{ matrix.real }}
           E2E_GPU_ARGS: ${{ matrix.args }}
         run: go test -tags e2e -count=1 -v -run '^TestGPU$' -timeout 20m ./e2e/ > "$RUNNER_TEMP/gpu.log" 2>&1 && status=0 || status=$?; tail -60 "$RUNNER_TEMP/gpu.log"; exit "$status"
+
+  # Every pkgx wasip1/wasm bottle the signed catalogue lists, as an image:
+  # --version / --help (or the probe in internal/mirror/testdata/smoke.json)
+  # under the engine's wazero and under wasmtime, compared byte for byte. A
+  # failure or a difference that the spec does not name, and a named one that
+  # no longer happens, fail the job; the findings for go-pkgx are in the summary.
+  bottles:
+    name: pkgx bottles (smoke, engine vs wasmtime)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
+        with: { go-version: '1.27.3' }
+      - uses: bytecodealliance/actions/wasmtime/setup@v1
+      - run: wasmtime --version
+      - name: mirror smoke
+        run: go run ./cmd/mirror smoke --require-wasmtime --spec internal/mirror/testdata/smoke.json --out "$RUNNER_TEMP/smoke.json" --summary "$RUNNER_TEMP/smoke.md" > "$RUNNER_TEMP/smoke.log" 2>&1 && status=0 || status=$?; tail -60 "$RUNNER_TEMP/smoke.log"; cat "$RUNNER_TEMP/smoke.md" >> "$GITHUB_STEP_SUMMARY" || true; exit "$status"
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: bottles-smoke
+          path: |
+            ${{ runner.temp }}/smoke.json
+            ${{ runner.temp }}/smoke.log
 
   # The same images natively, for comparison: wazero through the engine,
   # and wasmtime.

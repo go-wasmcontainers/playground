@@ -125,10 +125,50 @@ browser without WebGPU, gets no adapter: these images print
   Ctrl-P Ctrl-Q detaches from `run -it` and leaves the container running. `wctr build` and `wctr compose` are wired in as in
   `cmd/wctr`.
 
-Last, pkgx `wasip1` bottles taken from `ghcr.io/go-pkgx/packages` at build time:
-the Go ones `age` 1.3.2, `go-md2man` 2.0.7, `shfmt` 3.14.1, and the C ones
-`lua` 5.4.9, `sqlite3` 3.53.4 and `minigzip` (zlib 1.3.2), whose layers are
-`tar+zstd`, served as published. lua raises its errors with WebAssembly
+Last, **every pkgx `wasip1/wasm` bottle**, taken from `ghcr.io/go-pkgx/packages`
+at build time. The list is not typed anywhere: `go run ./cmd/site build --pkgx`
+reads pkgx's signed catalogue (`go-pkgx.dev/catalog`, `bottle.FetchCatalog`,
+which verifies the signature), keeps the projects whose `versions` is not
+empty for `wasip1/wasm`, and mirrors the newest version of each, so a bottle
+published tomorrow is an image after the next build with no code change. At
+the time of writing that is 7 images from 6 bottles: `age`, `go-md2man`,
+`shfmt` (Go) and `lua`, `luac`, `sqlite3`, `minigzip` (C; the layers are
+`tar+zstd`, served as published). The page's `wctr images` and the dashboard's
+Images view list whatever `catalog.json` holds, and each entry names its
+`project`, `version` and layer `bytes`.
+
+The rules, each tested in `internal/mirror`:
+
+- **Version**: the highest by numeric components, then rebuild counter
+  (`1.8.2_1` &gt; `1.8.2`), then raw string; the catalogue's order is not trusted;
+  a string that is not version-shaped or not an OCI tag is skipped.
+- **Names**: an image per name in the project's `provides` that has a
+  `bin/<name>.wasm` in the bottle (`lua` gives `lua` and `luac`), all sharing the
+  bottle's layer; if no `provides` name has a module, the bottle's modules are
+  the images (zlib gives `minigzip`). A name taken by another project goes to the
+  project whose last path segment equals it, else the smallest project name; the
+  others become `<project-with-dashes>-<name>`. A first-party image keeps its name.
+- **Dependencies are ignored**: a `wasip1` module is statically linked, and the
+  catalogue's `deps` are read from the host recipe.
+- **Limits** (`mirror.DefaultBottleLimits`): 400 projects, 900 images, 8 images per
+  bottle, 100 MiB per compressed layer, 512 MiB and 20 000 entries unpacked, a
+  3 minute catalogue timeout and 30 minutes in all. An unverifiable or empty
+  catalogue, a network error and a count over its limit stop the build: there is
+  no built-in list to fall back to. A bottle over a size limit, or whose tar has
+  an absolute path, a `..`, or a link leaving the root, is refused and listed in
+  `findings.json`, and costs only itself.
+- **Page cost**: one `catalog.json` (about 330 bytes per image, read up to 1 MiB
+  and 1000 entries), then an image's blobs only when a command uses it.
+
+`go run ./cmd/mirror smoke --require-wasmtime --spec internal/mirror/testdata/smoke.json`
+runs every derived image under the engine (wazero) and under wasmtime with
+`--version` and `--help` (or the probe the spec names, e.g. `lua -v`), and
+compares exit status, stdout and stderr byte for byte; CI does it on every
+change (`pkgx bottles`), with the findings for go-pkgx in the job summary. A
+failure or difference that the spec does not name fails the job, and a named one
+that no longer happens fails it too.
+
+lua raises its errors with WebAssembly
 exception handling, which runs in Chromium and Firefox (tested) and natively:
 
 ```console

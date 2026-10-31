@@ -33,7 +33,8 @@ type Options struct {
 	Root string
 	// Out is the output directory (replaced).
 	Out string
-	// Pkgx adds the pkgx wasip1 pilots, fetched from ghcr.io.
+	// Pkgx adds every pkgx wasip1/wasm bottle the signed catalogue lists,
+	// fetched from ghcr.io (mirror.Bottles).
 	Pkgx bool
 	// Remote adds the images pinned by digest (mirror.Remote: the shell),
 	// fetched from ghcr.io.
@@ -121,6 +122,7 @@ func Build(ctx context.Context, o Options) (*Manifest, error) {
 
 	// Images.
 	var imgs []mirror.Image
+	var findings []mirror.Finding
 	wasip1 := []string{"GOOS=wasip1", "GOARCH=wasm", "CGO_ENABLED=0"}
 	for _, im := range Images {
 		bin := filepath.Join(tmp, im.Name+".wasm")
@@ -146,23 +148,24 @@ func Build(ctx context.Context, o Options) (*Manifest, error) {
 		logf("image %s: %d bytes of wasm", im.Name, len(mod))
 	}
 	if o.Pkgx {
-		for _, b := range mirror.Pilots {
-			bl, err := mirror.FetchBottle(ctx, b, 100<<20)
-			if err != nil {
-				return nil, err
-			}
-			bin := filepath.Dir(bl.WasmPath)
-			imgs = append(imgs, mirror.Image{
-				Name: b.Name, Tags: []string{bl.Ref.Tag, "latest"},
-				Description: "pkgx bottle " + bl.Ref.Path + ":" + bl.Ref.Tag + " (" + strings.TrimPrefix(bl.WasmPath, "/") + ")",
-				Layer:       bl.Layer,
-				LayerZstd:   bl.Zstd,
-				Entrypoint:  []string{bl.WasmPath},
-				Env:         []string{"PATH=" + bin + ":/usr/local/bin:/usr/bin:/bin"},
-				Created:     time.Date(2026, 10, 26, 0, 0, 0, 0, time.UTC),
-			})
-			logf("image %s: pkgx bottle %s, %d bytes", b.Name, b.Ref, len(bl.Layer))
+		// Derived from the signed pkgx wasip1/wasm catalogue (mirror.Bottles):
+		// every published bottle, no typed list.
+		reserved := map[string]bool{}
+		for _, im := range imgs {
+			reserved[im.Name] = true
 		}
+		for _, p := range mirror.Remote {
+			reserved[p.Name] = true
+		}
+		der, err := mirror.Bottles(ctx, mirror.DefaultBottleLimits, reserved, o.Log)
+		if err != nil {
+			return nil, err
+		}
+		imgs = append(imgs, der.Images...)
+		for _, f := range der.Findings {
+			logf("finding %s %s: %s", f.Project, f.Kind, f.Detail)
+		}
+		findings = der.Findings
 	}
 	if o.Remote {
 		for _, p := range mirror.Remote {
@@ -176,6 +179,11 @@ func Build(ctx context.Context, o Options) (*Manifest, error) {
 	}
 	if err := mirror.Write(o.Out, imgs); err != nil {
 		return nil, err
+	}
+	if o.Pkgx {
+		if err := mirror.WriteFindings(o.Out, findings); err != nil {
+			return nil, err
+		}
 	}
 
 	// The engine, the Go runtime glue, the container worker.
