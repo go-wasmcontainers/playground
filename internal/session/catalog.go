@@ -30,6 +30,7 @@ func ParseCatalog(b []byte) []Image {
 		Name        string   `json:"name"`
 		Tags        []string `json:"tags"`
 		Description string   `json:"description"`
+		Checked     *bool    `json:"checked"`
 	}
 	if json.Unmarshal(b, &entries) != nil {
 		return nil
@@ -39,7 +40,17 @@ func ParseCatalog(b []byte) []Image {
 	}
 	out := make([]Image, len(entries))
 	for i, e := range entries {
-		out[i] = Image{Name: e.Name, Tags: e.Tags, Description: e.Description}
+		d := e.Description
+		// pkgx images: [checked] ran clean under the engine and wasmtime at
+		// build time, [mirrored] is published as is (see the README).
+		if e.Checked != nil {
+			if *e.Checked {
+				d += " [checked]"
+			} else {
+				d += " [mirrored]"
+			}
+		}
+		out[i] = Image{Name: e.Name, Tags: e.Tags, Description: d}
 	}
 	return out
 }

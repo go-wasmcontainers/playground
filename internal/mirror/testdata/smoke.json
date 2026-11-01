@@ -33,7 +33,6 @@
   },
   "expected": {
     "tomlv": {"verdict": "fail", "reason": "tomlv only reads named files and the smoke test has no file input; --version and --help exit 1 under both runtimes"},
-    "yq": {"verdict": "diff", "reason": "with stdin a pipe, the engine's host reports a character device (the isatty path of sqlite3): yq prints eval usage where wasmtime evaluates the input"},
-    "gnostic": {"verdict": "diff", "reason": "gnostic calls os.Exit(-1) for --version: the engine reports exit 4294967295, wasmtime traps (exit status outside [0..126)) and exits 1"}
+    "gnostic": {"verdict": "diff", "reason": "engine v0.30.1: exit status now matches (1). gnostic calls os.Exit(-1) for --version and wasmtime also prints its own trap message (exit status outside [0..126)) on stderr; the program's output is identical"}
   }
 }
