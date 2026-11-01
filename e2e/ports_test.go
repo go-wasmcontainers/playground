@@ -61,6 +61,17 @@ func TestFileshare(t *testing.T) {
 		st, _ := view.Evaluate(`() => window.__wctrView`)
 		t.Fatalf("the container's page never opened; view %v", st)
 	}
+	// The port is published as soon as the container starts, but the server
+	// listens only once its module (26 MB) is compiled and running: until
+	// then the route answers 502. Wait for anything else.
+	listening := false
+	for deadline := time.Now().Add(90 * time.Second); !listening && time.Now().Before(deadline); time.Sleep(250 * time.Millisecond) {
+		st, err := f.Evaluate(`async () => (await fetch("files/README.txt")).status`)
+		listening = err == nil && num(st) != 502
+	}
+	if !listening {
+		t.Fatal("the fileshare server never listened: the route still answers 502")
+	}
 	got, err := f.Evaluate(`async () => {
 		const auth = {Authorization: "Basic " + btoa("alice:playground")};
 		const anon = await fetch("files/README.txt");
