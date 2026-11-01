@@ -13,7 +13,7 @@ type Pinned struct {
 	// Name is the local image name ("shell").
 	Name string
 	// Ref is the registry reference with its digest
-	// ("ghcr.io/go-wasmcontainers/shell:0.1.0@sha256:…").
+	// ("ghcr.io/go-wasmcontainers/shell:0.5.0@sha256:…").
 	Ref string
 	// Tags are the mirror's tags for it (the first is the primary).
 	Tags        []string
@@ -22,13 +22,13 @@ type Pinned struct {
 
 // Remote are the pinned images the playground carries.
 var Remote = []Pinned{
-	{Name: "shell", Ref: "ghcr.io/go-wasmcontainers/shell:0.1.0@" + shellDigest, Tags: []string{"0.1.0", "latest"},
-		Description: "a shell and the usual commands (go-wasmcontainers/shell 0.1.0): wctr run --rm -it shell"},
+	{Name: "shell", Ref: "ghcr.io/go-wasmcontainers/shell:0.5.0@" + shellDigest, Tags: []string{"0.5.0", "latest"},
+		Description: "a shell with Tab completion and the usual commands (go-wasmcontainers/shell 0.5.0): wctr run --rm -it shell"},
 }
 
-// shellDigest is ghcr.io/go-wasmcontainers/shell:0.1.0, as `site pin`
+// shellDigest is ghcr.io/go-wasmcontainers/shell:0.5.0, as `site pin`
 // printed it.
-const shellDigest = "sha256:79b185bfd505b523227396208976641e616723c3238c2a2edf18adcf15423b0e"
+const shellDigest = "sha256:d122bdb78a44bc761148b1d77878bf23093995f57f425210f4d01e895df433ed"
 
 // Mirrored is a pinned image's content: its top document (an index or a
 // manifest) as published, and the wasip1/wasm manifest, config and layers

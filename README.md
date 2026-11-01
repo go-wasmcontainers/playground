@@ -112,9 +112,10 @@ browser without WebGPU, gets no adapter: these images print
 `no GPU adapter` and exit 2. Software (fallback) adapters are refused.
 
 - `shell`: [go-wasmcontainers/shell](https://github.com/go-wasmcontainers/shell)
-  0.1.0, mirrored verbatim from `ghcr.io` and pinned by digest
+  0.5.0, mirrored verbatim from `ghcr.io` and pinned by digest
   (`go run ./cmd/site pin REF` prints the digest to pin). It contains `sh`
-  and 42 coreutils. Programs started by the shell run as WASIX processes in
+  (with Tab completion, and the shared line editor: Ctrl-R search, wide
+  characters) and 42 coreutils. Programs started by the shell run as WASIX processes in
   the browser:
 
   ```console

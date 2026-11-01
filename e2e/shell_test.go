@@ -67,6 +67,34 @@ func TestShell(t *testing.T) {
 	if out := b.must("wctr ps -a", 0); strings.Contains(out, "shell") {
 		t.Fatalf("run --rm -it left its container:\n%s", out)
 	}
+	// shell 0.5.0: Tab completes. Only "ec" is typed; "echo" on the screen
+	// can only be the shell's completion.
+	tabCompletes(t, b, "wctr run --rm -it shell")
+}
+
+// tabCompletes starts an interactive shell, types "ec" and Tab, waits for
+// "echo" to appear, finishes the line ("hi") and checks the output.
+func tabCompletes(t *testing.T, b tab, line string) {
+	t.Helper()
+	page := b.page
+	n := int(num(b.eval(`() => window.__playground.state.transcript.length`)))
+	before := len(b.screen())
+	if err := page.Keyboard().Type(line); err != nil {
+		t.Fatal(err)
+	}
+	page.Keyboard().Press("Enter")
+	time.Sleep(time.Second)
+	page.Keyboard().Type("ec")
+	page.Keyboard().Press("Tab")
+	b.until(line+": Tab did not complete ec to echo",
+		`() => /\$ echo/.test(window.__playground.text().slice(`+itoa(before)+`)) || /\becho\b/.test(window.__playground.text().slice(`+itoa(before)+`))`, time.Minute)
+	page.Keyboard().Type("hi")
+	page.Keyboard().Press("Enter")
+	b.until(line+": the completed command did not run",
+		`() => /(^|\n)hi[ \t]*(\n|$)/.test(window.__playground.text().slice(`+itoa(before)+`))`, time.Minute)
+	page.Keyboard().Type("exit 4")
+	page.Keyboard().Press("Enter")
+	b.until(line+" did not end", `() => window.__playground.state.transcript.length > `+itoa(n), time.Minute)
 }
 
 // interactiveShell types line into the terminal, waits for the shell,
