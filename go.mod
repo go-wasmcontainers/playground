@@ -7,7 +7,7 @@ require (
 	github.com/go-wasmcontainers/build v0.4.0
 	github.com/go-wasmcontainers/compose v0.5.0
 	github.com/go-wasmcontainers/dashboard v0.8.0
-	github.com/go-wasmcontainers/engine v0.30.0
+	github.com/go-wasmcontainers/engine v0.30.1
 	github.com/go-wasmcontainers/gpu v0.6.0
 	github.com/go-wasmcontainers/relay v0.3.1
 	github.com/go-widgets/mvvm v0.15.0

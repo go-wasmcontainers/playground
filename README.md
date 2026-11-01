@@ -143,8 +143,12 @@ the time of writing that is 43 images from 41 bottles (30 Go projects such as
 Images view list whatever `catalog.json` holds, and each entry names its
 `project`, `version`, layer `bytes` and `checked`: `true` when the build ran
 the image under the engine and wasmtime and nothing failed or differed (40 of
-43 today), `false` when it is only mirrored (the three named expected
-cases in `internal/mirror/testdata/smoke.json`: `yq`, `gnostic`, `tomlv`).
+43 today with engine v0.30.0), `false` when it is only mirrored (the named
+expected cases in `internal/mirror/testdata/smoke.json`: `tomlv`, `gnostic`).
+`wctr images` and completion show `[checked]` or `[mirrored]` after the
+description. Engine v0.30.1 fixed what made `yq` differ (piped stdio is no
+longer reported as a tty) and reports out-of-range exit codes as 1, as `gnostic`
+needed; wasmtime still prints its own trap message on stderr for `gnostic`.
 
 The rules, each tested in `internal/mirror`:
 

@@ -13,6 +13,10 @@ func TestParseCatalog(t *testing.T) {
 	if len(got) != 2 || got[0].Name != "hello" || got[0].Tags[0] != "latest" || got[0].Description != "says hello" || got[1].Name != "lab" {
 		t.Fatalf("got %+v", got)
 	}
+	c := ParseCatalog([]byte(`[{"name":"a","description":"x","checked":true},{"name":"b","description":"y","checked":false},{"name":"c","description":"z"}]`))
+	if c[0].Description != "x [checked]" || c[1].Description != "y [mirrored]" || c[2].Description != "z" {
+		t.Errorf("checked marks: %+v", c)
+	}
 	for _, bad := range []string{"", "{", `{"name":"x"}`, "null", `[1]`} {
 		if got := ParseCatalog([]byte(bad)); len(got) != 0 {
 			t.Errorf("%q: got %+v", bad, got)
