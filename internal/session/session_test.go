@@ -78,9 +78,24 @@ func line(t *testing.T, s *Session, l string) (string, Result) {
 	return out.String(), r
 }
 
-// TestTranscript is the playground's target session, natively.
-func TestTranscript(t *testing.T) {
+// TestSpinIsKilledByTheClock: a container that never ends is stopped by the
+// wall-clock limit and reports 137. Only this test needs a short limit.
+func TestSpinIsKilledByTheClock(t *testing.T) {
 	s := engine(t, container.Options{Timeout: 3 * time.Second})
+	if out, r := line(t, s, "wctr run --rm lab spin"); r.Code != 137 {
+		t.Fatalf("spin: exit %d, want 137\n%s", r.Code, out)
+	}
+}
+
+// TestTranscript is the playground's target session, natively.
+//
+// Its wall-clock limit is generous on purpose: it used to be the 3 seconds
+// that `spin` needs, which also applied to `-m 32m lab hog`, so on a slow or
+// shared runner under -race hog was killed by the clock (137) before the
+// memory limit stopped it (2, "out of memory") and main went red. What each
+// command proves must not depend on how fast the host is.
+func TestTranscript(t *testing.T) {
+	s := engine(t, container.Options{Timeout: time.Minute})
 	for _, c := range []struct {
 		in   string
 		code int
@@ -96,7 +111,6 @@ func TestTranscript(t *testing.T) {
 		{"wctr run --name y lab exit 7", 7, []string{"bye"}},
 		{"wctr run --rm lab cat /etc/motd", 0, []string{"welcome"}},
 		{"wctr run --rm lab echo 'two  words'", 0, []string{"two  words"}},
-		{"wctr run --rm lab spin", 137, nil},
 		{"wctr run --rm -m 32m lab hog", 2, []string{"out of memory"}},
 		{"wctr run --rm lab bench 200", 0, []string{"200 stat calls"}},
 		{"wctr ps -a", 0, []string{"Exited (7)", " y\n"}},
