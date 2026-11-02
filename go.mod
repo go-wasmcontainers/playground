@@ -3,11 +3,11 @@ module github.com/go-wasmcontainers/playground
 go 1.27.3
 
 require (
-	github.com/go-pkgx/bottle v0.60.0
+	github.com/go-pkgx/bottle v0.62.1
 	github.com/go-wasmcontainers/build v0.4.0
-	github.com/go-wasmcontainers/compose v0.5.0
+	github.com/go-wasmcontainers/compose v0.6.0
 	github.com/go-wasmcontainers/dashboard v0.8.0
-	github.com/go-wasmcontainers/engine v0.30.1
+	github.com/go-wasmcontainers/engine v0.31.0
 	github.com/go-wasmcontainers/gpu v0.6.0
 	github.com/go-wasmcontainers/relay v0.3.1
 	github.com/go-widgets/mvvm v0.15.0
@@ -50,6 +50,7 @@ require (
 	github.com/go-authn/servercert v0.5.2 // indirect
 	github.com/go-authn/sshcert v0.1.9 // indirect
 	github.com/go-compressions/lzfse v0.4.1 // indirect
+	github.com/go-compressions/xz v0.1.0 // indirect
 	github.com/go-crdt/crdt v0.57.0 // indirect
 	github.com/go-encryptions/ccm v0.0.0-20260927083542-1713f748107c // indirect
 	github.com/go-encryptions/xts v0.0.0-20260911133109-312298263872 // indirect
@@ -106,6 +107,7 @@ require (
 	github.com/go-volumes/gpt v0.3.0 // indirect
 	github.com/go-volumes/s3 v0.2.2 // indirect
 	github.com/go-volumes/safeio v0.0.0-20260831125406-d8f54b2890d4 // indirect
+	github.com/go-wasmcontainers/engine/lineedit v0.1.0 // indirect
 	github.com/go-widgets/android v0.16.0 // indirect
 	github.com/go-widgets/mvvmtk v0.15.0 // indirect
 	github.com/go-widgets/painter v0.16.0 // indirect
