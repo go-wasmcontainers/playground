@@ -481,13 +481,23 @@ func CSPFor(u *url.URL) string {
 	if !strings.HasSuffix(u.Path, "/engine-worker.js") {
 		return CSP
 	}
-	r := u.Query().Get("relay")
-	if !relayRE.MatchString(r) {
-		return CSP
+	// The engine worker downloads pinned model weights (wctr run --model):
+	// Hugging Face answers, then redirects to its CDN. Only the worker gets
+	// these two origins; the page keeps 'self'.
+	src := "connect-src 'self'"
+	if r := u.Query().Get("relay"); relayRE.MatchString(r) {
+		host := strings.TrimPrefix(r, "https://")
+		src += " https://" + host + " wss://" + host
 	}
-	host := strings.TrimPrefix(r, "https://")
-	return strings.Replace(CSP, "connect-src 'self'", "connect-src 'self' https://"+host+" wss://"+host, 1)
+	src += " " + ModelOrigins
+	return strings.Replace(CSP, "connect-src 'self'", src, 1)
 }
+
+// ModelOrigins are the only origins, besides a class relay, the engine
+// worker may connect to: where the pinned models come from (engine
+// models.Registry: the huggingface.co repository, served from the CDN).
+// web/sw.js has the same constant.
+const ModelOrigins = "https://huggingface.co https://us.aws.cdn.hf.co"
 
 // Handler serves dir under prefix like GitHub Pages; with isolate it also
 // sends the COOP/COEP/CORP and CSP headers the service worker otherwise

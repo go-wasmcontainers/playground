@@ -30,17 +30,22 @@ const CSP = "default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; style-src
 // else keeps 'self'. The same rule as internal/site CSPFor (tested there):
 // the value is spliced into the header, so only a plain host passes.
 const RELAY_RE = /^https:\/\/([a-z0-9.-]{1,253}|\[[0-9a-f:]{2,39}\])(:[0-9]{1,5})?$/;
+const MODEL_ORIGINS = "https://huggingface.co https://us.aws.cdn.hf.co"; // internal/site ModelOrigins
 function cspFor(url) {
   // The explorer (explore.js) is framed by the playground, and by it only.
   if (url.pathname.endsWith("/explorer.html")) {
     return CSP.replace("frame-ancestors 'none'", "frame-ancestors 'self'");
   }
   if (url.pathname.endsWith("/engine-worker.js")) {
+    // Pinned model weights (wctr run --model): Hugging Face and its CDN,
+    // for the engine worker only; the page keeps 'self'.
+    let src = "connect-src 'self'";
     const r = url.searchParams.get("relay");
     if (r && RELAY_RE.test(r)) {
       const host = r.slice("https://".length);
-      return CSP.replace("connect-src 'self'", "connect-src 'self' https://" + host + " wss://" + host);
+      src += " https://" + host + " wss://" + host;
     }
+    return CSP.replace("connect-src 'self'", src + " " + MODEL_ORIGINS);
   }
   return CSP;
 }
