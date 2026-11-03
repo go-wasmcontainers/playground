@@ -95,6 +95,29 @@ picture 0 of the MNIST test set by Y. LeCun, C. Cortes and C. J. C. Burges
 (CC BY-SA 3.0). The image carries both notices at
 `/usr/share/doc/mnist/NOTICE`), and these:
 
+- `llm`: a language model in your tab. One command, on a browser with
+  WebGPU:
+
+  ```sh
+  wctr run --rm --gpu --gpu-memory 512m --model smollm2-135m-instruct-q4_0 llm "Once upon a time"
+  ```
+
+  `llm` is [go-wasmcontainers/llm](https://github.com/go-wasmcontainers/llm)'s
+  `examples/generate` (greedy decoding, `-n N` tokens before the prompt).
+  The weights are SmolLM2-135M-Instruct Q4_0 (Apache-2.0, 92 MB), pinned in
+  the engine's registry by Hugging Face commit and sha256. The first run
+  downloads them with progress (`downloading … 45.0 / 91.9 MB (49%)`),
+  checks the size and then the sha256 **before** the container exists, and
+  keeps them in the browser's OPFS; later runs, even after a reload or
+  offline, read them from there and fetch nothing. A refused (wrong size or
+  hash) or failed (offline, quota) download leaves no file behind and prints
+  the error. `--gpu-memory` defaults to 256m, at most 1.5g. `models` lists
+  the registry and what is cached; `models rm NAME` frees the storage. The
+  engine worker's CSP is the only one that names `https://huggingface.co`
+  and `https://us.aws.cdn.hf.co`; the weights are never part of the site.
+  The e2e (`e2e/models_test.go`, Chromium and Firefox) serves a synthetic
+  model from a local stand-in, so CI never reaches Hugging Face; run it
+  against the real download with `LLM_LIVE_HF=1`.
 - `compute`: **wasi:webgpu** compute. `wctr run --rm --gpu compute` runs a
   1M-float vector add and a 256x256 matrix product on the GPU, and checks
   both against the CPU.

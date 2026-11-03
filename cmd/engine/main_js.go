@@ -174,7 +174,10 @@ func main() {
 	lim := image.DefaultLimits
 	lim.MaxImageBytes = 256 << 20
 	lim.MaxBlobBytes = 128 << 20
+	sn, su := modelStub()
+	om := &opfsModels{stubName: sn, stubURL: su}
 	d, err := daemon.New(daemon.Options{
+		ModelSource:   om.source,
 		StorageInfo:   storageInfo,
 		ImagesRemoved: exec.ClearCodeCache,
 		Backend:       backend,
@@ -224,6 +227,7 @@ func main() {
 		Version: version,
 		Client:  func(string) (*api.Client, error) { return api.NewClientWith(hc, "http://engine"), nil },
 		Images:  session.FetchCatalog(base + "catalog.json" + v),
+		Models:  om,
 	}
 
 	// Join class: the relay origin is in this worker's URL (relay=...; the

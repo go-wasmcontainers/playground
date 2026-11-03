@@ -7,8 +7,8 @@ require (
 	github.com/go-wasmcontainers/build v0.4.0
 	github.com/go-wasmcontainers/compose v0.6.0
 	github.com/go-wasmcontainers/dashboard v0.8.0
-	github.com/go-wasmcontainers/engine v0.31.0
-	github.com/go-wasmcontainers/gpu v0.6.0
+	github.com/go-wasmcontainers/engine v0.36.0
+	github.com/go-wasmcontainers/gpu v0.8.0
 	github.com/go-wasmcontainers/relay v0.3.1
 	github.com/go-widgets/mvvm v0.15.0
 	github.com/go-widgets/webcanvas v0.7.0
@@ -86,6 +86,7 @@ require (
 	github.com/go-fsctl/projquota v0.1.0 // indirect
 	github.com/go-fsctl/zfs v0.1.1 // indirect
 	github.com/go-gfx/gfx v0.36.1 // indirect
+	github.com/go-gfx/webgpu v0.8.0 // indirect
 	github.com/go-gtk/gtk4 v0.9.0 // indirect
 	github.com/go-icons/iconoir v0.3.0 // indirect
 	github.com/go-images/images v0.1.1-0.20261026203936-4ac989d310a1 // indirect
@@ -104,10 +105,12 @@ require (
 	github.com/go-sql-driver/mysql v1.10.1 // indirect
 	github.com/go-stack/stack v1.8.1 // indirect
 	github.com/go-typeset/bidi v0.3.1 // indirect
+	github.com/go-virtio/gpu v0.10.0 // indirect
 	github.com/go-volumes/gpt v0.3.0 // indirect
 	github.com/go-volumes/s3 v0.2.2 // indirect
 	github.com/go-volumes/safeio v0.0.0-20260831125406-d8f54b2890d4 // indirect
 	github.com/go-wasmcontainers/engine/lineedit v0.1.0 // indirect
+	github.com/go-wasmcontainers/llm v0.1.0 // indirect
 	github.com/go-widgets/android v0.16.0 // indirect
 	github.com/go-widgets/mvvmtk v0.15.0 // indirect
 	github.com/go-widgets/painter v0.16.0 // indirect
@@ -193,4 +196,5 @@ require (
 tool (
 	github.com/go-fileshare/explorer
 	github.com/go-fileshare/fileshare
+	github.com/go-wasmcontainers/llm/examples/generate
 )

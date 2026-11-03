@@ -121,6 +121,8 @@ var Images = []struct {
 		Files: map[string]string{"usr/share/doc/mnist/NOTICE": MnistNotice}},
 	{Name: "compute", Description: "wasi:webgpu compute: a 1M-float vector add and a 256x256 matrix product on the GPU, checked against the CPU (run --gpu)"},
 	{Name: "triangle", Description: "wasi:webgpu and wasi-gfx:surface: a spinning triangle in a dashboard pane, 120 frames or the first argument (run --gpu)"},
+	{Name: "llm", Description: "generates text with SmolLM2-135M (Apache-2.0) on the page's WebGPU; the weights (92 MB) download once, are checked and kept in the browser: wctr run --rm --gpu --gpu-memory 512m --model smollm2-135m-instruct-q4_0 llm \"Once upon a time\"",
+		Pkg: "github.com/go-wasmcontainers/llm/examples/generate", Args: []string{"run"}},
 	{Name: "fileshare", Description: "the go-fileshare server, WebDAV only: wctr run -d -p 8080:80 fileshare, open :8080, user alice, password playground",
 		Pkg: "github.com/go-fileshare/fileshare", Tags: FileshareTags,
 		Args: []string{"--config", "/etc/fileshare/fileshare.hcl"},

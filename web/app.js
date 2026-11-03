@@ -347,7 +347,12 @@
     // default: measured, it does not pay; see cmd/engine).
     const cc = /[?&]codecache=1\b/.test(location.search) ? "&codecache=1" : "";
     const rp = relay ? "&relay=" + encodeURIComponent(relay) : "";
-    engine = new Worker("engine-worker.js?v=" + build + cc + rp);
+    // ?modelstub=NAME,SIZE,SHA256,PATH (loopback pages only, for the e2e):
+    // one extra model, fetched from this origin; the engine checks its size
+    // and sha256 like any other. Ignored on every other host.
+    const ms = /^(localhost|127\.0\.0\.1)$/.test(location.hostname) ? new URLSearchParams(location.search).get("modelstub") : null;
+    const mp = ms ? "&modelstub=" + encodeURIComponent(ms) : "";
+    engine = new Worker("engine-worker.js?v=" + build + cc + rp + mp);
     window.__wctrEngine = engine;
     window.__wctrBuild = build;
     // The dashboard's bridge listens on the worker too (addEventListener);
