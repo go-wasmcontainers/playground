@@ -458,7 +458,11 @@ xterm.js (keys, raw) ─────► console: engine's cli/lineedit + session
   `default-src 'self'`, `connect-src 'self'`, `script-src 'self'
   'wasm-unsafe-eval'` (WebAssembly, no `eval`), no inline script; xterm.js
   is served from the site (fetched from npm, checked against the registry's
-  sha512).
+  sha512). One exception, for pinned LLM weights (`wctr run --model`): the
+  engine worker's `connect-src` also lists `https://huggingface.co` and
+  `https://us.aws.cdn.hf.co` (the CDN Hugging Face redirects to), nothing
+  broader; the page itself keeps `'self'` (tested, fuzzed). The bytes are
+  checked (size, then sha256) against the engine's registry before any use.
 - Container output is hostile: before it reaches xterm.js the engine keeps
   text, `\t \n \r \b`, colours (SGR) and erase-in-line, and drops every other
   escape (OSC 52 clipboard writes, OSC 8 links, title and report sequences
