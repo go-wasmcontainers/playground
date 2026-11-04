@@ -114,7 +114,7 @@ picture 0 of the MNIST test set by Y. LeCun, C. Cortes and C. J. C. Burges
   the error. `--gpu-memory` defaults to 256m, at most 1.5g. `models` lists
   the registry and what is cached; `models rm NAME` frees the storage. The
   engine worker's CSP is the only one that names `https://huggingface.co`
-  and `https://us.aws.cdn.hf.co`; the weights are never part of the site.
+  and `https://us.aws.cdn.hf.co` (and the weights are never part of the site).
   The e2e (`e2e/models_test.go`, Chromium and Firefox) serves a synthetic
   model from a local stand-in, so CI never reaches Hugging Face; run it
   against the real download with `LLM_LIVE_HF=1`.
