@@ -33,6 +33,7 @@ var Builtins = []cli.Candidate{
 	{Value: "wctr", Description: "the container command"},
 	{Value: "help", Description: "what this terminal can do"},
 	{Value: "clear", Description: "clear the screen"},
+	{Value: "models", Description: "list and remove downloaded LLM models"},
 }
 
 // LabCommands complete `wctr run lab <TAB>`.
@@ -108,6 +109,64 @@ type Session struct {
 	Rate, Burst int
 	// Now is the clock of the rate limiter (default time.Now).
 	Now func() time.Time
+	// Models is the browser's model cache (nil: the `models` command says
+	// there is none).
+	Models ModelCache
+}
+
+// Model is one row of `models`: a pinned registry model, or a cached file the
+// registry does not list.
+type Model struct {
+	Name    string
+	Size    int64 // bytes of the model; for a cached file, its size on disk
+	Cached  bool
+	Pinned  bool
+	License string
+}
+
+// ModelCache lists and removes cached models. List reports every registry
+// model (Cached or not) and every unlisted cached file.
+type ModelCache interface {
+	List() ([]Model, error)
+	Remove(name string) (freed int64, err error)
+}
+
+// models implements `models` (ls) and `models rm NAME`.
+func (s *Session) models(w io.Writer, args []string) int {
+	if s.Models == nil {
+		fmt.Fprintln(w, "models: no model cache in this context")
+		return 1
+	}
+	switch {
+	case len(args) == 0 || (len(args) == 1 && (args[0] == "ls" || args[0] == "list")):
+		rows, err := s.Models.List()
+		if err != nil {
+			fmt.Fprintln(w, "models:", err)
+			return 1
+		}
+		fmt.Fprintf(w, "%-30s %10s  %s\n", "MODEL", "SIZE", "STATE")
+		for _, m := range rows {
+			st := "not downloaded (wctr run --model " + m.Name + " ...)"
+			if m.Cached {
+				st = "cached"
+			}
+			if !m.Pinned {
+				st = "cached, not in the registry"
+			}
+			fmt.Fprintf(w, "%-30s %7.1f MB  %s\n", m.Name, float64(m.Size)/1e6, st)
+		}
+		return 0
+	case len(args) == 2 && (args[0] == "rm" || args[0] == "remove"):
+		n, err := s.Models.Remove(args[1])
+		if err != nil {
+			fmt.Fprintln(w, "models:", err)
+			return 1
+		}
+		fmt.Fprintf(w, "removed %s (%.1f MB freed)\n", args[1], float64(n)/1e6)
+		return 0
+	}
+	fmt.Fprintln(w, "usage: models [ls] | models rm NAME")
+	return 2
 }
 
 // Result is how a line ended.
@@ -165,6 +224,8 @@ func (s *Session) RunIO(ctx context.Context, line string, in io.Reader, out io.W
 		return Result{}
 	case "clear":
 		return Result{Clear: true}
+	case "models":
+		return Result{Code: s.models(w, words[1:])}
 	case "wctr":
 		cmd := cli.RootCmd(s.CLIOptions())
 		// As cmd/wctr: the root's flags are read before the subcommand,
@@ -207,6 +268,7 @@ Containers are WebAssembly (wasip1) modules; nothing leaves your browser.
   wctr inspect NAME               details, as JSON
   wctr events                     what happens, as it happens (Ctrl-C to stop)
   wctr system df | prune -f       what is stored, and freeing it
+  models [ls] | models rm NAME    LLM models downloaded to this browser (wctr run --model NAME)
   clear                           clear the screen
 Everything is kept in this browser across reloads; the page works offline.
 Tab completes commands, flags, images and container names; Tab Tab lists
