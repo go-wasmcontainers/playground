@@ -117,7 +117,13 @@ picture 0 of the MNIST test set by Y. LeCun, C. Cortes and C. J. C. Burges
   and `https://us.aws.cdn.hf.co` (and the weights are never part of the site).
   The e2e (`e2e/models_test.go`, Chromium and Firefox) serves a synthetic
   model from a local stand-in, so CI never reaches Hugging Face; run it
-  against the real download with `LLM_LIVE_HF=1`.
+  against the real download with `LLM_LIVE_HF=1`. On Safari it runs locally
+  (`E2E_BROWSERS=safari go test -tags e2e -run TestModelDownloadSafari ./e2e/`,
+  the real Safari through `safaridriver`, after a one-time
+  `sudo safaridriver --enable`): it fails, never skips, on a refused session,
+  a missing adapter or a fallback adapter. Measured on Safari 27.2, Apple M4
+  Max (adapter `apple`/`apple`, shader-f16 yes, subgroups no): the whole
+  scenario passes.
 - `compute`: **wasi:webgpu** compute. `wctr run --rm --gpu compute` runs a
   1M-float vector add and a 256x256 matrix product on the GPU, and checks
   both against the CPU.

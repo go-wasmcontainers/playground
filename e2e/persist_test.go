@@ -62,7 +62,7 @@ func serveCopy(t *testing.T, isolate bool) (string, string) {
 
 type tab struct {
 	t    *testing.T
-	page playwright.Page
+	page pager // a playwright.Page, or the real Safari (safari_test.go)
 	who  string
 }
 

@@ -113,7 +113,15 @@ func modelDownload(t *testing.T, pw *playwright.Playwright, browserName string) 
 		t.Fatal(err)
 	}
 	b := tab{t, page, browserName}
-	if _, err := page.Goto(base + "?ui=terminal&modelstub=" + url.QueryEscape(spec)); err != nil {
+	modelSteps(t, b, st, func(u string) error { _, err := page.Goto(u); return err },
+		func() error { _, err := page.Reload(); return err }, base+"?ui=terminal&modelstub="+url.QueryEscape(spec))
+}
+
+// modelSteps is the model download scenario, on any browser: open opens the
+// page, reload reloads it.
+func modelSteps(t *testing.T, b tab, st *stub, open func(url string) error, reload func() error, pageURL string) {
+	t.Helper()
+	if err := open(pageURL); err != nil {
 		t.Fatal(err)
 	}
 	b.ready()
@@ -134,7 +142,7 @@ func modelDownload(t *testing.T, pw *playwright.Playwright, browserName string) 
 		t.Fatalf("the second run made %d requests", n)
 	}
 	// Across a reload too (a new engine worker re-verifies the cached file).
-	if _, err := page.Reload(); err != nil {
+	if err := reload(); err != nil {
 		t.Fatal(err)
 	}
 	b.ready()
