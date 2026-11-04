@@ -215,8 +215,8 @@ github.com/go-wasmcontainers/compose v0.6.0 h1:p23ShWPYKGQXKdod8jiC0n83uENOK2/fx
 github.com/go-wasmcontainers/compose v0.6.0/go.mod h1:HBwoF9Y5jCX9KUYbyhl8ZCUv0S61y5fULl2CbV4dVdE=
 github.com/go-wasmcontainers/dashboard v0.8.0 h1:POyji82qJcMqOPBoN/GWH3nztKNlCduz/Z2bSSeN4vk=
 github.com/go-wasmcontainers/dashboard v0.8.0/go.mod h1:IEjXRNLufM4rbvQLOi0pI6YZBPV8Nz1ztPNSP++RUfI=
-github.com/go-wasmcontainers/engine v0.36.0 h1:wP7FhmM3e6xcn0S/OA1txa+TlAhsIyTtsmQ7iFNKZbo=
-github.com/go-wasmcontainers/engine v0.36.0/go.mod h1:cdj/Opcls0h1bviuWtty4o+Vs06mmKQhfx7JQHiXndg=
+github.com/go-wasmcontainers/engine v0.37.0 h1:B5LiaEJLjlp9w71tqoyCXxtlDbte5WfMCECE4CEYDUA=
+github.com/go-wasmcontainers/engine v0.37.0/go.mod h1:cdj/Opcls0h1bviuWtty4o+Vs06mmKQhfx7JQHiXndg=
 github.com/go-wasmcontainers/engine/lineedit v0.1.0 h1:GCVxUFzuyD5WRwOMNgRuMox+TvjpkNO/5LfVYZ82Ymg=
 github.com/go-wasmcontainers/engine/lineedit v0.1.0/go.mod h1:k3V5txHVOaeqBZaPcKJ88jCUSCB7jLO1Ezl7SuFEZmQ=
 github.com/go-wasmcontainers/gpu v0.8.0 h1:41N76gzpb+2ZWdRsG6DIW5JqfakOR5zmnICr0IYh5fg=
