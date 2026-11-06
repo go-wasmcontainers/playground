@@ -3,17 +3,17 @@ module github.com/go-wasmcontainers/playground
 go 1.27.3
 
 require (
-	github.com/go-pkgx/bottle v0.62.1
+	github.com/go-pkgx/bottle v0.85.0
 	github.com/go-wasmcontainers/build v0.4.0
 	github.com/go-wasmcontainers/compose v0.6.0
 	github.com/go-wasmcontainers/dashboard v0.8.0
-	github.com/go-wasmcontainers/engine v0.37.0
-	github.com/go-wasmcontainers/gpu v0.8.0
+	github.com/go-wasmcontainers/engine v0.38.0
+	github.com/go-wasmcontainers/gpu v0.12.1
 	github.com/go-wasmcontainers/relay v0.3.1
 	github.com/go-widgets/mvvm v0.15.0
-	github.com/go-widgets/webcanvas v0.7.0
+	github.com/go-widgets/webcanvas v0.8.0
 	github.com/klauspost/compress v1.20.3
-	github.com/mxschmitt/playwright-go v0.6201.1
+	github.com/mxschmitt/playwright-go v0.6401.0
 	github.com/spf13/cobra v1.10.2
 	github.com/stealthrocket/net v0.2.1
 )
@@ -57,7 +57,7 @@ require (
 	github.com/go-encryptions/zfscrypt v0.0.0-20260927173133-ff7dd33bb415 // indirect
 	github.com/go-fde/apfs v0.0.0-20260912170739-6acb57fc9eb0 // indirect
 	github.com/go-fileshare/explorer v0.4.0 // indirect
-	github.com/go-fileshare/fileshare v0.32.0 // indirect
+	github.com/go-fileshare/fileshare v0.36.0 // indirect
 	github.com/go-fileshare/portal v0.3.2 // indirect
 	github.com/go-filesystems/apfs v0.3.0 // indirect
 	github.com/go-filesystems/btrfs v0.3.0 // indirect
@@ -110,7 +110,7 @@ require (
 	github.com/go-volumes/s3 v0.2.2 // indirect
 	github.com/go-volumes/safeio v0.0.0-20260831125406-d8f54b2890d4 // indirect
 	github.com/go-wasmcontainers/engine/lineedit v0.1.0 // indirect
-	github.com/go-wasmcontainers/llm v0.1.0 // indirect
+	github.com/go-wasmcontainers/llm v0.5.0 // indirect
 	github.com/go-widgets/android v0.16.0 // indirect
 	github.com/go-widgets/mvvmtk v0.15.0 // indirect
 	github.com/go-widgets/painter v0.16.0 // indirect
