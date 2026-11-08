@@ -136,6 +136,29 @@ picture 0 of the MNIST test set by Y. LeCun, C. Cortes and C. J. C. Burges
   `input`, the guest prints what it receives: `pointer-down 80,80`, then
   `key-down key-a "A" shift=true`.
 
+- `quake`: **Quake in a container**, level 1. `wctr run --rm --gpu -m 512m quake`
+  plays e1m1 of LibreQuake: [go-quake1/engine](https://github.com/go-quake1/engine)
+  v0.10.0 (`cmd/quake-wctr`) as a wasip1 guest, drawing every frame with its
+  *software* renderer (the frame is 640x400, 8 bits per pixel) and showing it
+  on a `wasi-gfx:surface`. A guest's bind groups take buffers only, so the
+  frame goes up as a storage buffer of packed indices plus a palette buffer,
+  and a fragment shader without loops (the host refuses a loop there) looks
+  the colour up. Click the pane, then WASD or the arrows move, Space jumps,
+  1-8 select a weapon, Esc opens the menu. There is no sound (no audio path
+  exists for a wasip1 guest) and no mouse look (a surface pointer event has no
+  button). The game data is [go-quake1/freepak](https://github.com/go-quake1/freepak)
+  v0.2.0, pinned by size and sha256 at build time (the build refuses other
+  bytes); id Software's data is not used. The image is **GPL-3.0-or-later**
+  and names its source in `/usr/share/doc/quake/copyright`; the data's own
+  licences (BSD-3-Clause, with `progs.dat` GPL-2.0-or-later) are in
+  `/usr/share/quake/`. `quake --worldref 4` draws one fixed view (the eye at
+  `info_player_start`), prints `sha256(indices)` and the `sha256(rgba)` the
+  page must show, and presents it; `quake --frames 150` prints the mean frame
+  time. Frame time of a level-1 frame in Chromium on an Apple M4 Max:
+  **deferred, load 17.7 to 31.7** (1-minute load average; the rule is a load
+  of at most 8). For the record only, not a measurement: 20.4 to 21.2 ms per
+  frame (150 frames) at those loads.
+
 GPU access is opt-in per container. A container without `--gpu`, or a
 browser without WebGPU, gets no adapter: these images print
 `no GPU adapter` and exit 2. Software (fallback) adapters are refused.
@@ -549,6 +572,20 @@ The e2e has three opt-in parts:
   - without `--gpu`, there is no adapter.
 
   It also runs `TestGPUSurfaceInput`. That test clicks a known point of the triangle's pane and types Shift+A. The guest must log `pointer-down`/`pointer-up` at the surface coordinates the pane maps the point to (letterbox included), then `key-a "A" shift=true`, down and up. It fails when the worker does not forward the input.
+- `E2E_GPU=1` also runs `TestQuake` on a real GPU (a software adapter
+  skips it, or fails it with `E2E_GPU_REAL=1`):
+  - `wctr run --rm --gpu -m 512m quake --worldref 4`: the guest's
+    `sha256(indices)` equals the golden, the figure go-quake1/engine's
+    `quake-worldref` prints for the same view, and the ImageBitmap the page
+    receives (read back through `__wctrFrameProbe`) has exactly the RGBA
+    whose `sha256` the guest printed (`webgpupresent.Reference`);
+  - `quake --frames 150` (no `--worldref`): at least 120 frames reach the
+    page and they keep changing.
+
+  The goldens are those of a build without fused multiply-add, which is what
+  WebAssembly and amd64 compute: a native arm64 build fuses `x*y+z` and draws
+  another frame of the same view (`1a6f7e81...` against `580802e2...`), and
+  with `-gcflags=all=-d=fmahash=n` it draws the golden.
 - `E2E_GPU_REAL=1` makes a software adapter fail the test. CI sets it on
   the macOS lane, which runs on the Apple GPU. The Linux lane has only
   SwiftShader on Vulkan
