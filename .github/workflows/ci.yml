@@ -25,42 +25,27 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
-      - name: Check
+      - uses: actions/setup-go@v7
+        with: { go-version: '1.27.3' }
+      # fleettools linkcheck replaces the curl loop: retries with backoff that
+      # honours Retry-After, github.com URLs decided by the REST API (the HTML
+      # pages answer 504/429 to a loaded runner), and exit 2 for FLAKY apart
+      # from 1 for DEAD. localhost, 127.0.0.1, img.shields.io and http://web/
+      # (containers' names on a playground network) are skipped built in.
+      - name: linkcheck
         run: |
-          set -uo pipefail
-          # The character class matters: an extractor stopping only at ) and "
-          # carries a closing > or < into the request.
-          urls=$(grep -hoE 'https?://[^)">< [:space:]]+' README.md | sed -E 's/[.,`]+$//' | sort -u)
-          test -n "$urls" || { echo "::error::no links found; is the README still there?"; exit 1; }
-          echo "checking $(printf '%s\n' "$urls" | wc -l) distinct URLs"
-          fail=0
-          while read -r u; do
-            case "$u" in
-              # Renders whatever it is asked for; proves nothing.
-              *img.shields.io*) continue ;;
-              # Published by this repository and go-wasmcontainers/docs.
-              *go-wasmcontainers.github.io*) continue ;;
-              # This repository's own workflow pages exist once the workflow
-              # is on main; a PR adding one would otherwise fail on itself.
-              *github.com/go-wasmcontainers/playground/actions/workflows/*) continue ;;
-              # Examples of a local server, not links.
-              *127.0.0.1*|*localhost*) continue ;;
-              # Containers' names on a playground network (http://web/…).
-              http://web/*|http://web.*) continue ;;
-            esac
-            code=000
-            for _ in 1 2 3; do
-              code=$(curl -sS -o /dev/null -w '%{http_code}' -L --max-time 25 "$u" 2>/dev/null) || true
-              code=${code:-000}
-              case "$code" in 2*|3*) break ;; esac
-              sleep 3
-            done
-            case "$code" in
-              2*|3*) printf '  ok   %s  %s\n' "$code" "$u" ;;
-              *)     printf '  FAIL %s  %s\n' "$code" "$u"; fail=1 ;;
-            esac
-          done <<< "$urls"
-          test "$fail" -eq 0 || { echo "::error::at least one link does not resolve"; exit 1; }
+          set -eu
+          token="${RUNNER_TEMP}/linkcheck-token"
+          trap 'rm -f "${token}"' EXIT
+          printf '%s' '${{ github.token }}' > "${token}"
+          # go-wasmcontainers.github.io: published by this repository and
+          # go-wasmcontainers/docs. The workflow pages exist once the
+          # workflow is on main; a PR adding one would otherwise fail on itself.
+          go run github.com/go-fleettools/fleettools/cmd/linkcheck@v0.88.0 \
+            --token-file "${token}" \
+            --skip go-wasmcontainers.github.io \
+            --skip github.com/go-wasmcontainers/playground/actions/workflows/ \
+            README.md
 
   test:
     name: test (native)
