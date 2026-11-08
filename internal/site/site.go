@@ -111,6 +111,9 @@ var Images = []struct {
 	Pkg               string
 	Tags              []string
 	Args              []string
+	// Pinned files are fetched at build time and refused unless their
+	// size and sha256 are the pinned ones (FetchPinned).
+	Pinned []PinnedFile
 }{
 	{Name: "hello", Description: "prints a greeting and exits"},
 	{Name: "greet", Description: "greets $NAME (a CNCF wasm OCI artifact)", Artifact: true},
@@ -123,6 +126,9 @@ var Images = []struct {
 	{Name: "triangle", Description: "wasi:webgpu and wasi-gfx:surface: a spinning triangle in a dashboard pane, 120 frames or the first argument (run --gpu)"},
 	{Name: "llm", Description: "generates text with SmolLM2-135M (Apache-2.0) on the page's WebGPU; the weights (92 MB) download once, are checked and kept in the browser: wctr run --rm --gpu --gpu-memory 512m --model smollm2-135m-instruct-q4_0 llm \"Once upon a time\"",
 		Pkg: "github.com/go-wasmcontainers/llm/examples/generate", Args: []string{"run"}},
+	{Name: "quake", Description: "Quake in a dashboard pane: go-quake1's engine, software renderer, e1m1 of LibreQuake (freepak " + FreepakTag + "), shown through wasi-gfx:surface; click the pane, WASD and arrows move, space jumps. GPL-3.0-or-later, source in /usr/share/doc/quake/copyright: wctr run --rm --gpu -m 512m quake",
+		Pkg: "github.com/go-quake1/engine/cmd/quake-wctr", Pinned: QuakeFiles,
+		Files: map[string]string{"usr/share/doc/quake/copyright": QuakeLicense}},
 	{Name: "fileshare", Description: "the go-fileshare server, WebDAV only: wctr run -d -p 8080:80 fileshare, open :8080, user alice, password playground",
 		Pkg: "github.com/go-fileshare/fileshare", Tags: FileshareTags,
 		Args: []string{"--config", "/etc/fileshare/fileshare.hcl"},
@@ -217,6 +223,13 @@ func Build(ctx context.Context, o Options) (*Manifest, error) {
 			mi.Files = map[string][]byte{"bin/" + im.Name + ".wasm": mod}
 			for p, c := range im.Files {
 				mi.Files[p] = []byte(c)
+			}
+			for _, pf := range im.Pinned {
+				b, err := FetchPinned(ctx, nil, pf)
+				if err != nil {
+					return nil, fmt.Errorf("image %s: %w", im.Name, err)
+				}
+				mi.Files[pf.Path] = b
 			}
 			mi.Entrypoint = append([]string{"/bin/" + im.Name + ".wasm"}, im.Args...)
 		}
