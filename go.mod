@@ -7,8 +7,8 @@ require (
 	github.com/go-wasmcontainers/build v0.4.0
 	github.com/go-wasmcontainers/compose v0.6.0
 	github.com/go-wasmcontainers/dashboard v0.8.0
-	github.com/go-wasmcontainers/engine v0.37.0
-	github.com/go-wasmcontainers/gpu v0.8.0
+	github.com/go-wasmcontainers/engine v0.38.0
+	github.com/go-wasmcontainers/gpu v0.12.5
 	github.com/go-wasmcontainers/relay v0.3.1
 	github.com/go-widgets/mvvm v0.15.0
 	github.com/go-widgets/webcanvas v0.7.0
@@ -86,7 +86,8 @@ require (
 	github.com/go-fsctl/projquota v0.1.0 // indirect
 	github.com/go-fsctl/zfs v0.1.1 // indirect
 	github.com/go-gfx/gfx v0.36.1 // indirect
-	github.com/go-gfx/webgpu v0.8.0 // indirect
+	github.com/go-gfx/webgpu v0.15.0 // indirect
+	github.com/go-gfx/wgsl v0.3.0 // indirect
 	github.com/go-gtk/gtk4 v0.9.0 // indirect
 	github.com/go-icons/iconoir v0.3.0 // indirect
 	github.com/go-images/images v0.1.1-0.20261026203936-4ac989d310a1 // indirect
@@ -101,6 +102,7 @@ require (
 	github.com/go-opentype/fonts v0.14.0 // indirect
 	github.com/go-opentype/opentype v0.16.2-0.20261027113239-5e69589e9a5e // indirect
 	github.com/go-opentype/shape v0.7.0 // indirect
+	github.com/go-quake1/engine v0.10.0 // indirect
 	github.com/go-richdoc/richdoc v0.7.0 // indirect
 	github.com/go-sql-driver/mysql v1.10.1 // indirect
 	github.com/go-stack/stack v1.8.1 // indirect
@@ -138,6 +140,8 @@ require (
 	github.com/jcmturner/goidentity/v6 v6.0.1 // indirect
 	github.com/jcmturner/gokrb5/v8 v8.4.4 // indirect
 	github.com/jcmturner/rpc/v2 v2.0.3 // indirect
+	github.com/jfreymuth/oggvorbis v1.0.5 // indirect
+	github.com/jfreymuth/vorbis v1.0.2 // indirect
 	github.com/lestrrat-go/blackmagic v1.0.4 // indirect
 	github.com/lestrrat-go/dsig v1.4.0 // indirect
 	github.com/lestrrat-go/dsig-secp256k1 v1.0.0 // indirect
@@ -196,5 +200,6 @@ require (
 tool (
 	github.com/go-fileshare/explorer
 	github.com/go-fileshare/fileshare
+	github.com/go-quake1/engine/cmd/quake-wctr
 	github.com/go-wasmcontainers/llm/examples/generate
 )
