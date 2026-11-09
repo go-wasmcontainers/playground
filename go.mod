@@ -12,7 +12,7 @@ require (
 	github.com/go-wasmcontainers/relay v0.3.1
 	github.com/go-widgets/mvvm v0.15.0
 	github.com/go-widgets/toolkit v0.345.2
-	github.com/go-widgets/webcanvas v0.13.0
+	github.com/go-widgets/webcanvas v0.14.0
 	github.com/klauspost/compress v1.20.3
 	github.com/mxschmitt/playwright-go v0.6201.1
 	github.com/spf13/cobra v1.10.2

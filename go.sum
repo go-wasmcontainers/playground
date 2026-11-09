@@ -241,8 +241,8 @@ github.com/go-widgets/textinput v0.1.1 h1:3NZD5CJm5XYSWA3YzQ64tXC86gnEQ0UlNPL5qJ
 github.com/go-widgets/textinput v0.1.1/go.mod h1:Y/k3PDtUEMQ/4psCVKdmUStNWa/EsVAMcCKG2lEtQ5c=
 github.com/go-widgets/toolkit v0.345.2 h1:M8xEpwsb5JJVeCQrjShQEexc0rZz/+zWBxw3dlsuNHo=
 github.com/go-widgets/toolkit v0.345.2/go.mod h1:CfZ1nZLl0aRsASVdW3v/oJ6voSa4yXwe0FNU1whlos8=
-github.com/go-widgets/webcanvas v0.13.0 h1:mj3TVIqCUBQSo7BEGWDjpQzKKAKlHSHEFMw7TkYdW/o=
-github.com/go-widgets/webcanvas v0.13.0/go.mod h1:H0lf7ZOm5QLap3MyizCjb2ArVszjZd8lDLk1SRRCfZk=
+github.com/go-widgets/webcanvas v0.14.0 h1:ZLp+HAeY+qXx6tvwBgBoZpPTK03VGexAVJWiBwEIGZ8=
+github.com/go-widgets/webcanvas v0.14.0/go.mod h1:H0lf7ZOm5QLap3MyizCjb2ArVszjZd8lDLk1SRRCfZk=
 github.com/go-widgets/window v0.89.1 h1:kNTwPTjfarEBwQCd+7+/B4JBICM5wgC2GYDachUX0fA=
 github.com/go-widgets/window v0.89.1/go.mod h1:MsQ9jO0Ylsxd/4wxEzo/JRlxXTW8ni6lELuvFrQqGTs=
 github.com/goccy/go-json v0.11.2 h1:jdZv93Tt4ioR8yW1CoNsvSxrcZlCXAUU1aZXN7gpXUA=
