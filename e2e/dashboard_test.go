@@ -264,7 +264,9 @@ func dashboard(t *testing.T, pw *playwright.Playwright, browserName, mode string
 			if time.Now().After(deadline) {
 				clip, cerr := page.Evaluate(`() => navigator.clipboard.readText().catch((e) => "readText failed: " + e)`)
 				tr, _ := page.Evaluate(`() => (window.__clipTrace || []).join("\n")`)
-				t.Fatalf("%s: the pasted line never appeared.\nclipboard now: %v (%v)\ntrace:\n%v", d.who, clip, cerr, tr)
+				tk, _ := page.Evaluate(`() => window.__dashboard.clip()`)
+				t.Fatalf("%s: the pasted line never appeared.\nclipboard now: %v (%v)\ntoolkit clipboard: %q\nterminal tail: %q\ntrace:\n%v",
+					d.who, clip, cerr, tk, tail(d.state().Terminal, 300), tr)
 			}
 			time.Sleep(50 * time.Millisecond)
 		}
@@ -301,6 +303,15 @@ func dashboard(t *testing.T, pw *playwright.Playwright, browserName, mode string
 		ctx.SetOffline(false)
 	}
 	return rep
+}
+
+// tail is the last n bytes of s, for a failure message.
+func tail(s string, n int) string {
+	s = strings.TrimRight(s, "\n ")
+	if len(s) > n {
+		return s[len(s)-n:]
+	}
+	return s
 }
 
 // TestDashboard drives the default page in Chromium (service worker and
