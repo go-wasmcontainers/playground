@@ -232,6 +232,54 @@ func dashboard(t *testing.T, pw *playwright.Playwright, browserName, mode string
 	d.run("wctr run --rm lab echo from-the-dashboard")
 	d.until("the echo", 60*time.Second, func(p ui.Probe) bool { return strings.Contains(p.Terminal, "from-the-dashboard\n") })
 
+	// Paste from the browser's clipboard into the Terminal (webcanvas's
+	// clipboard bridge): a command copied elsewhere, pasted with the
+	// terminal's paste shortcut (Cmd+Shift+V or Ctrl+Shift+V; Ctrl+V alone is
+	// ^V for the shell), then run. Chromium only: Playwright grants clipboard
+	// permissions there.
+	if browserName == "chromium" {
+		if err := ctx.GrantPermissions([]string{"clipboard-read", "clipboard-write"}); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := page.Evaluate(`() => navigator.clipboard.writeText("wctr run --rm lab echo pasted-from-the-clipboard")`); err != nil {
+			t.Fatalf("%s: writeText: %v", d.who, err)
+		}
+		// Where the chain breaks, if it does: what the clipboard holds, the
+		// key as the page saw it, any paste event, and every readText the
+		// bridge made with its outcome.
+		if _, err := page.Evaluate(`() => {
+			const tr = window.__clipTrace = [];
+			addEventListener("keydown", (e) => tr.push("keydown " + e.key + " ctrl=" + e.ctrlKey + " meta=" + e.metaKey + " shift=" + e.shiftKey + " target=" + (e.target && e.target.tagName)), true);
+			addEventListener("paste", (e) => tr.push("paste " + JSON.stringify(e.clipboardData && e.clipboardData.getData("text/plain"))), true);
+			const rt = navigator.clipboard.readText.bind(navigator.clipboard);
+			navigator.clipboard.readText = () => { tr.push("readText called"); return rt().then((t) => { tr.push("readText -> " + JSON.stringify(t)); return t; }, (err) => { tr.push("readText rejected: " + err); throw err; }); };
+		}`); err != nil {
+			t.Fatal(err)
+		}
+		d.view("Terminal")
+		d.click("terminal")
+		// The echo above is printed before `run --rm` has finished removing
+		// its container; while a command runs, the terminal takes Ctrl-C only,
+		// so a paste then is dropped (seen in CI: running=true at the key).
+		d.until("the prompt back", 60*time.Second, func(p ui.Probe) bool { return !p.Running })
+		d.press("ControlOrMeta+Shift+V")
+		deadline := time.Now().Add(10 * time.Second)
+		for !strings.Contains(d.state().Terminal, "wctr run --rm lab echo pasted-from-the-clipboard") {
+			if time.Now().After(deadline) {
+				clip, cerr := page.Evaluate(`() => navigator.clipboard.readText().catch((e) => "readText failed: " + e)`)
+				tr, _ := page.Evaluate(`() => (window.__clipTrace || []).join("\n")`)
+				tk, _ := page.Evaluate(`() => window.__dashboard.clip()`)
+				t.Fatalf("%s: the pasted line never appeared.\nclipboard now: %v (%v)\ntoolkit clipboard: %q\nterminal tail: %q\ntrace:\n%v",
+					d.who, clip, cerr, tk, tail(d.state().Terminal, 300), tr)
+			}
+			time.Sleep(50 * time.Millisecond)
+		}
+		d.press("Enter")
+		d.until("the pasted command's output", 60*time.Second, func(p ui.Probe) bool {
+			return strings.Contains(p.Terminal, "pasted-from-the-clipboard\n")
+		})
+	}
+
 	if mode == "live" {
 		return rep
 	}
@@ -259,6 +307,15 @@ func dashboard(t *testing.T, pw *playwright.Playwright, browserName, mode string
 		ctx.SetOffline(false)
 	}
 	return rep
+}
+
+// tail is the last n bytes of s, for a failure message.
+func tail(s string, n int) string {
+	s = strings.TrimRight(s, "\n ")
+	if len(s) > n {
+		return s[len(s)-n:]
+	}
+	return s
 }
 
 // TestDashboard drives the default page in Chromium (service worker and

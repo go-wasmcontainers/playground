@@ -27,6 +27,7 @@ import (
 	"github.com/go-wasmcontainers/engine/api"
 	"github.com/go-wasmcontainers/engine/cli"
 	"github.com/go-widgets/mvvm"
+	"github.com/go-widgets/toolkit"
 	"github.com/go-widgets/webcanvas"
 
 	"github.com/go-wasmcontainers/playground/internal/session"
@@ -64,6 +65,10 @@ func main() {
 	}
 	opts := sess.CLIOptions()
 
+	// The toolkit's clipboard is in memory until a host installs one: without
+	// this, Cmd+C/Cmd+V in the Terminal copy and paste inside the page only.
+	toolkit.SetClipboard(webcanvas.NewClipboard())
+
 	var scene *ui.Scene
 	q := mvvm.NewQueue(func() {
 		if scene != nil {
@@ -85,6 +90,8 @@ func main() {
 			b, _ := json.Marshal(scene.Probe())
 			return string(b)
 		}),
+		// What the toolkit's clipboard holds (the e2e's paste check).
+		"clip": js.FuncOf(func(js.Value, []js.Value) any { return toolkit.ClipboardText() }),
 	})
 	go app.RunLive(context.Background(), vm.PollInterval)
 	webcanvas.Run("screen", scene)
