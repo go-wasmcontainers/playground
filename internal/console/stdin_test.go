@@ -18,14 +18,19 @@ func TestStdin(t *testing.T) {
 	}()
 	s.put("echo hi\r")
 	s.put(strings.Repeat("x", maxStdin+10)) // must not block
-	s.put("\x04")                           // dropped: the buffer may be full
+	// The bound is on what is BUFFERED, not on the total: when the reader
+	// has drained some bytes before this put, "\x04" fits and is kept.
+	// Main's CI read 65545 = 8 + maxStdin + 1 that way (2026-11-08).
+	s.put("\x04")
 	time.Sleep(10 * time.Millisecond)
 	s.close()
 	s.put("after close")
 	select {
 	case b := <-got:
-		if !strings.HasPrefix(b, "echo hi\r") || len(b) > maxStdin+len("echo hi\r") || strings.Contains(b, "after") {
-			t.Fatalf("read %d bytes, starting %q", len(b), b[:min(len(b), 16)])
+		body := strings.TrimSuffix(strings.TrimPrefix(b, "echo hi\r"), "\x04")
+		if !strings.HasPrefix(b, "echo hi\r") || strings.Trim(body, "x") != "" ||
+			len(b) > len("echo hi\r")+maxStdin+len("\x04") || strings.Contains(b, "after") {
+			t.Fatalf("read %d bytes, starting %q, ending %q", len(b), b[:min(len(b), 16)], b[max(0, len(b)-4):])
 		}
 	case <-time.After(5 * time.Second):
 		t.Fatal("reader not released by close")
