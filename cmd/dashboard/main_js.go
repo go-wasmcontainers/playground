@@ -94,5 +94,17 @@ func main() {
 		"clip": js.FuncOf(func(js.Value, []js.Value) any { return toolkit.ClipboardText() }),
 	})
 	go app.RunLive(context.Background(), vm.PollInterval)
-	webcanvas.Run("screen", scene)
+	webcanvas.Run("screen", tracedScene{scene})
+}
+
+// tracedScene records every KeyDown in window.__clipTrace when a test has
+// created it (the clipboard paste e2e), and is the scene otherwise: the
+// embedded *ui.Scene keeps every optional webcanvas interface.
+type tracedScene struct{ *ui.Scene }
+
+func (s tracedScene) KeyDown(key string) bool {
+	if tr := js.Global().Get("__clipTrace"); tr.Truthy() {
+		tr.Call("push", "go KeyDown "+key+" clip="+toolkit.ClipboardText())
+	}
+	return s.Scene.KeyDown(key)
 }
