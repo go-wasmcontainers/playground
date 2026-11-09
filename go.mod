@@ -6,15 +6,15 @@ require (
 	github.com/go-pkgx/bottle v0.62.1
 	github.com/go-wasmcontainers/build v0.4.0
 	github.com/go-wasmcontainers/compose v0.6.0
-	github.com/go-wasmcontainers/dashboard v0.8.0
-	github.com/go-wasmcontainers/engine v0.38.0
+	github.com/go-wasmcontainers/dashboard v0.9.0
+	github.com/go-wasmcontainers/engine v0.39.0
 	github.com/go-wasmcontainers/gpu v0.12.5
 	github.com/go-wasmcontainers/relay v0.3.1
 	github.com/go-widgets/mvvm v0.15.0
-	github.com/go-widgets/toolkit v0.345.2
+	github.com/go-widgets/toolkit v0.362.0
 	github.com/go-widgets/webcanvas v0.14.0
 	github.com/klauspost/compress v1.20.3
-	github.com/mxschmitt/playwright-go v0.6201.1
+	github.com/mxschmitt/playwright-go v0.6401.0
 	github.com/spf13/cobra v1.10.2
 	github.com/stealthrocket/net v0.2.1
 )
@@ -112,11 +112,12 @@ require (
 	github.com/go-volumes/gpt v0.3.0 // indirect
 	github.com/go-volumes/s3 v0.2.2 // indirect
 	github.com/go-volumes/safeio v0.0.0-20260831125406-d8f54b2890d4 // indirect
-	github.com/go-wasmcontainers/engine/lineedit v0.1.0 // indirect
 	github.com/go-wasmcontainers/llm v0.1.0 // indirect
 	github.com/go-widgets/android v0.16.0 // indirect
+	github.com/go-widgets/lineedit v0.1.1 // indirect
 	github.com/go-widgets/mvvmtk v0.15.0 // indirect
 	github.com/go-widgets/painter v0.17.0 // indirect
+	github.com/go-widgets/shellterm v0.1.0 // indirect
 	github.com/go-widgets/textinput v0.1.1 // indirect
 	github.com/go-widgets/window v0.89.1 // indirect
 	github.com/goccy/go-json v0.11.2 // indirect
@@ -161,7 +162,7 @@ require (
 	github.com/remyoudompheng/bigfft v0.0.0-20230129092748-24d4a6f8daec // indirect
 	github.com/segmentio/asm v1.2.1 // indirect
 	github.com/sirupsen/logrus v1.9.3 // indirect
-	github.com/spf13/pflag v1.0.10 // indirect
+	github.com/spf13/pflag v1.1.0 // indirect
 	github.com/stretchr/testify v1.12.1 // indirect
 	github.com/tetratelabs/wazero v1.12.0 // indirect
 	github.com/ulikunitz/xz v0.5.17 // indirect
