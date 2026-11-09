@@ -14,6 +14,7 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
 	"strings"
@@ -103,8 +104,21 @@ func main() {
 type tracedScene struct{ *ui.Scene }
 
 func (s tracedScene) KeyDown(key string) bool {
-	if tr := js.Global().Get("__clipTrace"); tr.Truthy() {
+	tr := js.Global().Get("__clipTrace")
+	if tr.Truthy() {
 		tr.Call("push", "go KeyDown "+key+" clip="+toolkit.ClipboardText())
 	}
-	return s.Scene.KeyDown(key)
+	ok := s.Scene.KeyDown(key)
+	if tr.Truthy() {
+		p := s.Scene.Probe()
+		tr.Call("push", fmt.Sprintf("go KeyDown %s -> %v focus=%s view=%s running=%v", key, ok, p.Focus, p.View, p.Running))
+	}
+	return ok
+}
+
+func (s tracedScene) Modifiers(m webcanvas.Modifiers) {
+	if tr := js.Global().Get("__clipTrace"); tr.Truthy() {
+		tr.Call("push", fmt.Sprintf("go Modifiers %+v", m))
+	}
+	s.Scene.Modifiers(m)
 }
