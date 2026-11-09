@@ -149,7 +149,7 @@ func RootCmd() *cobra.Command {
 		},
 	}
 	drv.Flags().StringVar(&ddir, "dir", "", "driver directory (PLAYWRIGHT_DRIVER_PATH)")
-	drv.Flags().StringVar(&dver, "version", "1.62.1", "playwright-core version (must match playwright-go v0.6201.1)")
+	drv.Flags().StringVar(&dver, "version", "1.64.1", "playwright-core version (must match go.mod's playwright-go, v0.6401.0)")
 	drv.MarkFlagRequired("dir")
 
 	var allow, ucOut string
