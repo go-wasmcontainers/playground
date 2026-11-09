@@ -11,7 +11,8 @@ require (
 	github.com/go-wasmcontainers/gpu v0.12.5
 	github.com/go-wasmcontainers/relay v0.3.1
 	github.com/go-widgets/mvvm v0.15.0
-	github.com/go-widgets/webcanvas v0.7.0
+	github.com/go-widgets/toolkit v0.345.2
+	github.com/go-widgets/webcanvas v0.13.0
 	github.com/klauspost/compress v1.20.3
 	github.com/mxschmitt/playwright-go v0.6201.1
 	github.com/spf13/cobra v1.10.2
@@ -85,7 +86,7 @@ require (
 	github.com/go-fsctl/btrfs v0.1.1 // indirect
 	github.com/go-fsctl/projquota v0.1.0 // indirect
 	github.com/go-fsctl/zfs v0.1.1 // indirect
-	github.com/go-gfx/gfx v0.36.1 // indirect
+	github.com/go-gfx/gfx v0.41.0 // indirect
 	github.com/go-gfx/webgpu v0.15.0 // indirect
 	github.com/go-gfx/wgsl v0.3.0 // indirect
 	github.com/go-gtk/gtk4 v0.9.0 // indirect
@@ -115,8 +116,8 @@ require (
 	github.com/go-wasmcontainers/llm v0.1.0 // indirect
 	github.com/go-widgets/android v0.16.0 // indirect
 	github.com/go-widgets/mvvmtk v0.15.0 // indirect
-	github.com/go-widgets/painter v0.16.0 // indirect
-	github.com/go-widgets/toolkit v0.345.2 // indirect
+	github.com/go-widgets/painter v0.17.0 // indirect
+	github.com/go-widgets/textinput v0.1.1 // indirect
 	github.com/go-widgets/window v0.89.1 // indirect
 	github.com/goccy/go-json v0.11.2 // indirect
 	github.com/godbus/dbus/v5 v5.2.2 // indirect

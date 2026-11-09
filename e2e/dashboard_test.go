@@ -232,6 +232,30 @@ func dashboard(t *testing.T, pw *playwright.Playwright, browserName, mode string
 	d.run("wctr run --rm lab echo from-the-dashboard")
 	d.until("the echo", 60*time.Second, func(p ui.Probe) bool { return strings.Contains(p.Terminal, "from-the-dashboard\n") })
 
+	// Paste from the browser's clipboard into the Terminal (webcanvas's
+	// clipboard bridge): a command copied elsewhere, pasted with the
+	// terminal's paste shortcut (Cmd+Shift+V or Ctrl+Shift+V; Ctrl+V alone is
+	// ^V for the shell), then run. Chromium only: Playwright grants clipboard
+	// permissions there.
+	if browserName == "chromium" {
+		if err := ctx.GrantPermissions([]string{"clipboard-read", "clipboard-write"}); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := page.Evaluate(`() => navigator.clipboard.writeText("wctr run --rm lab echo pasted-from-the-clipboard")`); err != nil {
+			t.Fatalf("%s: writeText: %v", d.who, err)
+		}
+		d.view("Terminal")
+		d.click("terminal")
+		d.press("ControlOrMeta+Shift+V")
+		d.until("the pasted line", 10*time.Second, func(p ui.Probe) bool {
+			return strings.Contains(p.Terminal, "wctr run --rm lab echo pasted-from-the-clipboard")
+		})
+		d.press("Enter")
+		d.until("the pasted command's output", 60*time.Second, func(p ui.Probe) bool {
+			return strings.Contains(p.Terminal, "pasted-from-the-clipboard\n")
+		})
+	}
+
 	if mode == "live" {
 		return rep
 	}

@@ -16,6 +16,9 @@ and sees what they do — no virtual machine, no server: the
 [dashboard](https://github.com/go-wasmcontainers/dashboard) (Containers,
 Images, Volumes, Terminal; logs and stats of the selected container, stop,
 start and remove buttons that print the `wctr` command they ran). The
+dashboard's Terminal copies and pastes with the system clipboard: select and
+press Cmd+C or Ctrl+Shift+C, paste with Cmd+V or Ctrl+Shift+V (Ctrl+V alone
+is `^V` for the shell). This goes through webcanvas's clipboard bridge. The
 terminal alone, on xterm.js, stays at
 [`?ui=terminal`](https://go-wasmcontainers.github.io/playground/?ui=terminal).
 

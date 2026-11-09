@@ -27,6 +27,7 @@ import (
 	"github.com/go-wasmcontainers/engine/api"
 	"github.com/go-wasmcontainers/engine/cli"
 	"github.com/go-widgets/mvvm"
+	"github.com/go-widgets/toolkit"
 	"github.com/go-widgets/webcanvas"
 
 	"github.com/go-wasmcontainers/playground/internal/session"
@@ -63,6 +64,10 @@ func main() {
 		Images:  session.FetchCatalog(base + "catalog.json" + build),
 	}
 	opts := sess.CLIOptions()
+
+	// The toolkit's clipboard is in memory until a host installs one: without
+	// this, Cmd+C/Cmd+V in the Terminal copy and paste inside the page only.
+	toolkit.SetClipboard(webcanvas.NewClipboard())
 
 	var scene *ui.Scene
 	q := mvvm.NewQueue(func() {
