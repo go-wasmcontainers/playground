@@ -258,6 +258,10 @@ func dashboard(t *testing.T, pw *playwright.Playwright, browserName, mode string
 		}
 		d.view("Terminal")
 		d.click("terminal")
+		// The echo above is printed before `run --rm` has finished removing
+		// its container; while a command runs, the terminal takes Ctrl-C only,
+		// so a paste then is dropped (seen in CI: running=true at the key).
+		d.until("the prompt back", 60*time.Second, func(p ui.Probe) bool { return !p.Running })
 		d.press("ControlOrMeta+Shift+V")
 		deadline := time.Now().Add(10 * time.Second)
 		for !strings.Contains(d.state().Terminal, "wctr run --rm lab echo pasted-from-the-clipboard") {

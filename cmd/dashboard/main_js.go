@@ -14,7 +14,6 @@ package main
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"io"
 	"net/http"
 	"strings"
@@ -95,30 +94,5 @@ func main() {
 		"clip": js.FuncOf(func(js.Value, []js.Value) any { return toolkit.ClipboardText() }),
 	})
 	go app.RunLive(context.Background(), vm.PollInterval)
-	webcanvas.Run("screen", tracedScene{scene})
-}
-
-// tracedScene records every KeyDown in window.__clipTrace when a test has
-// created it (the clipboard paste e2e), and is the scene otherwise: the
-// embedded *ui.Scene keeps every optional webcanvas interface.
-type tracedScene struct{ *ui.Scene }
-
-func (s tracedScene) KeyDown(key string) bool {
-	tr := js.Global().Get("__clipTrace")
-	if tr.Truthy() {
-		tr.Call("push", "go KeyDown "+key+" clip="+toolkit.ClipboardText())
-	}
-	ok := s.Scene.KeyDown(key)
-	if tr.Truthy() {
-		p := s.Scene.Probe()
-		tr.Call("push", fmt.Sprintf("go KeyDown %s -> %v focus=%s view=%s running=%v", key, ok, p.Focus, p.View, p.Running))
-	}
-	return ok
-}
-
-func (s tracedScene) Modifiers(m webcanvas.Modifiers) {
-	if tr := js.Global().Get("__clipTrace"); tr.Truthy() {
-		tr.Call("push", fmt.Sprintf("go Modifiers %+v", m))
-	}
-	s.Scene.Modifiers(m)
+	webcanvas.Run("screen", scene)
 }
