@@ -1,0 +1,7 @@
+{
+  "org": "go-wasmcontainers-usercontent",
+  "repo": "go-wasmcontainers-usercontent.github.io",
+  "parents": ["https://go-wasmcontainers.github.io"],
+  "shells": ["/shell.html"],
+  "csp": "default-src 'none'; script-src 'self'; style-src 'unsafe-inline'; frame-src 'self'; base-uri 'none'; form-action 'none'"
+}

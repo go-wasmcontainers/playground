@@ -379,6 +379,13 @@ view tab (this origin, not isolated, not frameable)
   container. A service worker can neither see nor set cookies, so the
   engine keeps a cookie jar per session (sessions work; `document.cookie`
   in the container's page does not see them).
+- **The second origin is declared and gated.** `.second-origin.json` names
+  the usercontent organisation, its Pages repository, the one parent origin
+  the shell may name, the shell path and its CSP; the `second-origin` CI job
+  runs `secondorigin verify` ([fleettools](https://github.com/go-fleettools/fleettools),
+  v0.101.0) and fails when the published shell drifts from the declaration
+  (CSP, an origin other than the parent, a `"*"` target) or the origin
+  disappears. An answer it cannot read is "not verified", never a pass.
 - The shell is not a boundary against the container's own pages (they
   share its origin); what they reach through it is HTTP to this session's
   published ports, nothing of the playground.
