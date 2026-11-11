@@ -22,6 +22,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/go-gfx/webgpu"
 	"github.com/go-wasmcontainers/engine/runtime/browser"
 
 	"github.com/go-wasmcontainers/playground/internal/mirror"
@@ -333,6 +334,12 @@ func Build(ctx context.Context, o Options) (*Manifest, error) {
 		return nil, err
 	}
 	if err := os.WriteFile(filepath.Join(o.Out, "container-worker.js"), browser.WorkerJS, 0o644); err != nil {
+		return nil, err
+	}
+	// replay.js: the JavaScript half of the batched stream (wasi_webgpu_batch),
+	// served as a file because the page's CSP forbids the blob URL the library
+	// would otherwise make.
+	if err := os.WriteFile(filepath.Join(o.Out, webgpu.ReplayJSName), []byte(webgpu.ReplayJS), 0o644); err != nil {
 		return nil, err
 	}
 	// Static files.

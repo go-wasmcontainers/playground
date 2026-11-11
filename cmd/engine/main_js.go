@@ -40,7 +40,9 @@ import (
 	"github.com/go-wasmcontainers/engine/state"
 	"github.com/go-wasmcontainers/engine/wasi"
 
+	wgpu "github.com/go-gfx/webgpu"
 	"github.com/go-wasmcontainers/dashboard/bridge"
+	"github.com/go-wasmcontainers/gpu/gpubatch"
 	nnwebgpu "github.com/go-wasmcontainers/gpu/nn/webgpu"
 	"github.com/go-wasmcontainers/gpu/webgpu"
 
@@ -156,7 +158,11 @@ func main() {
 		//    whose frame-acks come back to webgpu.AckFrame;
 		//  - WASIX (wasix_32v1): processes, so a container's sh can start
 		//    programs.
-		HostModules: append(append([]wasi.HostModule{nnwebgpu.NewModule()},
+		//  - wasi_webgpu_batch: the batched stream (one host crossing per
+		//    submit; go-wasmcontainers/gpu gpubatch), which the quake image
+		//    draws its world through (--gpuworld). Same grant as wasi:webgpu
+		//    (--gpu), software adapters refused.
+		HostModules: append(append([]wasi.HostModule{nnwebgpu.NewModule(), gpubatch.NewModule(gpubatch.Browser{ReplayURL: base + wgpu.ReplayJSName})},
 			webgpu.HostModules(webgpu.Browser{OnSurface: postSurface})...), wasi.WASIX),
 		// Compiled modules across reloads; the URLs are never fetched.
 		CodeCache: codeCache, CodeCacheURL: base + "module-cache/",

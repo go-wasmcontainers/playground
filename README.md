@@ -159,7 +159,14 @@ picture 0 of the MNIST test set by Y. LeCun, C. Cortes and C. J. C. Burges
   `/usr/share/quake/`. `quake --worldref 4` draws one fixed view (the eye at
   `info_player_start`), prints `sha256(indices)` and the `sha256(rgba)` the
   page must show, and presents it; `quake --frames 150` prints the mean frame
-  time. Frame time of a level-1 frame in Chromium on an Apple M4 Max:
+  time. **Level 2** (engine v0.13.0): `quake --worldref 4 --gpuworld` also
+  draws the view on the GPU through the batched stream (`wasi_webgpu_batch`,
+  one host crossing per frame, the index frame read back in the same submit),
+  checks it against the software frame at go-quake1/engine's worldcheck
+  measure (the pixels a one-pixel shift does not explain, at most 2.5 %; a GPU
+  frame is not hash-equal to the CPU's) and presents it. The game loop still
+  draws its world on the CPU. The page serves `webgpu-replay.js` for the
+  stream because its CSP forbids the blob URL. Frame time of a level-1 frame in Chromium on an Apple M4 Max:
   **deferred, load 17.7 to 31.7** (1-minute load average; the rule is a load
   of at most 8). For the record only, not a measurement: 20.4 to 21.2 ms per
   frame (150 frames) at those loads.
@@ -591,6 +598,10 @@ The e2e has three opt-in parts:
     `quake-worldref` prints for the same view, and the ImageBitmap the page
     receives (read back through `__wctrFrameProbe`) has exactly the RGBA
     whose `sha256` the guest printed (`webgpupresent.Reference`);
+  - `quake --worldref 4 --gpuworld`: the software hashes are still the
+    goldens, the GPU frame passes the worldcheck measure (measured 7 of
+    256000 pixels differ, 0 unexplained, on the Apple GPU) and reaches the
+    page;
   - `quake --frames 150` (no `--worldref`): at least 120 frames reach the
     page and they keep changing.
 
