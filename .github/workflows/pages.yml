@@ -26,7 +26,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-go@v7
-        with: { go-version: '1.27.3' }
+        with: { go-version: '1.27.4' }
       - run: go version
       # wasmtime: the build smoke-tests every pkgx image against it and marks
       # the clean ones "checked" in catalog.json.
@@ -67,7 +67,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-go@v7
-        with: { go-version: '1.27.3' }
+        with: { go-version: '1.27.4' }
       - uses: actions/download-artifact@v8
         with: { name: build-manifest, path: manifest }
       # pipefail: without it the pipeline's status is tee's, and a verify that
@@ -86,7 +86,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-go@v7
-        with: { go-version: '1.27.3' }
+        with: { go-version: '1.27.4' }
       - uses: actions/setup-node@v7
         with: { node-version: 22 }
       - name: Playwright driver and Chromium

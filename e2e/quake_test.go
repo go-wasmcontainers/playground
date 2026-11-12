@@ -117,6 +117,22 @@ func TestQuake(t *testing.T) {
 		t.Errorf("the page's ImageBitmap is %s, the guest presented %s", page640, want)
 	}
 
+	// 1b. --worldref 4 --gpuworld: the world drawn on the GPU through the
+	// batch stream and read back in the same submit. The software hashes are
+	// still the goldens (printed first); the GPU frame is not hash-equal, it
+	// passes go-quake1/engine's worldcheck measure, and it is what the page gets.
+	b.eval(`() => { window.__q.hashes = []; }`)
+	out = b.must("wctr run --rm --gpu -m 512m quake --worldref 4 --gpuworld", 0, "view 4 640x400 gpuworld PASS")
+	if got := re("indices"); got != quakeIndicesGolden {
+		t.Errorf("with --gpuworld the software indices hash is %s, golden %s", got, quakeIndicesGolden)
+	}
+	m := regexp.MustCompile(`gpuworld (\d+) of 256000 pixels differ, (\d+) unexplained`).FindStringSubmatch(out)
+	if m == nil {
+		t.Fatalf("no gpuworld verdict in:\n%s", out)
+	}
+	t.Logf("gpuworld: %s of 256000 pixels differ, %s unexplained", m[1], m[2])
+	b.until("no GPU frame reached the page", `() => window.__q.hashes.length > 0`, 30e9)
+
 	// 2. Play: 150 frames, no --worldref. They keep changing.
 	b.eval(`() => { window.__q.hashes = []; }`)
 	out = b.must("wctr run --rm --gpu -m 512m quake --frames 150", 0, "150 frames in ")

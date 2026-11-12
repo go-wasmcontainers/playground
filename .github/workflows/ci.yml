@@ -26,7 +26,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-go@v7
-        with: { go-version: '1.27.3' }
+        with: { go-version: '1.27.4' }
       # fleettools linkcheck replaces the curl loop: retries with backoff that
       # honours Retry-After, github.com URLs decided by the REST API (the HTML
       # pages answer 504/429 to a loaded runner), and exit 2 for FLAKY apart
@@ -59,7 +59,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-go@v7
-        with: { go-version: '1.27.3' }
+        with: { go-version: '1.27.4' }
       - name: secondorigin verify
         run: |
           set -eu
@@ -76,7 +76,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-go@v7
-        with: { go-version: '1.27.3' }
+        with: { go-version: '1.27.4' }
       - run: go version
       - name: gofmt
         run: |
@@ -115,7 +115,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-go@v7
-        with: { go-version: '1.27.3' }
+        with: { go-version: '1.27.4' }
       - run: go test -run '^$' -fuzz '^${{ matrix.target }}$' -fuzztime 45s ${{ matrix.pkg }}
 
   vulns:
@@ -124,7 +124,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-go@v7
-        with: { go-version: '1.27.3' }
+        with: { go-version: '1.27.4' }
       - name: govulncheck, judged by vulngate
         run: |
           set -eu
@@ -145,7 +145,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-go@v7
-        with: { go-version: '1.27.3' }
+        with: { go-version: '1.27.4' }
       # Node 26 hangs after unpacking a browser (seen locally); 22 does not.
       - uses: actions/setup-node@v7
         with: { node-version: 22 }
@@ -208,7 +208,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-go@v7
-        with: { go-version: '1.27.3' }
+        with: { go-version: '1.27.4' }
       - uses: actions/setup-node@v7
         with: { node-version: 22 }
       - name: Playwright driver and Chromium
@@ -245,7 +245,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-go@v7
-        with: { go-version: '1.27.3' }
+        with: { go-version: '1.27.4' }
       - uses: bytecodealliance/actions/wasmtime/setup@v1
       - run: wasmtime --version
       - name: mirror smoke
@@ -266,7 +266,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-go@v7
-        with: { go-version: '1.27.3' }
+        with: { go-version: '1.27.4' }
       - uses: bytecodealliance/actions/wasmtime/setup@v1
       - run: wasmtime --version
       - name: go test -tags perf
