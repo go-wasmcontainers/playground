@@ -5,6 +5,7 @@ package e2e
 import (
 	"os"
 	"regexp"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -132,6 +133,22 @@ func TestQuake(t *testing.T) {
 	}
 	t.Logf("gpuworld: %s of 256000 pixels differ, %s unexplained", m[1], m[2])
 	b.until("no GPU frame reached the page", `() => window.__q.hashes.length > 0`, 30e9)
+
+	// 1c. The game loop with the world on the GPU: 30 frames, each also drawn
+	// whole on the CPU and compared (worldcheck's measure: the pixels a
+	// one-pixel shift does not explain, at most 2.5 % of a frame). The
+	// software default above is unchanged.
+	b.eval(`() => { window.__q.hashes = []; }`)
+	out = b.must("wctr run --rm --gpu -m 512m quake --gpuworld --gpuworld-check --frames 30", 0, "gpuworld check PASS")
+	m = regexp.MustCompile(`gpuworld check: (\d+) frames, (\d+) of (\d+) pixels differ, (\d+) unexplained, worst frame ([0-9.]+)`).FindStringSubmatch(out)
+	if m == nil {
+		t.Fatalf("no gpuworld check line in:\n%s", out)
+	}
+	t.Logf("game loop on the GPU: %s frames compared, %s of %s pixels differ, %s unexplained, worst frame %s", m[1], m[2], m[3], m[4], m[5])
+	if n, _ := strconv.Atoi(m[1]); n < 25 {
+		t.Errorf("only %s frames were compared, want at least 25 of 30", m[1])
+	}
+	b.until("no GPU-world frame reached the page", `() => window.__q.hashes.length >= 25`, 30e9)
 
 	// 2. Play: 150 frames, no --worldref. They keep changing.
 	b.eval(`() => { window.__q.hashes = []; }`)
