@@ -4,7 +4,7 @@ go 1.27.4
 
 require (
 	github.com/go-gfx/webgpu v0.18.0
-	github.com/go-pkgx/bottle v0.62.1
+	github.com/go-pkgx/bottle v0.88.0
 	github.com/go-wasmcontainers/build v0.4.0
 	github.com/go-wasmcontainers/compose v0.6.0
 	github.com/go-wasmcontainers/dashboard v0.9.0
@@ -12,9 +12,9 @@ require (
 	github.com/go-wasmcontainers/gpu v0.13.0
 	github.com/go-wasmcontainers/relay v0.3.1
 	github.com/go-widgets/mvvm v0.15.0
-	github.com/go-widgets/toolkit v0.362.0
-	github.com/go-widgets/webcanvas v0.14.0
-	github.com/klauspost/compress v1.20.3
+	github.com/go-widgets/toolkit v0.374.11
+	github.com/go-widgets/webcanvas v0.14.3
+	github.com/klauspost/compress v1.20.4
 	github.com/mxschmitt/playwright-go v0.6401.0
 	github.com/spf13/cobra v1.10.2
 	github.com/stealthrocket/net v0.2.1
@@ -59,7 +59,7 @@ require (
 	github.com/go-encryptions/zfscrypt v0.0.0-20260927173133-ff7dd33bb415 // indirect
 	github.com/go-fde/apfs v0.0.0-20260912170739-6acb57fc9eb0 // indirect
 	github.com/go-fileshare/explorer v0.4.0 // indirect
-	github.com/go-fileshare/fileshare v0.32.0 // indirect
+	github.com/go-fileshare/fileshare v0.45.1 // indirect
 	github.com/go-fileshare/portal v0.3.2 // indirect
 	github.com/go-filesystems/apfs v0.3.0 // indirect
 	github.com/go-filesystems/btrfs v0.3.0 // indirect
@@ -103,7 +103,7 @@ require (
 	github.com/go-opentype/fonts v0.14.0 // indirect
 	github.com/go-opentype/opentype v0.16.2-0.20261027113239-5e69589e9a5e // indirect
 	github.com/go-opentype/shape v0.7.0 // indirect
-	github.com/go-quake1/engine v0.14.0 // indirect
+	github.com/go-quake1/engine v0.15.0 // indirect
 	github.com/go-richdoc/richdoc v0.7.0 // indirect
 	github.com/go-sql-driver/mysql v1.10.1 // indirect
 	github.com/go-stack/stack v1.8.1 // indirect
@@ -112,7 +112,7 @@ require (
 	github.com/go-volumes/gpt v0.3.0 // indirect
 	github.com/go-volumes/s3 v0.2.2 // indirect
 	github.com/go-volumes/safeio v0.0.0-20260831125406-d8f54b2890d4 // indirect
-	github.com/go-wasmcontainers/llm v0.1.0 // indirect
+	github.com/go-wasmcontainers/llm v0.5.0 // indirect
 	github.com/go-widgets/android v0.16.0 // indirect
 	github.com/go-widgets/lineedit v0.1.1 // indirect
 	github.com/go-widgets/mvvmtk v0.15.0 // indirect
