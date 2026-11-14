@@ -223,6 +223,8 @@ github.com/go-wasmcontainers/engine v0.39.0 h1:PFY+Pk9JGbZbn+h8NR+O+if7nUIiSP7mf
 github.com/go-wasmcontainers/engine v0.39.0/go.mod h1:mrlxXw/GdNBGe0O/xNzMa/qg37VMpRXuHJJurovml+c=
 github.com/go-wasmcontainers/gpu v0.13.0 h1:Wy3ulLyjeqPB5BokeXvH2h0x0CBkWhU6MCcFSlbsjgY=
 github.com/go-wasmcontainers/gpu v0.13.0/go.mod h1:OBnfYRTTYv1Ls/axPNT3c4uQyhjSxaTTaQP+CVmVNPo=
+github.com/go-wasmcontainers/gpu v0.13.1 h1:KEyLwzdJXm4NrMtu4dD5G4mowyV4yFf+c/1WVbz8DfI=
+github.com/go-wasmcontainers/gpu v0.13.1/go.mod h1:4+YzzSE98EIOh+a6jVExWmFjdu7QDPCldlNta4R+unE=
 github.com/go-wasmcontainers/llm v0.1.0 h1:gzW0o0RGCZwOW5Tv60L/TDNOqRB340S5X41pQ8l79qc=
 github.com/go-wasmcontainers/llm v0.1.0/go.mod h1:fjqoPPBYFUzTjAFatPonMqFsDmv6QcuWIB19t8gKEGM=
 github.com/go-wasmcontainers/relay v0.3.1 h1:KJBOwZ6L+XHB3VAWVx1n+0TAA4UJTnFwJOMS6wfbd9U=
