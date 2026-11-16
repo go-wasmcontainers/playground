@@ -75,12 +75,17 @@ func TestQuake(t *testing.T) {
 		t.Skipf("no real GPU adapter (%s): the engine refuses software adapters, so there is no frame to check", info)
 	}
 
-	quakeSteps(t, b)
+	quakeSteps(t, b, 25)
 }
 
 // quakeSteps is TestQuake's checks on a page whose adapter is a real GPU, for
 // any browser (TestQuake: Chromium; TestQuakeFirefox: Firefox).
-func quakeSteps(t *testing.T, b tab) {
+//
+// minCompared is how many of the 30 frames of the GPU-world game loop must have
+// been compared with the CPU's: 25 on a real GPU in Chromium; Firefox on the CI
+// runner (138 ms per frame, software WebRender) compared 7 of 30 with engine
+// v0.24.0 and 30 of 30 on an Apple M4 Max, so its lane asks for 5.
+func quakeSteps(t *testing.T, b tab, minCompared int) {
 	t.Helper()
 	// Every frame the page receives: its size and a hash of its RGBA, and
 	// the last one's pixels, read back through a 2D canvas.
@@ -152,8 +157,8 @@ func quakeSteps(t *testing.T, b tab) {
 		t.Fatalf("no gpuworld check line in:\n%s", out)
 	}
 	t.Logf("game loop on the GPU: %s frames compared, %s of %s pixels differ, %s unexplained, worst frame %s", m[1], m[2], m[3], m[4], m[5])
-	if n, _ := strconv.Atoi(m[1]); n < 25 {
-		t.Errorf("only %s frames were compared, want at least 25 of 30", m[1])
+	if n, _ := strconv.Atoi(m[1]); n < minCompared {
+		t.Errorf("only %s frames were compared, want at least %d of 30", m[1], minCompared)
 	}
 	b.until("no GPU-world frame reached the page", `() => window.__q.hashes.length >= 25`, 30e9)
 
