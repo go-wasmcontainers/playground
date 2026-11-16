@@ -13,7 +13,7 @@ import (
 )
 
 // Goldens of the quake image's --worldref 4 (the eye at info_player_start
-// of the freepak v0.2.0 e1m1, 640x400): the figures go-quake1/engine's
+// of the freepak v0.2.0 and v0.2.1 e1m1, 640x400): the figures go-quake1/engine's
 // quake-worldref prints for the same view (the 8-bit index frame) and
 // webgpupresent.Reference computes (the RGBA frame the page must show).
 //

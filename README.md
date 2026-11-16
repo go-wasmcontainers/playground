@@ -183,7 +183,7 @@ picture 0 of the MNIST test set by Y. LeCun, C. Cortes and C. J. C. Burges
   denied` and plays silent. The mouse comes through the surface
   extension of go-wasmcontainers/gpu v0.14.0 (relative motion, buttons and the
   pointer lock) and the dashboard v0.11.0 pane. The game data is [go-quake1/freepak](https://github.com/go-quake1/freepak)
-  v0.2.0, pinned by size and sha256 at build time (the build refuses other
+  v0.2.1 (the ambient `water1.wav` now has a loop point), pinned by size and sha256 at build time (the build refuses other
   bytes); id Software's data is not used. The image is **GPL-3.0-or-later**
   and names its source in `/usr/share/doc/quake/copyright`; the data's own
   licences (BSD-3-Clause, with `progs.dat` GPL-2.0-or-later) are in

@@ -141,6 +141,17 @@ func TestQuakeAudio(t *testing.T) {
 	}
 	const run = "wctr run --rm --gpu --audio -m 512m quake --map e1m1 --frames 300"
 
+	// 0. The pak the image carries gives the ambient water its loop point (freepak
+	// v0.2.1; LibreQuake's water1.wav had none, so it played once and the level
+	// went quiet): the game logs what it loads. e1m1 has water, and its ambient
+	// is on a reserved static channel from the start.
+	wlog := a.must("wctr run --rm --gpu --audio -m 512m quake --map e1m1 --frames 1", 0)
+	if m := regexp.MustCompile(`loaded WAV sound/ambience/water1\.wav -- rate=11025Hz bits=8 numSamples=(\d+) loopStart=(-?\d+)`).FindStringSubmatch(wlog); m == nil {
+		t.Errorf("the game did not log loading ambience/water1.wav:\n%s", wlog)
+	} else if m[2] != "0" {
+		t.Errorf("water1.wav has loopStart=%s (of %s samples), want its cue point 0: the pak lacks freepak v0.2.1's loop point", m[2], m[1])
+	}
+
 	// 1. Before: the fixed chunk (what the game did before the pacing).
 	out := a.must(run+" --fixed-mixer", 0, "sound on (wctr_audio_out, 11025 Hz stereo)", "audio: playing")
 	before, n0, s0 := ratio(out)
