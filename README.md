@@ -142,6 +142,20 @@ picture 0 of the MNIST test set by Y. LeCun, C. Cortes and C. J. C. Burges
   `input`, the guest prints what it receives: `pointer-down 80,80`, then
   `key-down key-a "A" shift=true`.
 
+- `tone`: **sound**. `wctr run -d --audio tone [--hz N] [--silent] [--seconds N]`
+  plays a 440 Hz sine (11025 Hz stereo, amplitude 0.25) through the host module
+  `wctr_audio_out`. Sound is opt-in per container, like the GPU: without
+  `--audio` the module answers *denied* and `tone` exits 2. **Click the page
+  once** (or press a key in it): a browser lets a page play sound only after a
+  user gesture, so until then the stream is *waiting* and the engine discards
+  what the container writes, instead of playing it late. The page runs one
+  `AudioContext`, an `AudioWorklet` per stream (wasmbox's `audioring` asset,
+  served as `audio-worklet.js`), a gain per container and a page gain.
+  **Volume and mute** work at two levels in the *Sound* strip at the bottom left
+  (one row per playing container with a slider and a mute button, and *mute
+  all*), and are gain nodes, so a container cannot undo them. Native `wctr`
+  has no audio output and answers *unsupported*. Design and bounds:
+  [go-wasmcontainers/engine docs/audio-design.md](https://github.com/go-wasmcontainers/engine/blob/main/docs/audio-design.md).
 - `quake`: **Quake in a container**, level 1. `wctr run --rm --gpu -m 512m quake`
   **boots into the main menu**, as the browser build does: Single Player, New
   Game and a skill (Enter, or a click) start LibreQuake's `start` hub, whose
@@ -159,8 +173,11 @@ picture 0 of the MNIST test set by Y. LeCun, C. Cortes and C. J. C. Burges
   frame goes up as a storage buffer of packed indices plus a palette buffer,
   and a fragment shader without loops (the host refuses a loop there) looks
   the colour up. Click the pane, then WASD or the arrows move, Space jumps,
-  1-8 select a weapon, Esc opens the menu. There is no sound yet (no audio
-  path exists for a wasip1 guest). The mouse comes through the surface
+  1-8 select a weapon, Esc opens the menu. **Sound is opt-in, like the
+  GPU: `wctr run --rm --gpu --audio -m 512m quake`** (the `tone` image above
+  explains the unlock click). The game writes its mix through `wctr_audio_out`,
+  paced like tyrquake's `S_Update`; without `--audio` it prints `sound off:
+  denied` and plays silent. The mouse comes through the surface
   extension of go-wasmcontainers/gpu v0.14.0 (relative motion, buttons and the
   pointer lock) and the dashboard v0.11.0 pane. The game data is [go-quake1/freepak](https://github.com/go-quake1/freepak)
   v0.2.0, pinned by size and sha256 at build time (the build refuses other
@@ -594,6 +611,22 @@ $ PLAYWRIGHT_DRIVER_PATH=/tmp/pwd PLAYWRIGHT_NODEJS_PATH=$(command -v node) \
 $ PLAYWRIGHT_DRIVER_PATH=/tmp/pwd PLAYWRIGHT_NODEJS_PATH=$(command -v node) go test -tags e2e ./e2e/
 ```
 
+`TestAudio` runs in every e2e lane (no GPU needed). Chromium starts with
+`--autoplay-policy=document-user-activation-required`, and the test talks to the
+page through the DevTools Protocol with `userGesture:false` and posts its
+keystrokes to the engine, because Playwright's `evaluate` and typing are user
+gestures that would let the context start by itself. It runs
+`wctr run -d --audio tone`, asserts the context is *suspended* before any
+gesture, clicks (a trusted event), and over 2 s asserts: frames played at least
+half of 2 s worth, the analyser's peak in the 440 Hz bin (plus or minus one), an
+RMS above -30 dBFS, and fewer than 5 underruns. It also drives the volume and
+mute controls and reads the level after both gains. Planted negatives, each
+required to fail its own assertion (and the test fails if it passes):
+`tone --silent` (RMS), `tone --hz 880` (frequency), no click (frames played: the
+context stays suspended), and no `--audio` (*denied*, no stream, no context).
+It logs the platform latency and the measured cost of a `stream_write` (one
+engine round trip).
+
 The e2e has three opt-in parts:
 
 - `E2E_REMOTE=1` mirrors the shell image and runs `TestShell`: exec, a
@@ -620,7 +653,12 @@ The e2e has three opt-in parts:
     reach the page and they keep changing; `quake --frames 30` (the default,
     the menu) draws at least 25.
 
-  `E2E_GPU=1` also runs `TestQuakeMenuMouse` and `TestQuakeSoak`. The soak
+  `E2E_GPU=1` also runs `TestQuakeAudio` (Quake with sound: the mixer is
+  paced, measured as the mix frames offered per second of game time over the
+  11025 an output plays, in 300 frames of e1m1 in Chromium on the Apple GPU:
+  **2.773 with the fixed chunk the game painted before, 1.010 paced**; without
+  `--audio` the game runs silent and says why; with it the stream plays after a
+  click), `TestQuakeMenuMouse` and `TestQuakeSoak`. The soak
   plays `quake --map e1m1` (menu skipped) for 45 s in each mode.
   `TestQuakeMenuMouse` starts the image with no flag, in the dashboard: the
   first click locks the pointer, three Enters (Single Player, New Game, a

@@ -13,7 +13,9 @@
 // Messages to the page: {t:"ready", version, storage}, {t:"write", data}
 // (ANSI for the terminal), {t:"history", items}, {t:"done", line, code, ms},
 // and the GPU surfaces: {t:"surface", op, surface, …} and {t:"frame",
-// surface, seq, width, height, bitmap}.
+// surface, seq, width, height, bitmap}, and the sound streams of containers
+// run with --audio: {t:"audio", op:"open", stream, container, sampleRate,
+// channels, capacityFrames, sab} and {t:"audio", op:"close", stream}.
 // The dashboard's http.* messages (package bridge) carry the engine's API
 // to the canvas UI.
 package main
@@ -31,6 +33,7 @@ import (
 	"github.com/go-wasmcontainers/engine/api"
 	"github.com/go-wasmcontainers/engine/api/inproc"
 	"github.com/go-wasmcontainers/engine/api/server"
+	"github.com/go-wasmcontainers/engine/audio"
 	"github.com/go-wasmcontainers/engine/container"
 	"github.com/go-wasmcontainers/engine/daemon"
 	"github.com/go-wasmcontainers/engine/image"
@@ -79,6 +82,11 @@ func postSurface(e webgpu.SurfaceEvent) {
 		post(map[string]any{"t": "surface", "op": "capture", "surface": e.Surface, "capture": e.Capture})
 	}
 }
+
+// postAudio hands a container's sound stream to the page ({t:"audio", op:
+// "open"|"close", ...}, audio.Browser); the SharedArrayBuffer in an open is
+// shared, not transferred.
+func postAudio(m js.Value) { js.Global().Call("postMessage", m) }
 
 // frameAck reads {t:"frame-ack", surface, seq}: surface a u32, seq an
 // integer from 1 to 2^53, as the dashboard sends them.
@@ -162,12 +170,15 @@ func main() {
 		//    whose frame-acks come back to webgpu.AckFrame;
 		//  - WASIX (wasix_32v1): processes, so a container's sh can start
 		//    programs.
+		//  - wctr_audio_out: sound for a container run with --audio, one
+		//    SharedArrayBuffer ring per stream announced to the page
+		//    (postAudio), which plays it through an AudioWorklet (web/audio.js);
 		//  - wasi_webgpu_batch: the batched stream (one host crossing per
 		//    submit; go-wasmcontainers/gpu gpubatch), which the quake image
 		//    draws its world through (--gpuworld). Same grant as wasi:webgpu
 		//    (--gpu), software adapters refused.
 		HostModules: append(append([]wasi.HostModule{nnwebgpu.NewModule(), gpubatch.NewModule(gpubatch.Browser{ReplayURL: base + wgpu.ReplayJSName})},
-			webgpu.HostModules(webgpu.Browser{OnSurface: postSurface})...), wasi.WASIX),
+			webgpu.HostModules(webgpu.Browser{OnSurface: postSurface})...), wasi.WASIX, audio.New(&audio.Browser{Post: postAudio})),
 		// Compiled modules across reloads; the URLs are never fetched.
 		CodeCache: codeCache, CodeCacheURL: base + "module-cache/",
 		OnCompile: func(s browser.CompileStat) {

@@ -146,6 +146,29 @@ func (s *Session) SendKeys(ctx context.Context, keys []string) error {
 	return err
 }
 
+// PerformActions runs W3C Perform Actions with the given action sequences (one
+// input source each): the trusted way to give the page a user gesture, which
+// Execute is not (a script's click is untrusted and activates nothing; some
+// pages, an AudioContext among them, start only after a trusted one).
+func (s *Session) PerformActions(ctx context.Context, sources []any) error {
+	_, err := s.c.do(ctx, http.MethodPost, "/session/"+s.ID+"/actions", map[string]any{"actions": sources})
+	return err
+}
+
+// Click presses and releases the left button at (x, y), in CSS pixels from the
+// viewport's top-left corner: a pointer move, a press and a release (W3C
+// Perform Actions, one mouse pointer source). The events are trusted, so the
+// page gets user activation.
+func (s *Session) Click(ctx context.Context, x, y int) error {
+	return s.PerformActions(ctx, []any{map[string]any{
+		"type": "pointer", "id": "mouse", "parameters": map[string]string{"pointerType": "mouse"},
+		"actions": []any{
+			map[string]any{"type": "pointerMove", "duration": 0, "origin": "viewport", "x": x, "y": y},
+			map[string]any{"type": "pointerDown", "button": 0},
+			map[string]any{"type": "pointerUp", "button": 0},
+		}}})
+}
+
 // Delete ends the session.
 func (s *Session) Delete(ctx context.Context) error {
 	_, err := s.c.do(ctx, http.MethodDelete, "/session/"+s.ID, nil)

@@ -24,9 +24,14 @@ import (
 
 	"github.com/go-gfx/webgpu"
 	"github.com/go-wasmcontainers/engine/runtime/browser"
+	"github.com/wasmdesk/wasmbox/audioring"
 
 	"github.com/go-wasmcontainers/playground/internal/mirror"
 )
+
+// AudioWorkletName is the served name of the audio worklet (web/audio.js
+// loads it): audioring.WorkletJS, written into the site by Build.
+const AudioWorkletName = "audio-worklet.js"
 
 // Options of a build.
 type Options struct {
@@ -125,10 +130,14 @@ var Images = []struct {
 		Files: map[string]string{"usr/share/doc/mnist/NOTICE": MnistNotice}},
 	{Name: "compute", Description: "wasi:webgpu compute: a 1M-float vector add and a 256x256 matrix product on the GPU, checked against the CPU (run --gpu)"},
 	{Name: "triangle", Description: "wasi:webgpu and wasi-gfx:surface: a spinning triangle in a dashboard pane, 120 frames or the first argument (run --gpu)"},
+	{Name: "tone", Description: "a 440 Hz sine, 11025 Hz stereo, through wctr_audio_out (run --audio; click the page once to unlock sound); --hz N, --silent, --seconds N"},
 	{Name: "llm", Description: "generates text with SmolLM2-135M (Apache-2.0) on the page's WebGPU; the weights (92 MB) download once, are checked and kept in the browser: wctr run --rm --gpu --gpu-memory 512m --model smollm2-135m-instruct-q4_0 llm \"Once upon a time\"",
 		Pkg: "github.com/go-wasmcontainers/llm/examples/generate", Args: []string{"run"}},
-	{Name: "quake", Description: "Quake in a dashboard pane: go-quake1's engine, software renderer, e1m1 of LibreQuake (freepak " + FreepakTag + "), shown through wasi-gfx:surface; click the pane, WASD and arrows move, space jumps. GPL-3.0-or-later, source in /usr/share/doc/quake/copyright: wctr run --rm --gpu -m 512m quake",
+	{Name: "quake", Description: "Quake in a dashboard pane: go-quake1's engine, software renderer, e1m1 of LibreQuake (freepak " + FreepakTag + "), shown through wasi-gfx:surface; click the pane, WASD and arrows move, space jumps. GPL-3.0-or-later, source in /usr/share/doc/quake/copyright: wctr run --rm --gpu -m 512m quake. Sound is opt-in, like the GPU: add --audio (and click the page once; native wctr has no audio)",
 		Pkg: "github.com/go-quake1/engine/cmd/quake-wctr", Pinned: QuakeFiles,
+		// wctraudio: the guest imports wctr_audio_out (sound, only with
+		// run --audio; without it the game plays silent).
+		Tags:  []string{"wctraudio"},
 		Files: map[string]string{"usr/share/doc/quake/copyright": QuakeLicense}},
 	{Name: "fileshare", Description: "the go-fileshare server, WebDAV only: wctr run -d -p 8080:80 fileshare, open :8080, user alice, password playground",
 		Pkg: "github.com/go-fileshare/fileshare", Tags: FileshareTags,
@@ -340,6 +349,12 @@ func Build(ctx context.Context, o Options) (*Manifest, error) {
 	// served as a file because the page's CSP forbids the blob URL the library
 	// would otherwise make.
 	if err := os.WriteFile(filepath.Join(o.Out, webgpu.ReplayJSName), []byte(webgpu.ReplayJS), 0o644); err != nil {
+		return nil, err
+	}
+	// audio-worklet.js: the AudioWorklet that plays a container's sound ring
+	// (web/audio.js), wasmbox's audioring asset byte for byte -- one worklet
+	// for every page. A file, not a blob URL, because of the CSP.
+	if err := os.WriteFile(filepath.Join(o.Out, AudioWorkletName), audioring.WorkletJS, 0o644); err != nil {
 		return nil, err
 	}
 	// Static files.
