@@ -162,7 +162,7 @@ func quakeSteps(t *testing.T, b tab) {
 	// frame with GPU entities). E2E_GPU_ENTITIES=1 runs the check with them, which
 	// compares them too, requires some in view, and with the planted defect (the
 	// GPU's skins shifted by 16) must fail.
-	if os.Getenv("E2E_GPU_ENTITIES") == "1" {
+	if true { // DIAGNOSTIC (draft): always on, to read the device-loss reason in the lane's log
 		b.eval(`() => { window.__q.hashes = []; }`)
 		out = b.must("wctr run --rm --gpu -m 512m quake --map e1m1 --gpuworld --gpu-entities --gpuworld-check --frames 120", 0, "gpuworld check PASS")
 		me := regexp.MustCompile(`(\d+) alias entities drawn by the GPU over (\d+) frames`).FindStringSubmatch(out)
