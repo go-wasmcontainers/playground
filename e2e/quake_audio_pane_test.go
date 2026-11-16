@@ -99,6 +99,8 @@ func TestQuakeAudioPane(t *testing.T) {
 	})
 	_, _, _ = box, dpr, page
 	testStart := time.Now() // the game has been playing since about now
+	// What the user hears is the underruns: counted from here to the end.
+	sk := newSoak("chromium/pane", streamReading(t, page))
 
 	// alive fails the test, with the container's state and the end of its log,
 	// when the pane is gone: a game that ends cannot be measured.
@@ -139,6 +141,7 @@ func TestQuakeAudioPane(t *testing.T) {
 				}
 				a := v.([]any)
 				got = append(got, pair{num(a[0]), num(a[1])})
+				sk.note(streamReading(t, page))
 				time.Sleep(60 * time.Millisecond)
 			}
 		}
@@ -229,14 +232,19 @@ func TestQuakeAudioPane(t *testing.T) {
 	// the volume at the pane's level, and Quake's sound must be there in every 5 s
 	// window (requireSignal): the ambient sounds loop. The pane's volume is 30 %
 	// and the tap is before the gains, so the floor is the worklet's.
+	polls := 0
 	requireSignal(t, "pane", 65-int(time.Since(testStart).Seconds()), func() float64 {
 		alive()
-		v, err := page.Evaluate(`() => { const s = window.__wctrAudio.stats()[0]; return s ? s.rms : 0; }`)
-		if err != nil {
-			t.Fatal(err)
+		r := streamReading(t, page)
+		sk.note(r)
+		if polls++; polls%7 == 1 && len(d.state().Surfaces) == 1 {
+			if f, ok := paneFPS(d.state().Surfaces[0]); ok {
+				sk.noteFPS(f)
+			}
 		}
-		return num(v)
+		return r.Rms
 	})
+	sk.finish(t)
 	hb := func() float64 {
 		v, _ := page.Evaluate(`() => { const s = window.__wctrAudio.stats()[0]; return s ? s.heartbeat : -1; }`)
 		return num(v)

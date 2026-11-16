@@ -283,6 +283,7 @@ window.wctrAudio = (() => {
           stream: s.id, container: s.container, context: ctx ? ctx.state : "none", attached: !!s.node,
           sampleRate: s.rate, channels: s.ch, capacityFrames: s.cap,
           played: Atomics.load(s.hdr, 3) >>> 0, underruns: Atomics.load(s.hdr, 2) >>> 0,
+          written: Atomics.load(s.hdr, 0) >>> 0,
           heartbeat: Atomics.load(s.hdr, 6) >>> 0,
           buffered: (Atomics.load(s.hdr, 0) - Atomics.load(s.hdr, 1)) >>> 0,
         };

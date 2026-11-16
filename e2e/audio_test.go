@@ -50,6 +50,9 @@ type reading struct {
 	Underruns uint32  `json:"underruns"`
 	Heartbeat uint32  `json:"heartbeat"`
 	Buffered  uint32  `json:"buffered"`
+	Written   uint32  `json:"written"` // the ring's write position, in frames
+	Rate      float64 `json:"sampleRate"`
+	Rms       float64 `json:"rms"`
 	RmsDb     float64 `json:"rmsDb"`
 	PeakBin   int     `json:"peakBin"`
 	PeakHz    float64 `json:"peakHz"`

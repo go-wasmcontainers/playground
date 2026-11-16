@@ -242,7 +242,17 @@ jobs:
           E2E_GPU: "1"
           E2E_GPU_REAL: ${{ matrix.real }}
           E2E_GPU_ARGS: ${{ matrix.args }}
-        run: go test -tags e2e -count=1 -v -run '^(TestGPU(SurfaceInput)?|TestQuake(Soak|MenuMouse|Audio|AudioPane|SteadyState)?)$' -timeout 24m ./e2e/ > "$RUNNER_TEMP/gpu.log" 2>&1 && status=0 || status=$?; tail -60 "$RUNNER_TEMP/gpu.log"; exit "$status"
+          E2E_AUDIO_REPORT: ${{ runner.temp }}/audio.jsonl
+        run: go test -tags e2e -count=1 -v -run '^(TestGPU(SurfaceInput)?|TestQuake(Soak|MenuMouse|Audio|AudioPane|SteadyState)?)$' -timeout 24m ./e2e/ > "$RUNNER_TEMP/gpu.log" 2>&1 && status=0 || status=$?; tail -60 "$RUNNER_TEMP/gpu.log"; grep -n -e 'SOUND ' -e 'paced run' -e 'real-time ratio' "$RUNNER_TEMP/gpu.log" || true; exit "$status"
+      # The sound's numbers side by side (game fps, mixer rate, underruns, the
+      # ring's fill), one JSON line per soak.
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: audio-gpu-${{ matrix.os }}
+          path: |
+            ${{ runner.temp }}/audio.jsonl
+            ${{ runner.temp }}/gpu.log
 
   # The quake image in the real Firefox (e2e/firefox_test.go, go-wasmcontainers/
   # playground#56: exit 134 at the second frame, "Canvas not configured").
@@ -271,15 +281,18 @@ jobs:
           echo "GECKODRIVER=$drv" >> "$GITHUB_ENV"
           "$drv" --version
           /Applications/Firefox.app/Contents/MacOS/firefox --version
-      - name: go test -tags e2e -run 'TestQuakeFirefox|TestQuakeSoakFirefox'
+      - name: go test -tags e2e -run 'TestQuakeFirefox|TestQuakeSoakFirefox|TestQuakeAudioFirefox'
         env:
           E2E_BROWSERS: firefox
-        run: go test -tags e2e -count=1 -v -run '^(TestQuakeFirefox|TestQuakeSoakFirefox)$' -timeout 20m ./e2e/ > "$RUNNER_TEMP/firefox.log" 2>&1 && status=0 || status=$?; grep -n -m 30 -e '--- FAIL' -e 'exited' -e 'fatal error' -e 'panic:' -e 'firefox_test.go' "$RUNNER_TEMP/firefox.log" || true; tail -150 "$RUNNER_TEMP/firefox.log"; exit "$status"
+          E2E_AUDIO_REPORT: ${{ runner.temp }}/audio.jsonl
+        run: go test -tags e2e -count=1 -v -run '^(TestQuakeFirefox|TestQuakeSoakFirefox|TestQuakeAudioFirefox)$' -timeout 20m ./e2e/ > "$RUNNER_TEMP/firefox.log" 2>&1 && status=0 || status=$?; grep -n -m 30 -e '--- FAIL' -e 'exited' -e 'fatal error' -e 'panic:' -e 'firefox_test.go' "$RUNNER_TEMP/firefox.log" || true; tail -150 "$RUNNER_TEMP/firefox.log"; grep -n -e 'SOUND ' -e 'paced run' -e 'real-time ratio' "$RUNNER_TEMP/firefox.log" || true; exit "$status"
       - uses: actions/upload-artifact@v7
         if: always()
         with:
           name: firefox
-          path: ${{ runner.temp }}/firefox.log
+          path: |
+            ${{ runner.temp }}/firefox.log
+            ${{ runner.temp }}/audio.jsonl
 
   # Every pkgx wasip1/wasm bottle the signed catalogue lists, as an image:
   # --version / --help (or the probe in internal/mirror/testdata/smoke.json)

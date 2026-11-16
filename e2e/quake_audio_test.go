@@ -13,24 +13,38 @@ import (
 	"github.com/mxschmitt/playwright-go"
 )
 
-// The paced mixer's real-time ratio must lie in [pacedRatioMin, pacedRatioMax].
-// The ratio is mix frames offered per WALL second over 11025. A tic longer than
-// the mix-ahead (0.1 s) is not paid back (a stall is not a debt), so a loaded
-// runner offers less than real time: the measured CI spread is 0.746 (one red
-// run of playground #66), 0.884 (#63's lane), 1.01 (an idle machine). That is
-// the game falling behind the clock, not the mixer under-producing: the mixer
-// offers what the game's tics owe. 0.6 leaves room under the worst reading and
-// still fails a starved mixer (half rate). Whether the SOUND underran is a
-// different question, asserted on the page's stream, not here. The upper bound
-// catches the old defect: the fixed 512-frame chunk is 2.7 to 2.8 at 60 frames
-// a second, far above 1.1 (on a runner as slow as 15 frames a second the fixed
-// chunk itself reads 0.86 and only the log's predicted-ratio check sees it).
-const pacedRatioMin = 0.6
-
+// The paced mixer, judged by what it was asked to do. The raw real-time ratio
+// (mix frames offered per WALL second over 11025) falls below 1 on a slow
+// runner, because a tic longer than the mix-ahead (0.1 s) is not paid back (a
+// stall is not a debt, S_Update): a looser lower bound would only hide that, and
+// would not tell a slow game from a mixer that under-produces. The game's
+// summary therefore also prints the mix the stalled tics were owed and dropped
+// (go-quake1/engine#133): offered plus dropped is the whole of the game's time,
+// so "ratio with them" is 1.00 whatever the machine, and it is that which is
+// asserted. The upper bound is the old defect: the fixed 512-frame chunk reads
+// 2.7 to 2.8 at 60 frames a second, far above 1.1.
 func pacedRatioMax(seconds float64) float64 { return 1 + 0.06/seconds + 0.08 }
 
-func pacedRatioOK(ratio, seconds float64) bool {
-	return ratio >= pacedRatioMin && ratio <= pacedRatioMax(seconds)
+// pacedAccountedMin: what the paced mixer offers plus drops, over the game's
+// time. Under it the mixer under-produced; the 3 % are the run's first tic (it
+// has no dt) and the rounding.
+const pacedAccountedMin = 0.97
+
+func pacedRatioOK(ratio, withStalls, seconds float64) bool {
+	return withStalls >= pacedAccountedMin && withStalls <= pacedRatioMax(seconds) && ratio <= pacedRatioMax(seconds)
+}
+
+// stallsLine reads what the game says about its stalls after the ratio.
+func stallsLine(out string) (fps float64, dropped, stalls int, withStalls float64, ok bool) {
+	m := regexp.MustCompile(`real-time ratio [0-9.]+; ([0-9.]+) frames a second, (\d+) mix frames dropped in (\d+) stalled tics, ratio with them ([0-9.]+)`).FindStringSubmatch(out)
+	if m == nil {
+		return 0, 0, 0, 0, false
+	}
+	fps, _ = strconv.ParseFloat(m[1], 64)
+	dropped, _ = strconv.Atoi(m[2])
+	stalls, _ = strconv.Atoi(m[3])
+	withStalls, _ = strconv.ParseFloat(m[4], 64)
+	return fps, dropped, stalls, withStalls, true
 }
 
 // signalFloor is the worklet's RMS (linear, -60 dBFS) that a window of Quake's
@@ -66,16 +80,28 @@ func requireSignal(t *testing.T, what string, seconds int, rms func() float64) {
 }
 
 // A pacing regression to the fixed chunk (2.75 measured at 60 frames a second,
-// 2.2 at 48, 1.3 at 28) fails; the loaded runner (0.884) and the idle machine
-// (1.01) pass.
+// 2.2 at 48, 1.3 at 28, 0.86 at 15: it drops nothing, so it fails there too)
+// fails; the idle machine (1.01) and a slow runner whose stalls account for the
+// gap (0.746 with 0.25 dropped) pass; a mixer that under-produces (0.55 with
+// nothing dropped) fails.
 func TestPacedRatioBounds(t *testing.T) {
 	for _, c := range []struct {
-		ratio float64
-		ok    bool
-	}{{2.75, false}, {2.2, false}, {1.3, false}, {1.01, true}, {0.884, true}, {0.746, true}, {0.55, false}, {0, false}} {
-		if got := pacedRatioOK(c.ratio, 5); got != c.ok {
-			t.Errorf("ratio %.3f over 5 s: accepted=%v, want %v", c.ratio, got, c.ok)
+		name              string
+		ratio, withStalls float64
+		ok                bool
+	}{
+		{"fixed chunk, 60 fps", 2.75, 2.75, false}, {"fixed chunk, 48 fps", 2.2, 2.2, false},
+		{"fixed chunk, 28 fps", 1.3, 1.3, false}, {"fixed chunk, 15 fps", 0.861, 0.861, false},
+		{"idle machine", 1.01, 1.01, true}, {"slow runner, stalls dropped 0.25", 0.746, 0.996, true},
+		{"slow runner, stalls dropped 0.116", 0.884, 1.0, true},
+		{"under-producing mixer", 0.55, 0.55, false}, {"nothing", 0, 0, false},
+	} {
+		if got := pacedRatioOK(c.ratio, c.withStalls, 5); got != c.ok {
+			t.Errorf("%s: ratio %.3f (%.3f with the stalls): accepted=%v, want %v", c.name, c.ratio, c.withStalls, got, c.ok)
 		}
+	}
+	if _, _, _, w, ok := stallsLine("audio: playing, 1 mix frames offered, 1 accepted, in 4.91 s: real-time ratio 0.746; 15.0 frames a second, 13794 mix frames dropped in 7 stalled tics, ratio with them 0.996"); !ok || w != 0.996 {
+		t.Errorf("stallsLine did not read the engine's line: %v %v", w, ok)
 	}
 }
 
@@ -174,8 +200,14 @@ func TestQuakeAudio(t *testing.T) {
 	}
 	// Paced: the clock's worth, plus the lead it prefills (0.05 s of mix) over
 	// the run's length.
-	if !pacedRatioOK(after, s1) {
-		t.Errorf("paced real-time ratio %.3f, want between %.1f and %.3f", after, pacedRatioMin, pacedRatioMax(s1))
+	gameFPS, dropped, stalls, withStalls, ok := stallsLine(out)
+	if !ok {
+		t.Fatalf("the game's audio line has no stall accounting (go-quake1/engine#133):\n%s", out)
+	}
+	t.Logf("paced run: game %.1f fps, ratio %.3f, %d mix frames dropped in %d stalled tics, ratio with them %.3f", gameFPS, after, dropped, stalls, withStalls)
+	if !pacedRatioOK(after, withStalls, s1) {
+		t.Errorf("paced mixer: ratio %.3f, with the %d frames its %d stalled tics dropped %.3f, want %.2f to %.3f: it under-produced or over-produced, which a slow game does not explain",
+			after, dropped, stalls, withStalls, pacedAccountedMin, pacedRatioMax(s1))
 	}
 	if before > 1.3 && after >= before {
 		t.Errorf("pacing did not lower the ratio: %.3f against %.3f", after, before)
@@ -209,8 +241,13 @@ func TestQuakeAudio(t *testing.T) {
 	// audible at the start; the analyser tap sits after the worklet.
 	// ... and keeps reaching it for 60 s (past the 25 s at which the ambient
 	// sounds, not looped then, used to end).
+	sk := newSoak("chromium/quake", last)
+	sk.noteFPS(gameFPS)
 	requireSignal(t, "quake", 60, func() float64 {
-		return num(a.eval(`() => { const s = window.__wctrAudio.stats()[0]; return s ? s.rms : 0; }`))
+		r := a.streams()[0]
+		sk.note(r)
+		return r.Rms
 	})
+	sk.finish(t)
 	a.must("wctr rm -f qs", 0)
 }
