@@ -240,6 +240,43 @@ jobs:
           E2E_GPU_ARGS: ${{ matrix.args }}
         run: go test -tags e2e -count=1 -v -run '^(TestGPU(SurfaceInput)?|TestQuake(Soak|MenuMouse|Audio)?)$' -timeout 25m ./e2e/ > "$RUNNER_TEMP/gpu.log" 2>&1 && status=0 || status=$?; tail -60 "$RUNNER_TEMP/gpu.log"; exit "$status"
 
+  # The quake image in the real Firefox (e2e/firefox_test.go, go-wasmcontainers/
+  # playground#56: exit 134 at the second frame, "Canvas not configured").
+  # Playwright's Firefox does not start on every runner, so the lane drives the
+  # runner's own Firefox through geckodriver (W3C WebDriver, the client the
+  # Safari test uses). macOS has a GPU: Firefox runs headed (headless gets no
+  # adapter) and the test FAILS, never skips, without a hardware adapter.
+  # TestQuakeFirefox is TestQuake's checks; TestQuakeSoakFirefox keeps the
+  # container running for 45 s in the menu and in the game.
+  firefox:
+    name: Firefox (macOS, WebGPU)
+    runs-on: macos-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
+        with: { go-version: '1.27.4' }
+      - name: geckodriver and Firefox
+        run: |
+          set -eu
+          drv="${GECKOWEBDRIVER:-/nonexistent}/geckodriver"
+          if [ ! -x "$drv" ]; then
+            brew install geckodriver
+            drv="$(command -v geckodriver)"
+          fi
+          echo "GECKODRIVER=$drv" >> "$GITHUB_ENV"
+          "$drv" --version
+          /Applications/Firefox.app/Contents/MacOS/firefox --version
+      - name: go test -tags e2e -run 'TestQuakeFirefox|TestQuakeSoakFirefox'
+        env:
+          E2E_BROWSERS: firefox
+        run: go test -tags e2e -count=1 -v -run '^(TestQuakeFirefox|TestQuakeSoakFirefox)$' -timeout 20m ./e2e/ > "$RUNNER_TEMP/firefox.log" 2>&1 && status=0 || status=$?; grep -n -m 30 -e '--- FAIL' -e 'exited' -e 'fatal error' -e 'panic:' -e 'firefox_test.go' "$RUNNER_TEMP/firefox.log" || true; tail -150 "$RUNNER_TEMP/firefox.log"; exit "$status"
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: firefox
+          path: ${{ runner.temp }}/firefox.log
+
   # Every pkgx wasip1/wasm bottle the signed catalogue lists, as an image:
   # --version / --help (or the probe in internal/mirror/testdata/smoke.json)
   # under the engine's wazero and under wasmtime, compared byte for byte. A

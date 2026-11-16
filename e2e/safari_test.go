@@ -25,16 +25,17 @@ type pager interface {
 	Keyboard() playwright.Keyboard
 }
 
-// safariPage drives the real Safari through safaridriver (W3C WebDriver;
-// Playwright's WebKit is not Safari).
-type safariPage struct {
+// wdPage drives a real browser through its W3C WebDriver server: Safari
+// through safaridriver (Playwright's WebKit is not Safari), Firefox through
+// geckodriver (firefox_test.go).
+type wdPage struct {
 	s   *webdriver.Session
 	ctx context.Context
 }
 
 // Evaluate runs js, an arrow function's source as tab uses them, and waits
 // for a returned promise.
-func (p safariPage) Evaluate(js string, _ ...any) (any, error) {
+func (p wdPage) Evaluate(js string, _ ...any) (any, error) {
 	raw, err := p.s.ExecuteAsync(p.ctx, `const f = (`+js+`);
 const cb = arguments[arguments.length - 1];
 Promise.resolve().then(() => typeof f === "function" ? f() : f)
@@ -55,9 +56,9 @@ Promise.resolve().then(() => typeof f === "function" ? f() : f)
 	return r.OK, nil
 }
 
-func (p safariPage) Keyboard() playwright.Keyboard { return safariKeys{p} }
+func (p wdPage) Keyboard() playwright.Keyboard { return safariKeys{p} }
 
-type safariKeys struct{ p safariPage }
+type safariKeys struct{ p wdPage }
 
 var specialKeys = map[string]string{"Enter": "", "Backspace": "", "Tab": "", "Escape": "",
 	"ArrowLeft": "", "ArrowUp": "", "ArrowRight": "", "ArrowDown": ""}
@@ -120,7 +121,7 @@ func TestModelDownloadSafari(t *testing.T) {
 	sum := sha256.Sum256(st.data)
 	spec := fmt.Sprintf("stubm,%d,%s,/stub/model.bin", len(st.data), hex.EncodeToString(sum[:]))
 	base := serveWithStub(t, st)
-	page := safariPage{s, ctx}
+	page := wdPage{s, ctx}
 	b := tab{t, page, "safari " + s.Version}
 
 	// The adapter first: no adapter, or a software one, fails the lane.

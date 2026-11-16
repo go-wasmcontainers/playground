@@ -178,13 +178,22 @@ func (s *Session) Delete(ctx context.Context) error {
 // Start runs driver (for example /usr/bin/safaridriver) on a free port and
 // waits for GET /status to answer. stop kills the driver by PID.
 func Start(ctx context.Context, driver string) (c *Client, stop func(), err error) {
+	return StartWith(ctx, driver, nil)
+}
+
+// StartWith is Start with the driver's standard output and error copied to
+// out (nil: discarded) and extra command-line arguments after -p. geckodriver
+// passes Firefox's own output through, which is where the page's console
+// lines go when the devtools.console.stdout.content preference is set.
+func StartWith(ctx context.Context, driver string, out io.Writer, extra ...string) (c *Client, stop func(), err error) {
 	ln, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {
 		return nil, nil, err
 	}
 	port := ln.Addr().(*net.TCPAddr).Port
 	ln.Close()
-	cmd := exec.Command(driver, "-p", fmt.Sprint(port))
+	cmd := exec.Command(driver, append([]string{"-p", fmt.Sprint(port)}, extra...)...)
+	cmd.Stdout, cmd.Stderr = out, out
 	if err := cmd.Start(); err != nil {
 		return nil, nil, err
 	}

@@ -75,6 +75,13 @@ func TestQuake(t *testing.T) {
 		t.Skipf("no real GPU adapter (%s): the engine refuses software adapters, so there is no frame to check", info)
 	}
 
+	quakeSteps(t, b)
+}
+
+// quakeSteps is TestQuake's checks on a page whose adapter is a real GPU, for
+// any browser (TestQuake: Chromium; TestQuakeFirefox: Firefox).
+func quakeSteps(t *testing.T, b tab) {
+	t.Helper()
 	// Every frame the page receives: its size and a hash of its RGBA, and
 	// the last one's pixels, read back through a 2D canvas.
 	b.eval(`() => {
