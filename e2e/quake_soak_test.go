@@ -29,7 +29,7 @@ func TestQuakeSoak(t *testing.T) {
 	if os.Getenv("E2E_GPU") != "1" || os.Getenv("E2E_URL") != "" {
 		t.Skip("set E2E_GPU=1 on a lane with WebGPU")
 	}
-	secs := 45
+	secs := 60
 	if s := os.Getenv("E2E_SOAK_SECONDS"); s != "" {
 		n, err := strconv.Atoi(s)
 		if err != nil || n < 1 {
@@ -37,12 +37,31 @@ func TestQuakeSoak(t *testing.T) {
 		}
 		secs = n
 	}
-	for _, mode := range []struct{ name, flag string }{{"cpu-world", ""}, {"gpuworld", " --gpuworld"}} {
-		t.Run(mode.name, func(t *testing.T) { soak(t, mode.flag, time.Duration(secs)*time.Second) })
+	// The image as users run it: the main menu left alone (no --map, no input: a
+	// click or Enter would start a game), with and without --audio; and the game.
+	// The menu died after 20 to 30 s with "out of memory" until quake-wctr yielded
+	// each frame (go-wasmcontainers/playground#56), so the shortest run here
+	// is far past that.
+	for _, mode := range []struct {
+		name, args string
+		idle       bool
+	}{
+		{"menu", "", true},
+		{"menu-audio", "", true}, // wctr run --audio
+		{"cpu-world", " --map e1m1", false},
+		{"gpuworld", " --map e1m1 --gpuworld", false},
+	} {
+		t.Run(mode.name, func(t *testing.T) {
+			runFlags := ""
+			if strings.Contains(mode.name, "audio") {
+				runFlags = " --audio"
+			}
+			soak(t, runFlags, mode.args, mode.idle, time.Duration(secs)*time.Second)
+		})
 	}
 }
 
-func soak(t *testing.T, flag string, play time.Duration) {
+func soak(t *testing.T, runFlags, flag string, idle bool, play time.Duration) {
 	pw, err := playwright.Run()
 	if err != nil {
 		t.Fatal(err)
@@ -83,8 +102,7 @@ func soak(t *testing.T, flag string, play time.Duration) {
 		t.Skipf("a software adapter (%s): the engine refuses it", adapter)
 	}
 
-	// --map e1m1: play, not the menu the image opens on by default.
-	d.run("wctr run -d --gpu -m 512m --name q quake --map e1m1" + flag)
+	d.run("wctr run -d --gpu" + runFlags + " -m 512m --name q quake" + flag)
 	d.until("quake running", 120*time.Second, func(p ui.Probe) bool {
 		return len(p.Containers) == 1 && strings.Contains(p.Status[1], "1 running")
 	})
@@ -100,18 +118,22 @@ func soak(t *testing.T, flag string, play time.Duration) {
 		}
 	}
 	cx, cy := float64(box.X+box.W/2)/dpr, float64(box.Y+box.H/2)/dpr
-	if err := page.Mouse().Click(cx, cy); err != nil {
-		t.Fatal(err)
+	if !idle { // the first click locks the pointer; in the menu it would act as Enter
+		if err := page.Mouse().Click(cx, cy); err != nil {
+			t.Fatal(err)
+		}
 	}
 	keys := []string{"KeyA", "KeyS", "KeyD", "KeyQ", "KeyE", "Digit1", "Digit2", "Digit3", "Digit4", "Digit5", "Digit6", "Digit7", "Digit8",
 		"ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown", "ControlLeft", "ShiftLeft", "Tab", "Enter", "Backquote"}
 	t0 := time.Now()
 	for n := 0; time.Since(t0) < play; n++ {
-		_ = page.Keyboard().Down("KeyW")
-		_ = page.Keyboard().Press("Space")
-		_ = page.Keyboard().Press(keys[(n*7+3)%len(keys)])
-		_ = page.Mouse().Move(cx+float64((n*37)%400)-200, cy+float64((n*53)%300)-150)
-		_ = page.Mouse().Click(cx, cy)
+		if !idle {
+			_ = page.Keyboard().Down("KeyW")
+			_ = page.Keyboard().Press("Space")
+			_ = page.Keyboard().Press(keys[(n*7+3)%len(keys)])
+			_ = page.Mouse().Move(cx+float64((n*37)%400)-200, cy+float64((n*53)%300)-150)
+			_ = page.Mouse().Click(cx, cy)
+		}
 		time.Sleep(200 * time.Millisecond)
 		if s := d.state(); !strings.Contains(s.Status[1], "1 running") {
 			d.press("F6", "ArrowUp", "ArrowUp", "ArrowUp", "ArrowUp", "ArrowUp") // Surfaces -> Containers

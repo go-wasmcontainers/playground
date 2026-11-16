@@ -4,12 +4,15 @@ package e2e
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strconv"
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/mxschmitt/playwright-go"
 
 	"github.com/go-wasmcontainers/playground/internal/webdriver"
 )
@@ -69,12 +72,55 @@ func firefoxSession(t *testing.T) (wdPage, string, func()) {
 	return wdPage{s, ctx}, logPath, func() { s.Delete(ctx); stopDriver(); lf.Close() }
 }
 
+// ffPage is wdPage with a keyboard that checks what it typed. Typing through
+// geckodriver sometimes lands an extra character in the terminal ("-mo 512m",
+// "-pm 512m" in 3 of about 60 runs: the line then fails as an invalid flag, exit
+// 125), so Type reads the line back and types it again when it is not the text.
+type ffPage struct{ wdPage }
+
+func (p ffPage) Keyboard() playwright.Keyboard { return ffKeys{p, safariKeys{p.wdPage}} }
+
+type ffKeys struct {
+	p ffPage
+	safariKeys
+}
+
+func (k ffKeys) Type(text string, o ...playwright.KeyboardTypeOptions) error {
+	for attempt := 0; ; attempt++ {
+		if err := k.safariKeys.Type(text, o...); err != nil {
+			return err
+		}
+		// The engine echoes what is typed asynchronously: give the line a moment
+		// to catch up before judging it.
+		var v any
+		var err error
+		for i := 0; i < 50; i++ {
+			v, err = k.p.Evaluate(`() => window.__playground.text().split("\n").pop()`)
+			if line, _ := v.(string); err == nil && strings.HasSuffix(line, strings.TrimRight(text, " ")) {
+				return nil
+			}
+			time.Sleep(20 * time.Millisecond)
+		}
+		if attempt == 3 {
+			return fmt.Errorf("the terminal line is not %q after %d tries: %v", text, attempt+1, v)
+		}
+		// Rub the line out (more Backspaces than it holds) and type it again.
+		backspaces := make([]string, len(text)+12)
+		for i := range backspaces {
+			backspaces[i] = "" // WebDriver's Backspace
+		}
+		if err := k.p.s.SendKeys(k.p.ctx, backspaces); err != nil {
+			return err
+		}
+	}
+}
+
 // firefoxTab opens the playground's terminal page in Firefox, waits for the
 // engine, and checks the adapter is a hardware one.
 func firefoxTab(t *testing.T) (tab, string, func()) {
 	t.Helper()
 	page, logPath, stop := firefoxSession(t)
-	b := tab{t, page, "firefox"}
+	b := tab{t, ffPage{page}, "firefox"}
 	if err := page.s.Navigate(page.ctx, serve(t, true)+"?ui=terminal"); err != nil {
 		stop()
 		t.Fatal(err)
@@ -95,6 +141,19 @@ func firefoxTab(t *testing.T) (tab, string, func()) {
 		t.Fatalf("Firefox has no hardware WebGPU adapter: %v", v)
 	}
 	return b, logPath, stop
+}
+
+// deathLog is what a container that stopped said: the lines before and from
+// the first sign of its death (a Go fatal error or panic, or the engine's trap
+// line), not the tail, which is a dump of idle goroutines.
+func deathLog(logs string) string {
+	for _, sign := range []string{"fatal error:", "panic:", "wctr: the module trapped"} {
+		if i := strings.Index(logs, sign); i >= 0 {
+			from := max(0, i-1500)
+			return "log around " + strconv.Quote(sign) + ":\n" + logs[from:min(len(logs), i+2500)]
+		}
+	}
+	return "log tail:\n" + logs[len(logs)-min(len(logs), 3000):]
 }
 
 // fileTail is the last n bytes of the file.
@@ -128,11 +187,13 @@ func TestQuakeFirefox(t *testing.T) {
 
 // TestQuakeSoakFirefox starts the quake image the way the reporter of #56 did,
 // detached so the test can watch it, and checks it is still running after
-// E2E_SOAK_SECONDS (default 45) in each of two modes: the main menu the image
-// opens on, and the game with the world on the GPU. A container that stops
-// fails the test with its logs, which now name a trap's cause.
+// E2E_SOAK_SECONDS (default 60) in each of four modes: the main menu the image
+// opens on, left alone, with and without --audio (it died at 20 to 30 s with "out
+// of memory" until quake-wctr yielded each frame: the collector never ran), and
+// the game, with the world on the CPU and on the GPU. A container that stops
+// fails the test with the lines around its death.
 func TestQuakeSoakFirefox(t *testing.T) {
-	secs := 45
+	secs := 60
 	if s := os.Getenv("E2E_SOAK_SECONDS"); s != "" {
 		n, err := strconv.Atoi(s)
 		if err != nil || n < 1 {
@@ -147,19 +208,26 @@ func TestQuakeSoakFirefox(t *testing.T) {
 			t.Logf("firefox output tail:\n%s", fileTail(logPath, 6000))
 		}
 	}()
-	for _, mode := range []struct{ name, args string }{
+	for _, mode := range []struct{ name, args string }{ // "audio" in name: wctr run --audio
 		{"menu", ""},
+		{"menu-audio", ""},
+		{"game", " --map e1m1"},
 		{"gpuworld", " --map e1m1 --gpuworld"},
 	} {
 		t.Run(mode.name, func(t *testing.T) {
 			b := tab{t, b.page, b.who}
-			b.must("wctr run -d --gpu -m 512m --name q quake"+mode.args, 0)
+			b.run("wctr rm -f q") // a container a failed mode left behind
+			runFlags := ""
+			if strings.Contains(mode.name, "audio") {
+				runFlags = " --audio"
+			}
+			b.must("wctr run -d --gpu"+runFlags+" -m 512m --name q quake"+mode.args, 0)
 			t0 := time.Now()
 			for time.Since(t0) < time.Duration(secs)*time.Second {
 				time.Sleep(time.Second)
 				if _, ps := b.run("wctr ps"); !strings.Contains(ps, "Up") {
 					_, logs := b.run("wctr logs q")
-					t.Fatalf("quake%s stopped after %.1f s: %s\nlogs tail:\n%s", mode.args, time.Since(t0).Seconds(), ps, logs[len(logs)-min(len(logs), 3000):])
+					t.Fatalf("quake%s stopped after %.1f s: %s\n%s", mode.args, time.Since(t0).Seconds(), ps, deathLog(logs))
 				}
 			}
 			t.Logf("quake%s: still running after %.0f s", mode.args, time.Since(t0).Seconds())
