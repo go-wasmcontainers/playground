@@ -146,7 +146,7 @@ func quakeSteps(t *testing.T, b tab) {
 	// one-pixel shift does not explain, at most 2.5 % of a frame). The
 	// software default above is unchanged.
 	b.eval(`() => { window.__q.hashes = []; }`)
-	out = b.must("wctr run --rm --gpu -m 512m quake --map e1m1 --gpuworld --gpuworld-check --frames 30", 0, "gpuworld check PASS")
+	out = b.must("wctr run --rm --gpu -m 512m quake --map e1m1 --gpuworld --gpuworld-check --frames 120", 0, "gpuworld check PASS")
 	m = regexp.MustCompile(`gpuworld check: (\d+) frames, (\d+) of (\d+) pixels differ, (\d+) unexplained, worst frame ([0-9.]+)`).FindStringSubmatch(out)
 	if m == nil {
 		t.Fatalf("no gpuworld check line in:\n%s", out)
@@ -156,6 +156,28 @@ func quakeSteps(t *testing.T, b tab) {
 		t.Errorf("only %s frames were compared, want at least 25 of 30", m[1])
 	}
 	b.until("no GPU-world frame reached the page", `() => window.__q.hashes.length >= 25`, 30e9)
+
+	// 1d. The alias entities on the GPU (--gpu-entities, engine v0.24.0, off by
+	// default since v0.27.0: on the macOS CI lane the device was lost at the first
+	// frame with GPU entities). E2E_GPU_ENTITIES=1 runs the check with them, which
+	// compares them too, requires some in view, and with the planted defect (the
+	// GPU's skins shifted by 16) must fail.
+	if os.Getenv("E2E_GPU_ENTITIES") == "1" {
+		b.eval(`() => { window.__q.hashes = []; }`)
+		out = b.must("wctr run --rm --gpu -m 512m quake --map e1m1 --gpuworld --gpu-entities --gpuworld-check --frames 120", 0, "gpuworld check PASS")
+		me := regexp.MustCompile(`(\d+) alias entities drawn by the GPU over (\d+) frames`).FindStringSubmatch(out)
+		if me == nil {
+			t.Fatalf("no entity line in the check's output:\n%s", out)
+		}
+		t.Logf("game loop on the GPU: %s alias entities drawn by the GPU over %s frames", me[1], me[2])
+		if n, _ := strconv.Atoi(me[1]); n == 0 {
+			t.Errorf("no alias entity was in view: the check proves nothing about them")
+		}
+		ent := regexp.MustCompile(`gpuworld check: entities: [^\n]*`)
+		t.Logf("%s", ent.FindString(out))
+		out = b.must("wctr run --rm --gpu -m 512m quake --map e1m1 --gpuworld --gpu-entities --gpuworld-check --corrupt-gpu-skins --frames 120", 1, "above the tolerance")
+		t.Logf("planted defect (GPU skins shifted by 16): %s", ent.FindString(out))
+	}
 
 	// 2. Play: 150 frames, no --worldref. They keep changing. --map e1m1 skips
 	// the menu the image opens on by default (the menu is TestQuakeMenuMouse's).
