@@ -33,11 +33,11 @@ func TestQuakeAudioFirefox(t *testing.T) {
 		}
 	}()
 	// A trusted click, so the AudioContext starts as soon as a stream opens.
-	wd, ok := b.page.(wdPage)
+	ff, ok := b.page.(ffPage)
 	if !ok {
 		t.Fatalf("the Firefox tab is a %T", b.page)
 	}
-	if err := wd.s.Click(wd.ctx, 400, 300); err != nil {
+	if err := ff.s.Click(ff.ctx, 400, 300); err != nil {
 		t.Fatal(err)
 	}
 

@@ -34,8 +34,11 @@ func pacedRatioOK(ratio, withStalls, seconds float64) bool {
 	return withStalls >= pacedAccountedMin && withStalls <= pacedRatioMax(seconds) && ratio <= pacedRatioMax(seconds)
 }
 
-// stallsLine reads what the game says about its stalls after the ratio.
+// stallsLine reads what the game says about its stalls after the ratio. The
+// terminal wraps a long line (at about 120 columns, in the middle of it): the
+// breaks are taken out first.
 func stallsLine(out string) (fps float64, dropped, stalls int, withStalls float64, ok bool) {
+	out = strings.NewReplacer("\r", "", "\n", "").Replace(out)
 	m := regexp.MustCompile(`real-time ratio [0-9.]+; ([0-9.]+) frames a second, (\d+) mix frames dropped in (\d+) stalled tics, ratio with them ([0-9.]+)`).FindStringSubmatch(out)
 	if m == nil {
 		return 0, 0, 0, 0, false
@@ -100,7 +103,8 @@ func TestPacedRatioBounds(t *testing.T) {
 			t.Errorf("%s: ratio %.3f (%.3f with the stalls): accepted=%v, want %v", c.name, c.ratio, c.withStalls, got, c.ok)
 		}
 	}
-	if _, _, _, w, ok := stallsLine("audio: playing, 1 mix frames offered, 1 accepted, in 4.91 s: real-time ratio 0.746; 15.0 frames a second, 13794 mix frames dropped in 7 stalled tics, ratio with them 0.996"); !ok || w != 0.996 {
+	// The wrapped line, as the terminal printed it on CI (a break after "in 7 ").
+	if _, _, _, w, ok := stallsLine("audio: playing, 1 mix frames offered, 1 accepted, in 4.91 s: real-time ratio 0.746; 15.0 frames a second, 13794 mix frames dropped in 7 \nstalled tics, ratio with them 0.996\n"); !ok || w != 0.996 {
 		t.Errorf("stallsLine did not read the engine's line: %v %v", w, ok)
 	}
 }
@@ -164,6 +168,7 @@ func TestQuakeAudio(t *testing.T) {
 
 	ratio := func(out string) (float64, int, float64) {
 		t.Helper()
+		out = strings.NewReplacer("\r", "", "\n", "").Replace(out) // the terminal wraps long lines
 		m := regexp.MustCompile(`audio: (playing|silent), (\d+) mix frames offered, (\d+) accepted, in ([0-9.]+) s: real-time ratio ([0-9.]+)`).FindStringSubmatch(out)
 		if m == nil {
 			t.Fatalf("no audio line in:\n%s", out)
