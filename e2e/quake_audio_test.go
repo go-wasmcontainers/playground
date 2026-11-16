@@ -13,6 +13,32 @@ import (
 	"github.com/mxschmitt/playwright-go"
 )
 
+// The paced mixer's real-time ratio must lie in [0.8, pacedRatioMax]. Why 0.8:
+// a tic longer than the mix-ahead (0.1 s) is not paid back (a stall is not a
+// debt), so a loaded runner mixes a little under real time: CI's macOS lane
+// runs the game at about 15 frames a second and measured 0.884, an idle machine
+// measures 1.01. The upper bound is what catches the old defect: the fixed
+// 512-frame chunk is 2.7 to 2.8 at 60 frames a second, far above 1.1.
+func pacedRatioMax(seconds float64) float64 { return 1 + 0.06/seconds + 0.08 }
+
+func pacedRatioOK(ratio, seconds float64) bool {
+	return ratio >= 0.8 && ratio <= pacedRatioMax(seconds)
+}
+
+// A pacing regression to the fixed chunk (2.75 measured at 60 frames a second,
+// 2.2 at 48, 1.3 at 28) fails; the loaded runner (0.884) and the idle machine
+// (1.01) pass.
+func TestPacedRatioBounds(t *testing.T) {
+	for _, c := range []struct {
+		ratio float64
+		ok    bool
+	}{{2.75, false}, {2.2, false}, {1.3, false}, {1.01, true}, {0.884, true}, {0.79, false}, {0, false}} {
+		if got := pacedRatioOK(c.ratio, 5); got != c.ok {
+			t.Errorf("ratio %.3f over 5 s: accepted=%v, want %v", c.ratio, got, c.ok)
+		}
+	}
+}
+
 // TestQuakeAudio plays Quake with sound (go-quake1/engine#107): the quake image
 // run with --audio writes its mix through wctr_audio_out, the page plays it, and
 //
@@ -97,12 +123,8 @@ func TestQuakeAudio(t *testing.T) {
 	}
 	// Paced: the clock's worth, plus the lead it prefills (0.05 s of mix) over
 	// the run's length.
-	// The lower bound is looser than the upper: a tic longer than the mix-ahead
-	// (0.1 s) is not paid back (a stall is not a debt), so a loaded runner,
-	// which CI's macOS lane is (about 15 frames a second: 0.884 measured), mixes
-	// a little under real time while an idle machine measures 1.01.
-	if max := 1 + 0.06/s1 + 0.08; after > max || after < 0.8 {
-		t.Errorf("paced real-time ratio %.3f, want between 0.8 and %.3f", after, max)
+	if !pacedRatioOK(after, s1) {
+		t.Errorf("paced real-time ratio %.3f, want between 0.8 and %.3f", after, pacedRatioMax(s1))
 	}
 	if before > 1.3 && after >= before {
 		t.Errorf("pacing did not lower the ratio: %.3f against %.3f", after, before)
