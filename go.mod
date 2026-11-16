@@ -7,9 +7,9 @@ require (
 	github.com/go-pkgx/bottle v0.62.1
 	github.com/go-wasmcontainers/build v0.4.0
 	github.com/go-wasmcontainers/compose v0.6.0
-	github.com/go-wasmcontainers/dashboard v0.10.0
+	github.com/go-wasmcontainers/dashboard v0.11.0
 	github.com/go-wasmcontainers/engine v0.39.0
-	github.com/go-wasmcontainers/gpu v0.13.1
+	github.com/go-wasmcontainers/gpu v0.14.0
 	github.com/go-wasmcontainers/relay v0.3.1
 	github.com/go-widgets/mvvm v0.15.0
 	github.com/go-widgets/toolkit v0.362.0
@@ -103,7 +103,7 @@ require (
 	github.com/go-opentype/fonts v0.14.0 // indirect
 	github.com/go-opentype/opentype v0.16.2-0.20261027113239-5e69589e9a5e // indirect
 	github.com/go-opentype/shape v0.7.0 // indirect
-	github.com/go-quake1/engine v0.16.0 // indirect
+	github.com/go-quake1/engine v0.19.1 // indirect
 	github.com/go-richdoc/richdoc v0.7.0 // indirect
 	github.com/go-sql-driver/mysql v1.10.1 // indirect
 	github.com/go-stack/stack v1.8.1 // indirect
@@ -167,6 +167,7 @@ require (
 	github.com/tetratelabs/wazero v1.12.0 // indirect
 	github.com/ulikunitz/xz v0.5.17 // indirect
 	github.com/valyala/fastjson v1.6.10 // indirect
+	github.com/wasmdesk/wasmbox/audioring v0.1.0 // indirect
 	github.com/yeqown/go-qrcode/v2 v2.2.5 // indirect
 	github.com/yeqown/reedsolomon v1.0.0 // indirect
 	github.com/zclconf/go-cty v1.19.0 // indirect

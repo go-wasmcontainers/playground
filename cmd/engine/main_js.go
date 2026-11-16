@@ -74,6 +74,9 @@ func postSurface(e webgpu.SurfaceEvent) {
 		post(map[string]any{"t": "surface", "op": "resize", "surface": e.Surface, "width": e.Width, "height": e.Height})
 	case "close":
 		post(map[string]any{"t": "surface", "op": "close", "surface": e.Surface})
+	case "capture":
+		// The guest wants (or no longer wants) the pointer locked to its pane.
+		post(map[string]any{"t": "surface", "op": "capture", "surface": e.Surface, "capture": e.Capture})
 	}
 }
 
@@ -91,11 +94,11 @@ func frameAck(data js.Value) (uint32, uint64, bool) {
 	return uint32(sf), uint64(qf), true
 }
 
-// surfaceInput hands a dashboard pane's pointer or key event to the GPU
-// surface's guest. The fields are read bounded (str); a surface that is not
-// a u32, or anything webgpu.SurfaceInput does not accept (an unknown kind,
-// a coordinate that is not finite or too large, text over 64 bytes), is
-// dropped there.
+// surfaceInput hands a dashboard pane's pointer, mouse-button, relative
+// motion or key event to the GPU surface's guest. The fields are read bounded
+// (str); a surface that is not a u32, or anything webgpu.SurfaceInput does not
+// accept (an unknown kind, a coordinate or motion that is not finite or too
+// large, a button out of range, text over 64 bytes), is dropped there.
 func surfaceInput(data js.Value) {
 	sf := data.Get("surface").Float()
 	if sf < 0 || sf > 1<<32-1 || sf != float64(uint32(sf)) {
@@ -108,7 +111,8 @@ func surfaceInput(data js.Value) {
 		return 0
 	}
 	webgpu.SurfaceInput(uint32(sf), webgpu.InputEvent{
-		Kind: str(data, "kind"), X: num("x"), Y: num("y"), Code: str(data, "code"), Text: str(data, "text"),
+		Kind: str(data, "kind"), X: num("x"), Y: num("y"), DX: num("dx"), DY: num("dy"), Button: int(num("button")),
+		Code: str(data, "code"), Text: str(data, "text"),
 		Alt: data.Get("alt").Truthy(), Ctrl: data.Get("ctrl").Truthy(), Meta: data.Get("meta").Truthy(), Shift: data.Get("shift").Truthy(),
 	})
 }
