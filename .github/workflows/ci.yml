@@ -270,7 +270,12 @@ jobs:
       - name: go test -tags e2e -run 'TestQuakeFirefox|TestQuakeSoakFirefox'
         env:
           E2E_BROWSERS: firefox
-        run: go test -tags e2e -count=1 -v -run '^(TestQuakeFirefox|TestQuakeSoakFirefox)$' -timeout 20m ./e2e/ > "$RUNNER_TEMP/firefox.log" 2>&1 && status=0 || status=$?; tail -80 "$RUNNER_TEMP/firefox.log"; exit "$status"
+        run: go test -tags e2e -count=1 -v -run '^(TestQuakeFirefox|TestQuakeSoakFirefox)$' -timeout 20m ./e2e/ > "$RUNNER_TEMP/firefox.log" 2>&1 && status=0 || status=$?; grep -n -m 30 -e '--- FAIL' -e 'exited' -e 'fatal error' -e 'panic:' -e 'firefox_test.go' "$RUNNER_TEMP/firefox.log" || true; tail -150 "$RUNNER_TEMP/firefox.log"; exit "$status"
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: firefox
+          path: ${{ runner.temp }}/firefox.log
 
   # Every pkgx wasip1/wasm bottle the signed catalogue lists, as an image:
   # --version / --help (or the probe in internal/mirror/testdata/smoke.json)
