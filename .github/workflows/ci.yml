@@ -232,13 +232,15 @@ jobs:
       # the view with the mouse: the scene must move the way the mouse says.
       # TestQuakeAudio runs quake with --audio: the mixer's real-time ratio fixed
       # against paced, and the stream playing after a click.
-      - name: go test -tags e2e -run 'TestGPU|TestGPUSurfaceInput|TestQuake|TestQuakeSoak|TestQuakeMenuMouse|TestQuakeAudio'
+      # TestQuakeSteadyState: 60 s of the menu with --memstats; each window of 600
+      # frames at 57 to 63 fps, at most 64 KiB allocated per frame.
+      - name: go test -tags e2e -run 'TestGPU|TestGPUSurfaceInput|TestQuake|TestQuakeSoak|TestQuakeMenuMouse|TestQuakeAudio|TestQuakeSteadyState'
         shell: bash
         env:
           E2E_GPU: "1"
           E2E_GPU_REAL: ${{ matrix.real }}
           E2E_GPU_ARGS: ${{ matrix.args }}
-        run: go test -tags e2e -count=1 -v -run '^(TestGPU(SurfaceInput)?|TestQuake(Soak|MenuMouse|Audio)?)$' -timeout 25m ./e2e/ > "$RUNNER_TEMP/gpu.log" 2>&1 && status=0 || status=$?; tail -60 "$RUNNER_TEMP/gpu.log"; exit "$status"
+        run: go test -tags e2e -count=1 -v -run '^(TestGPU(SurfaceInput)?|TestQuake(Soak|MenuMouse|Audio|SteadyState)?)$' -timeout 22m ./e2e/ > "$RUNNER_TEMP/gpu.log" 2>&1 && status=0 || status=$?; tail -60 "$RUNNER_TEMP/gpu.log"; exit "$status"
 
   # The quake image in the real Firefox (e2e/firefox_test.go, go-wasmcontainers/
   # playground#56: exit 134 at the second frame, "Canvas not configured").
