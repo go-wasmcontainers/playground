@@ -67,3 +67,17 @@ func TestShiftErrors(t *testing.T) {
 		}
 	}
 }
+
+func TestMeanAbsDiff(t *testing.T) {
+	if d, err := MeanAbsDiff([]byte{0, 10, 20}, []byte{0, 10, 20}); err != nil || d != 0 {
+		t.Errorf("same: %v, %v", d, err)
+	}
+	if d, err := MeanAbsDiff([]byte{0, 10, 20}, []byte{3, 10, 17}); err != nil || d != 2 {
+		t.Errorf("(3+0+3)/3: %v, %v", d, err)
+	}
+	for _, c := range [][2][]byte{{nil, nil}, {{1}, {1, 2}}} {
+		if _, err := MeanAbsDiff(c[0], c[1]); err == nil {
+			t.Errorf("accepted %v", c)
+		}
+	}
+}
