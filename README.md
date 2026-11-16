@@ -201,13 +201,14 @@ picture 0 of the MNIST test set by Y. LeCun, C. Cortes and C. J. C. Burges
   draws it and says so on stderr; `quake --cpuworld` forces the CPU, and
   `--gpuworld` fails instead of falling back. Since v0.22.0 the server's light
   styles reach the world, the explosions' and the entities' dynamic lights
-  are drawn, and the dynamic-light uploads are coalesced. With
-  `--gpu-entities` (engine v0.24.0; off by default since v0.27.0) the alias
-  entities (monsters, items) are drawn on the GPU too, in a layer composited
-  after the CPU's sky and water: on the macOS CI lane the device was lost at
-  the first frame with GPU entities (cause not found), so the CPU draws them by
-  default. `E2E_GPU_ENTITIES=1` makes `TestQuake` run that check, with a planted
-  skin defect that must fail; `TestQuakeFrameTime` (`E2E_QUAKE_BENCH=1`) prints
+  are drawn, and the dynamic-light uploads are coalesced. The
+  alias entities (monsters, items) are drawn on the GPU too (engine v0.29.0
+  on by default; `--gpu-entities=false` for the CPU), in a layer composited
+  after the CPU's sky and water: on the macOS CI lane the device had been lost
+  at the first frame with them, because a handle only a local variable held was
+  collected and its id reused while the host still held it (fixed in v0.29.0).
+  `TestQuake` and `TestQuakeFirefox` run the entity check, with a planted
+  skin defect that must fail, and both compare at least 25 of 30 frames; `TestQuakeFrameTime` (`E2E_QUAKE_BENCH=1`) prints
   the frame phases for abbench. The page serves `webgpu-replay.js` for the
   stream because its CSP forbids the blob URL. Frame time of a level-1 frame in Chromium on an Apple M4 Max:
   **deferred, load 17.7 to 31.7** (1-minute load average; the rule is a load

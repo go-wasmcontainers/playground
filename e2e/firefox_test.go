@@ -182,7 +182,7 @@ func TestQuakeFirefox(t *testing.T) {
 			t.Logf("firefox output tail:\n%s", fileTail(logPath, 6000))
 		}
 	}()
-	quakeSteps(t, b, 5)
+	quakeSteps(t, b, 25)
 }
 
 // TestQuakeSoakFirefox starts the quake image the way the reporter of #56 did,
