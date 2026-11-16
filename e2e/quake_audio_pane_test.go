@@ -226,13 +226,17 @@ func TestQuakeAudioPane(t *testing.T) {
 	// heap grew until the 512 MiB limit, fixed in go-quake1/engine v0.24.0): the
 	// whole test runs at least 60 s, and the pane, the stream and the worklet
 	// must be alive at the end, the page still playing (heartbeat moving) and
-	// the volume at the pane's level. (Quake's ambient sounds play once and end
-	// at about 25 s of mix, a gap of the sound engine that is not this test's:
-	// the mixer then writes silence, so no signal is asked for here.)
-	for time.Since(testStart) < 65*time.Second {
-		time.Sleep(time.Second)
+	// the volume at the pane's level, and Quake's sound must be there in every 5 s
+	// window (requireSignal): the ambient sounds loop. The pane's volume is 30 %
+	// and the tap is before the gains, so the floor is the worklet's.
+	requireSignal(t, "pane", 65-int(time.Since(testStart).Seconds()), func() float64 {
 		alive()
-	}
+		v, err := page.Evaluate(`() => { const s = window.__wctrAudio.stats()[0]; return s ? s.rms : 0; }`)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return num(v)
+	})
 	hb := func() float64 {
 		v, _ := page.Evaluate(`() => { const s = window.__wctrAudio.stats()[0]; return s ? s.heartbeat : -1; }`)
 		return num(v)

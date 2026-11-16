@@ -25,6 +25,38 @@ func pacedRatioOK(ratio, seconds float64) bool {
 	return ratio >= 0.8 && ratio <= pacedRatioMax(seconds)
 }
 
+// signalFloor is the worklet's RMS (linear, -60 dBFS) that a window of Quake's
+// sound must exceed.
+const signalFloor = 1e-3
+
+// requireSignal samples the worklet's RMS every 150 ms for seconds and fails
+// unless EVERY window of 5 s holds a reading above signalFloor. Quake's
+// ambient sounds loop (go-quake1/engine v0.26.0, snd_mix.c S_PaintChannels:
+// at the end of a looping channel pos = loopstart); before that they played
+// once and the mixer went to exact silence at about 25 s of mix. A test that
+// asked for sound only in its first seconds could not see it.
+func requireSignal(t *testing.T, what string, seconds int, rms func() float64) {
+	t.Helper()
+	const window = 5 * time.Second
+	start := time.Now()
+	var worst float64 = -1
+	for w := 0; time.Since(start) < time.Duration(seconds)*time.Second; w++ {
+		var peak float64
+		end := time.Now().Add(window)
+		for time.Now().Before(end) {
+			peak = max(peak, rms())
+			time.Sleep(150 * time.Millisecond)
+		}
+		t.Logf("%s: %3.0f s: the worklet's peak RMS in the last 5 s is %.4f", what, time.Since(start).Seconds(), peak)
+		if worst < 0 || peak < worst {
+			worst = peak
+		}
+		if peak < signalFloor {
+			t.Fatalf("%s: no sound in the 5 s window ending at %.0f s (peak RMS %.5f, floor %g): the mixer went silent", what, time.Since(start).Seconds(), peak, signalFloor)
+		}
+	}
+}
+
 // A pacing regression to the fixed chunk (2.75 measured at 60 frames a second,
 // 2.2 at 48, 1.3 at 28) fails; the loaded runner (0.884) and the idle machine
 // (1.01) pass.
@@ -156,18 +188,10 @@ func TestQuakeAudio(t *testing.T) {
 	// The image really mixes sound (it is built with -tags wctraudio, site.go): not
 	// only frames of silence reach the worklet. e1m1's ambient sounds are
 	// audible at the start; the analyser tap sits after the worklet.
-	best := -200.0
-	for i := 0; i < 200 && best < -80; i++ {
-		for _, s := range a.streams() {
-			if s.RmsDb > best {
-				best = s.RmsDb
-			}
-		}
-		time.Sleep(100 * time.Millisecond)
-	}
-	t.Logf("quake's loudest tap reading: %.1f dBFS", best)
-	if best < -80 {
-		t.Errorf("only silence reached the worklet from the quake image (%.1f dBFS)", best)
-	}
+	// ... and keeps reaching it for 60 s (past the 25 s at which the ambient
+	// sounds, not looped then, used to end).
+	requireSignal(t, "quake", 60, func() float64 {
+		return num(a.eval(`() => { const s = window.__wctrAudio.stats()[0]; return s ? s.rms : 0; }`))
+	})
 	a.must("wctr rm -f qs", 0)
 }
