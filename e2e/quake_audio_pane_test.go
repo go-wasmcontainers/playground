@@ -98,6 +98,7 @@ func TestQuakeAudioPane(t *testing.T) {
 		return v == true
 	})
 	_, _, _ = box, dpr, page
+	testStart := time.Now() // the game has been playing since about now
 
 	// alive fails the test, with the container's state and the end of its log,
 	// when the pane is gone: a game that ends cannot be measured.
@@ -219,6 +220,30 @@ func TestQuakeAudioPane(t *testing.T) {
 	}
 	if r, n := ratio(pairs(2.5)); n < 3 || r < 0.25 || r > 0.35 {
 		t.Errorf("after Unmute the level is %.3f of the worklet's (%d readings), want 0.30", r, n)
+	}
+
+	// 5. Soak past the window where the guest used to die (about 20 to 33 s: its
+	// heap grew until the 512 MiB limit, fixed in go-quake1/engine v0.24.0): the
+	// whole test runs at least 60 s, and the pane, the stream and the worklet
+	// must be alive at the end, the page still playing (heartbeat moving) and
+	// the volume at the pane's level. (Quake's ambient sounds play once and end
+	// at about 25 s of mix, a gap of the sound engine that is not this test's:
+	// the mixer then writes silence, so no signal is asked for here.)
+	for time.Since(testStart) < 65*time.Second {
+		time.Sleep(time.Second)
+		alive()
+	}
+	hb := func() float64 {
+		v, _ := page.Evaluate(`() => { const s = window.__wctrAudio.stats()[0]; return s ? s.heartbeat : -1; }`)
+		return num(v)
+	}
+	h0 := hb()
+	time.Sleep(2 * time.Second)
+	if h1 := hb(); h0 < 0 || h1 <= h0 {
+		t.Errorf("after %v the worklet's heartbeat is %v -> %v: the page no longer plays", time.Since(testStart).Round(time.Second), h0, h1)
+	}
+	if s := sound(); s != "sound 30%" {
+		t.Errorf("after the soak the pane says %q, want its level kept", s)
 	}
 
 	d.press("F6", "ArrowUp") // Surfaces -> Terminal
