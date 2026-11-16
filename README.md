@@ -195,8 +195,13 @@ picture 0 of the MNIST test set by Y. LeCun, C. Cortes and C. J. C. Burges
   frame is not hash-equal to the CPU's) and presents it. `--map e1m1` to
   `e1m8` picks the map; since engine v0.16.0 every freepak e1 map builds a GPU
   world (surfaces in two atlases; e1m2, e1m3 and e1m6 used to fall back to the
-  CPU). `quake --gpuworld` draws the world of the game loop on the GPU too
-  (engine v0.15.0). The page serves `webgpu-replay.js` for the
+  CPU). The world of the game loop is drawn on the GPU by default when the
+  container has one (`--gpu`; since engine v0.22.0, before it `quake --gpuworld`
+  asked for it): with no GPU granted, or a map the device refuses, the CPU
+  draws it and says so on stderr; `quake --cpuworld` forces the CPU, and
+  `--gpuworld` fails instead of falling back. Since v0.22.0 the server's light
+  styles reach the world, the explosions' and the entities' dynamic lights
+  are drawn, and the dynamic-light uploads are coalesced. The page serves `webgpu-replay.js` for the
   stream because its CSP forbids the blob URL. Frame time of a level-1 frame in Chromium on an Apple M4 Max:
   **deferred, load 17.7 to 31.7** (1-minute load average; the rule is a load
   of at most 8). For the record only, not a measurement: 20.4 to 21.2 ms per

@@ -133,7 +133,7 @@ var Images = []struct {
 	{Name: "tone", Description: "a 440 Hz sine, 11025 Hz stereo, through wctr_audio_out (run --audio; click the page once to unlock sound); --hz N, --silent, --seconds N"},
 	{Name: "llm", Description: "generates text with SmolLM2-135M (Apache-2.0) on the page's WebGPU; the weights (92 MB) download once, are checked and kept in the browser: wctr run --rm --gpu --gpu-memory 512m --model smollm2-135m-instruct-q4_0 llm \"Once upon a time\"",
 		Pkg: "github.com/go-wasmcontainers/llm/examples/generate", Args: []string{"run"}},
-	{Name: "quake", Description: "Quake in a dashboard pane: go-quake1's engine, software renderer, e1m1 of LibreQuake (freepak " + FreepakTag + "), shown through wasi-gfx:surface; click the pane, WASD and arrows move, space jumps. GPL-3.0-or-later, source in /usr/share/doc/quake/copyright: wctr run --rm --gpu -m 512m quake. Sound is opt-in, like the GPU: add --audio (and click the page once; native wctr has no audio)",
+	{Name: "quake", Description: "Quake in a dashboard pane: go-quake1's engine, its world on the GPU when granted (software renderer otherwise), e1m1 of LibreQuake (freepak " + FreepakTag + "), shown through wasi-gfx:surface; click the pane, WASD and arrows move, space jumps. GPL-3.0-or-later, source in /usr/share/doc/quake/copyright: wctr run --rm --gpu -m 512m quake. Sound is opt-in, like the GPU: add --audio (and click the page once; native wctr has no audio)",
 		Pkg: "github.com/go-quake1/engine/cmd/quake-wctr", Pinned: QuakeFiles,
 		// wctraudio: the guest imports wctr_audio_out (sound, only with
 		// run --audio; without it the game plays silent).
