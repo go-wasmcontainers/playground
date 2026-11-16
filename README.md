@@ -201,6 +201,18 @@ picture 0 of the MNIST test set by Y. LeCun, C. Cortes and C. J. C. Burges
   **deferred, load 17.7 to 31.7** (1-minute load average; the rule is a load
   of at most 8). For the record only, not a measurement: 20.4 to 21.2 ms per
   frame (150 frames) at those loads.
+  **Firefox** (WebGPU on: 141 on Windows, 145 on macOS Tahoe with Apple
+  silicon, 147 on older macOS with Apple silicon; headed, since headless gets
+  no adapter): quake died with exit status 134 at its second frame until
+  go-wasmcontainers/gpu v0.14.1, because Firefox drops a canvas context's
+  configuration when `transferToImageBitmap` takes the frame (#56). A
+  container that ends in a trap now says why on its own stderr (`wctr: the
+  module trapped: <call and the browser's message>`, engine v0.40.1), above
+  the `[exit status 134]` line it used to print alone. The Firefox lane
+  (`e2e/firefox_test.go`: `TestQuakeFirefox`, `TestQuakeSoakFirefox`) drives
+  the real Firefox through `geckodriver` in CI on macOS; by hand:
+  `E2E_BROWSERS=firefox GECKODRIVER=/path/to/geckodriver go test -tags e2e -v
+  -run 'TestQuakeFirefox|TestQuakeSoakFirefox' ./e2e/`.
 
 GPU access is opt-in per container. A container without `--gpu`, or a
 browser without WebGPU, gets no adapter: these images print

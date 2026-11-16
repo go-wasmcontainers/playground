@@ -4,10 +4,13 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"strings"
+	"sync"
 	"testing"
 )
 
@@ -95,6 +98,61 @@ func TestClickIsPerformActions(t *testing.T) {
 	if len(got) != 1 || got[0] != `POST /session/S1/actions {"actions":[{"actions":[],"id":"x","type":"none"}]}` {
 		t.Fatalf("PerformActions sent %q", got)
 	}
+}
+
+// TestMain lets the test binary stand in for a driver (geckodriver,
+// safaridriver): with FAKE_DRIVER=1 it serves GET /status on the port given
+// after -p, prints its own arguments, and runs until killed.
+func TestMain(m *testing.M) {
+	if os.Getenv("FAKE_DRIVER") != "1" {
+		os.Exit(m.Run())
+	}
+	fmt.Println("fake driver args:", strings.Join(os.Args[1:], " "))
+	fmt.Fprintln(os.Stderr, "fake driver stderr line")
+	port := os.Args[2]
+	http.ListenAndServe("127.0.0.1:"+port, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		io.WriteString(w, `{"value":{"ready":true}}`)
+	}))
+}
+
+// TestStartWith: the driver starts with -p <port> then the extra arguments,
+// its standard output and error reach out, and stop kills it.
+func TestStartWith(t *testing.T) {
+	t.Setenv("FAKE_DRIVER", "1")
+	var out syncBuffer
+	c, stop, err := StartWith(context.Background(), os.Args[0], &out, "--log", "trace")
+	if err != nil {
+		t.Fatal(err)
+	}
+	// /status answered, so the driver printed its lines before it listened.
+	stop()
+	s := out.String()
+	for _, want := range []string{"fake driver args: -p ", " --log trace", "fake driver stderr line"} {
+		if !strings.Contains(s, want) {
+			t.Errorf("driver output %q lacks %q", s, want)
+		}
+	}
+	if c.Base == "" {
+		t.Error("no base URL")
+	}
+}
+
+// syncBuffer is a strings.Builder safe for the two copying goroutines of exec.
+type syncBuffer struct {
+	mu sync.Mutex
+	b  strings.Builder
+}
+
+func (s *syncBuffer) Write(p []byte) (int, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.b.Write(p)
+}
+
+func (s *syncBuffer) String() string {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.b.String()
 }
 
 func TestErrorResponse(t *testing.T) {
