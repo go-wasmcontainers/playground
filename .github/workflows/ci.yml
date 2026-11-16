@@ -236,13 +236,13 @@ jobs:
       # allocated per frame in each window of 600 frames. The runner's frame rate
       # (49 to 56 fps, a shared VM) is logged, not asserted; E2E_QUAKE_MIN_FPS=57
       # asserts it on a machine of one's own.
-      - name: go test -tags e2e -run 'TestGPU|TestGPUSurfaceInput|TestQuake|TestQuakeSoak|TestQuakeMenuMouse|TestQuakeAudio|TestQuakeSteadyState'
+      - name: go test -tags e2e -run 'TestGPU|TestGPUSurfaceInput|TestQuake|TestQuakeSoak|TestQuakeMenuMouse|TestQuakeAudio|TestQuakeAudioPane|TestQuakeSteadyState'
         shell: bash
         env:
           E2E_GPU: "1"
           E2E_GPU_REAL: ${{ matrix.real }}
           E2E_GPU_ARGS: ${{ matrix.args }}
-        run: go test -tags e2e -count=1 -v -run '^(TestGPU(SurfaceInput)?|TestQuake(Soak|MenuMouse|Audio|SteadyState)?)$' -timeout 22m ./e2e/ > "$RUNNER_TEMP/gpu.log" 2>&1 && status=0 || status=$?; tail -60 "$RUNNER_TEMP/gpu.log"; exit "$status"
+        run: go test -tags e2e -count=1 -v -run '^(TestGPU(SurfaceInput)?|TestQuake(Soak|MenuMouse|Audio|AudioPane|SteadyState)?)$' -timeout 24m ./e2e/ > "$RUNNER_TEMP/gpu.log" 2>&1 && status=0 || status=$?; tail -60 "$RUNNER_TEMP/gpu.log"; exit "$status"
 
   # The quake image in the real Firefox (e2e/firefox_test.go, go-wasmcontainers/
   # playground#56: exit 134 at the second frame, "Canvas not configured").

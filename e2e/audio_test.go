@@ -328,20 +328,27 @@ func TestAudio(t *testing.T) {
 		return db
 	}
 	loud := until("full volume", func(db float64) bool { return db > rmsFloorDb })
-	a.eval(`() => { const r = document.querySelector('#soundbar input[type=range]'); r.value = "30"; r.dispatchEvent(new Event("input")); return true; }`)
+	// Per container: the dashboard's pane calls setContainer (TestQuakeAudioPane
+	// drives the real pane buttons); this page has no dashboard, so the entry
+	// point is called directly.
+	cname, _ := a.eval(`() => window.__wctrAudio.containers()[0].container`).(string)
+	setc := func(v float64, muted bool) {
+		a.eval(fmt.Sprintf(`() => { window.wctrAudio.setContainer(%q, %g, %v); return true; }`, cname, v, muted))
+	}
+	setc(0.3, false)
 	// The analyser holds 4096 samples (0.5 s at 8 kHz), so wait for the old ones
 	// to leave: the level settles at 20*log10(0.3) = -10.46 dB below full.
 	want30 := loud + 20*math.Log10(0.3)
 	half := until("volume 30%", func(db float64) bool { return math.Abs(db-want30) < 1.5 })
 	t.Logf("speakers: %.1f dBFS at full volume, %.1f at 30%% (expect %.1f)", loud, half, want30)
-	a.eval(`() => { document.querySelector('#soundbar .soundrow button').click(); return true; }`)
+	setc(0.3, true)
 	until("container mute", func(db float64) bool { return db < -60 })
 	if g := a.eval(`() => window.__wctrAudio.containers()[0].gain`); num(g) != 0 {
 		t.Errorf("a muted container's gain is %v", g)
 	}
-	a.eval(`() => { document.querySelector('#soundbar .soundrow button').click(); return true; }`) // unmute
+	setc(0.3, false) // unmute
 	until("container unmute", func(db float64) bool { return db > -60 })
-	a.eval(`() => { const r = document.querySelector('#soundbar input[type=range]'); r.value = "100"; r.dispatchEvent(new Event("input")); return true; }`)
+	setc(1, false)
 	until("volume back", func(db float64) bool { return db > rmsFloorDb })
 	a.eval(`() => { document.getElementById("soundmute").click(); return true; }`)
 	until("page mute", func(db float64) bool { return db < -60 })

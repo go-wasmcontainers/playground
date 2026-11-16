@@ -1,0 +1,226 @@
+//go:build e2e
+
+package e2e
+
+import (
+	"math"
+	"os"
+	"slices"
+	"strings"
+	"testing"
+	"time"
+
+	"github.com/go-wasmcontainers/dashboard/ui"
+	"github.com/mxschmitt/playwright-go"
+)
+
+// TestQuakeAudioPane drives the per-container volume and mute in the
+// container's dashboard pane (the Vol -, Vol + and Mute buttons of the Surfaces
+// view's pane; the page-wide mute is the Sound strip's button) against Quake's
+// real sound, on a real GPU (E2E_GPU=1). Two analysers measure the same
+// moment: one before any gain (what the worklet played) and one after the
+// container's and the page's gains (what reaches the speakers); the pane's
+// level is the ratio between them. Quake's menu makes a sound on every
+// ArrowDown and ArrowUp, which the test presses to have a signal.
+func TestQuakeAudioPane(t *testing.T) {
+	if os.Getenv("E2E_GPU") != "1" || os.Getenv("E2E_URL") != "" {
+		t.Skip("set E2E_GPU=1 on a lane with WebGPU")
+	}
+	pw, err := playwright.Run()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer pw.Stop()
+	browser, err := pw.Chromium.Launch(playwright.BrowserTypeLaunchOptions{
+		Headless: playwright.Bool(true), Channel: playwright.String("chromium"),
+		IgnoreDefaultArgs: []string{"--autoplay-policy=no-user-gesture-required"},
+		Args: append([]string{"--enable-unsafe-webgpu", "--autoplay-policy=document-user-activation-required"},
+			strings.Fields(os.Getenv("E2E_GPU_ARGS"))...),
+		Timeout: playwright.Float(180000)})
+	if err != nil {
+		t.Fatalf("launch: %v", err)
+	}
+	defer browser.Close()
+	page, err := browser.NewPage(playwright.BrowserNewPageOptions{Viewport: &playwright.Size{Width: 1280, Height: 800}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var log []string
+	page.On("console", func(m playwright.ConsoleMessage) { log = append(log, m.Text()) })
+	if _, err := page.Goto(serve(t, true)); err != nil {
+		t.Fatal(err)
+	}
+	d := dash{t, page, "chromium/quake-audio-pane", &log}
+	d.ready()
+
+	info, _ := page.Evaluate(`async () => {
+	  if (!navigator.gpu) return "no navigator.gpu";
+	  const a = await navigator.gpu.requestAdapter();
+	  if (!a) return "no adapter";
+	  const i = a.info || {};
+	  return [i.vendor, i.architecture, i.device, i.description, (i.isFallbackAdapter || a.isFallbackAdapter) ? "fallback" : ""].join("|");
+	}`)
+	adapter, _ := info.(string)
+	if strings.HasPrefix(adapter, "no ") || strings.Contains(strings.ToLower(adapter), "swiftshader") || strings.Contains(adapter, "fallback") {
+		if os.Getenv("E2E_GPU_REAL") == "1" {
+			t.Fatalf("no hardware adapter on the GPU lane: %s", adapter)
+		}
+		t.Skipf("a software adapter (%s): the engine refuses it", adapter)
+	}
+
+	// Typing the command is a user gesture (sticky activation), so the page's
+	// AudioContext starts as soon as the stream opens.
+	d.run("wctr run -d --gpu --audio -m 512m --name q quake")
+	d.until("quake running", 120*time.Second, func(p ui.Probe) bool {
+		return len(p.Containers) == 1 && strings.Contains(p.Status[1], "1 running")
+	})
+	d.press("F6", "ArrowDown") // Terminal -> Surfaces
+	p := d.until("a frame in the pane, with its sound line", 90*time.Second, func(p ui.Probe) bool {
+		return p.View == "Surfaces" && len(p.SurfaceBoxes) == 1 && p.SurfaceBoxes[0].W > 0 && len(p.SurfaceSound) == 1
+	})
+	if p.SurfaceSound[0] != "sound 100%" {
+		t.Fatalf("the pane's sound line is %q at the start", p.SurfaceSound[0])
+	}
+	for _, b := range []string{"surface.1.voldown", "surface.1.volup", "surface.1.mute"} {
+		if _, ok := p.Boxes[b]; !ok {
+			t.Fatalf("no %s on the pane: %v", b, p.Boxes)
+		}
+	}
+	dpr := 1.0
+	if v, err := page.Evaluate(`() => window.devicePixelRatio`); err == nil {
+		if n, ok := v.(float64); ok {
+			dpr = n
+		}
+	}
+	box := p.SurfaceBoxes[0]
+	d.until("the audio stream", 30*time.Second, func(ui.Probe) bool {
+		v, _ := page.Evaluate(`() => window.__wctrAudio && window.__wctrAudio.stats().some((s) => s.attached) && window.__wctrAudio.state() === "running"`)
+		return v == true
+	})
+	_, _, _ = box, dpr, page
+
+	// alive fails the test, with the container's state and the end of its log,
+	// when the pane is gone: a game that ends cannot be measured.
+	alive := func() {
+		if _, ok := d.state().Boxes["surface.1.mute"]; ok {
+			return
+		}
+		d.press("F6", "ArrowUp")
+		d.run("clear")
+		d.run("wctr ps -a")
+		time.Sleep(time.Second)
+		d.run("wctr logs q")
+		time.Sleep(2 * time.Second)
+		t.Fatalf("the quake container is gone from the pane:\n%s", d.state().Terminal)
+	}
+	// pair reads the tap before the gains and the level after them at once.
+	type pair struct{ tap, out float64 }
+	pairs := func(secs float64) []pair {
+		t.Helper()
+		alive()
+		deadline := time.Now().Add(time.Duration(secs * float64(time.Second)))
+		var got []pair
+		for k := 0; time.Now().Before(deadline); k++ {
+			key := "ArrowDown"
+			if k%2 == 1 {
+				key = "ArrowUp"
+			}
+			// A menu sound: the key goes to the guest as the dashboard sends it
+			// ({t:"input", surface, kind, code}), so the pane's focus and the
+			// pointer lock stay out of it and the buttons stay clickable.
+			if _, err := page.Evaluate(`(code) => { for (const kind of ["key-down", "key-up"]) { window.__wctrEngine.postMessage({ t: "input", surface: 1, kind, code, text: "", alt: false, ctrl: false, meta: false, shift: false }); } return true; }`, key); err != nil {
+				t.Fatal(err)
+			}
+			for i := 0; i < 6; i++ {
+				v, err := page.Evaluate(`() => { const s = window.__wctrAudio.stats()[0]; return [s ? s.rms : 0, window.__wctrAudio.out().rms]; }`)
+				if err != nil {
+					t.Fatal(err)
+				}
+				a := v.([]any)
+				got = append(got, pair{num(a[0]), num(a[1])})
+				time.Sleep(60 * time.Millisecond)
+			}
+		}
+		return got
+	}
+	// loud keeps the readings where the worklet played something (-60 dBFS).
+	const floor = 1e-3
+	ratio := func(ps []pair) (median float64, n int) {
+		var rs []float64
+		for _, q := range ps {
+			if q.tap > floor {
+				rs = append(rs, q.out/q.tap)
+			}
+		}
+		if len(rs) == 0 {
+			return -1, 0
+		}
+		slices.Sort(rs)
+		return rs[len(rs)/2], len(rs)
+	}
+	click := func(name string, times int) {
+		t.Helper()
+		alive()
+		for i := 0; i < times; i++ {
+			d.click(name)
+			time.Sleep(50 * time.Millisecond)
+		}
+		time.Sleep(800 * time.Millisecond) // the 4096-sample window turns over (0.5 s at 8 kHz)
+	}
+	sound := func() string { return d.state().SurfaceSound[0] }
+
+	// 1. Full volume: what reaches the speakers is what the worklet played.
+	full, n := ratio(pairs(2.5))
+	t.Logf("full volume: out/tap %.3f over %d readings with sound", full, n)
+	if n < 3 {
+		t.Fatalf("Quake's menu gave only %d readings above -60 dBFS: no signal to measure with", n)
+	}
+	if full < 0.9 || full > 1.1 {
+		t.Errorf("at full volume out/tap is %.3f, want 1", full)
+	}
+
+	// 2. The pane's Vol - seven times: 30 %.
+	click("surface.1.voldown", 7)
+	if s := sound(); s != "sound 30%" {
+		t.Fatalf("after seven Vol -: %q", s)
+	}
+	if g, _ := page.Evaluate(`() => window.__wctrAudio.containers()[0].gain`); math.Abs(num(g)-0.3) > 1e-6 {
+		t.Errorf("the container's gain node is %v, want 0.3", g)
+	}
+	r30, n := ratio(pairs(2.5))
+	t.Logf("30%%: out/tap %.3f over %d readings", r30, n)
+	if n < 3 || r30 < 0.25 || r30 > 0.35 {
+		t.Errorf("at 30%% the level after the gains is %.3f of the worklet's (%d readings), want 0.30", r30, n)
+	}
+
+	// 3. Mute: silence at the speakers while the worklet still plays.
+	click("surface.1.mute", 1)
+	if s := sound(); s != "sound muted (30%)" {
+		t.Fatalf("after Mute: %q", s)
+	}
+	ps := pairs(2.5)
+	var tapMax, outMax float64
+	for _, q := range ps {
+		tapMax, outMax = max(tapMax, q.tap), max(outMax, q.out)
+	}
+	t.Logf("muted: worklet up to %.4f, speakers up to %.6f", tapMax, outMax)
+	if tapMax < floor {
+		t.Errorf("no signal while muted (%.5f): the test cannot show that mute silences it", tapMax)
+	}
+	if outMax > 1e-4 {
+		t.Errorf("muted, yet %.6f (%.1f dBFS) reaches the speakers", outMax, 20*math.Log10(outMax))
+	}
+
+	// 4. Unmute: back to 30 %. (The page-wide mute is TestAudio's: this test is
+	// kept short because the menu's sounds on its keys do not last.)
+	click("surface.1.mute", 1)
+	if s := sound(); s != "sound 30%" {
+		t.Fatalf("after Unmute: %q", s)
+	}
+	if r, n := ratio(pairs(2.5)); n < 3 || r < 0.25 || r > 0.35 {
+		t.Errorf("after Unmute the level is %.3f of the worklet's (%d readings), want 0.30", r, n)
+	}
+
+	d.press("F6", "ArrowUp") // Surfaces -> Terminal
+	d.run("wctr rm -f q")
+}

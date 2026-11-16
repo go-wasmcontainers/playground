@@ -127,5 +127,21 @@ func TestQuakeAudio(t *testing.T) {
 	if last.Heartbeat <= first.Heartbeat {
 		t.Errorf("the worklet's heartbeat did not move: %d -> %d", first.Heartbeat, last.Heartbeat)
 	}
+	// The image really mixes sound (it is built with -tags wctraudio, site.go): not
+	// only frames of silence reach the worklet. e1m1's ambient sounds are
+	// audible at the start; the analyser tap sits after the worklet.
+	best := -200.0
+	for i := 0; i < 200 && best < -80; i++ {
+		for _, s := range a.streams() {
+			if s.RmsDb > best {
+				best = s.RmsDb
+			}
+		}
+		time.Sleep(100 * time.Millisecond)
+	}
+	t.Logf("quake's loudest tap reading: %.1f dBFS", best)
+	if best < -80 {
+		t.Errorf("only silence reached the worklet from the quake image (%.1f dBFS)", best)
+	}
 	a.must("wctr rm -f qs", 0)
 }

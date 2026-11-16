@@ -151,9 +151,12 @@ picture 0 of the MNIST test set by Y. LeCun, C. Cortes and C. J. C. Burges
   what the container writes, instead of playing it late. The page runs one
   `AudioContext`, an `AudioWorklet` per stream (wasmbox's `audioring` asset,
   served as `audio-worklet.js`), a gain per container and a page gain.
-  **Volume and mute** work at two levels in the *Sound* strip at the bottom left
-  (one row per playing container with a slider and a mute button, and *mute
-  all*), and are gain nodes, so a container cannot undo them. Native `wctr`
+  **Volume and mute** work at two levels: each container's **dashboard pane**
+  (Surfaces view) has a sound line with *Vol -*, *Vol +* and *Mute*
+  (dashboard release with `window.wctrAudio.setContainer`), and a *Sound* strip
+  at the bottom left has the page-wide *mute all*. They are gain nodes, so a
+  container cannot undo them. A container with no surface has no pane, so no
+  per-container control (the page mute still applies). Native `wctr`
   has no audio output and answers *unsupported*. Design and bounds:
   [go-wasmcontainers/engine docs/audio-design.md](https://github.com/go-wasmcontainers/engine/blob/main/docs/audio-design.md).
 - `quake`: **Quake in a container**, level 1. `wctr run --rm --gpu -m 512m quake`
@@ -682,7 +685,11 @@ The e2e has three opt-in parts:
   11025 an output plays, in 300 frames of e1m1 in Chromium on the Apple GPU:
   **2.773 with the fixed chunk the game painted before, 1.010 paced**; without
   `--audio` the game runs silent and says why; with it the stream plays after a
-  click), `TestQuakeMenuMouse` and `TestQuakeSoak`. The soak
+  click), `TestQuakeAudioPane` (the dashboard pane's **Vol -** and **Mute**
+  against Quake's real sound: two analysers read, at the same moment, what the
+  worklet played and what reaches the speakers after the gains; the ratio is 1.000 at
+  full volume, 0.300 at 30 %, and muted the speakers get exactly 0 while the worklet
+  plays up to 0.41), `TestQuakeMenuMouse` and `TestQuakeSoak`. The soak
   plays `quake --map e1m1` (menu skipped) for 45 s in each mode.
   `TestQuakeMenuMouse` starts the image with no flag, in the dashboard: the
   first click locks the pointer, three Enters (Single Player, New Game, a
