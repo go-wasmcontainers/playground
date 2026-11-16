@@ -13,16 +13,24 @@ import (
 	"github.com/mxschmitt/playwright-go"
 )
 
-// The paced mixer's real-time ratio must lie in [0.8, pacedRatioMax]. Why 0.8:
-// a tic longer than the mix-ahead (0.1 s) is not paid back (a stall is not a
-// debt), so a loaded runner mixes a little under real time: CI's macOS lane
-// runs the game at about 15 frames a second and measured 0.884, an idle machine
-// measures 1.01. The upper bound is what catches the old defect: the fixed
-// 512-frame chunk is 2.7 to 2.8 at 60 frames a second, far above 1.1.
+// The paced mixer's real-time ratio must lie in [pacedRatioMin, pacedRatioMax].
+// The ratio is mix frames offered per WALL second over 11025. A tic longer than
+// the mix-ahead (0.1 s) is not paid back (a stall is not a debt), so a loaded
+// runner offers less than real time: the measured CI spread is 0.746 (one red
+// run of playground #66), 0.884 (#63's lane), 1.01 (an idle machine). That is
+// the game falling behind the clock, not the mixer under-producing: the mixer
+// offers what the game's tics owe. 0.6 leaves room under the worst reading and
+// still fails a starved mixer (half rate). Whether the SOUND underran is a
+// different question, asserted on the page's stream, not here. The upper bound
+// catches the old defect: the fixed 512-frame chunk is 2.7 to 2.8 at 60 frames
+// a second, far above 1.1 (on a runner as slow as 15 frames a second the fixed
+// chunk itself reads 0.86 and only the log's predicted-ratio check sees it).
+const pacedRatioMin = 0.6
+
 func pacedRatioMax(seconds float64) float64 { return 1 + 0.06/seconds + 0.08 }
 
 func pacedRatioOK(ratio, seconds float64) bool {
-	return ratio >= 0.8 && ratio <= pacedRatioMax(seconds)
+	return ratio >= pacedRatioMin && ratio <= pacedRatioMax(seconds)
 }
 
 // signalFloor is the worklet's RMS (linear, -60 dBFS) that a window of Quake's
@@ -64,7 +72,7 @@ func TestPacedRatioBounds(t *testing.T) {
 	for _, c := range []struct {
 		ratio float64
 		ok    bool
-	}{{2.75, false}, {2.2, false}, {1.3, false}, {1.01, true}, {0.884, true}, {0.79, false}, {0, false}} {
+	}{{2.75, false}, {2.2, false}, {1.3, false}, {1.01, true}, {0.884, true}, {0.746, true}, {0.55, false}, {0, false}} {
 		if got := pacedRatioOK(c.ratio, 5); got != c.ok {
 			t.Errorf("ratio %.3f over 5 s: accepted=%v, want %v", c.ratio, got, c.ok)
 		}
@@ -167,7 +175,7 @@ func TestQuakeAudio(t *testing.T) {
 	// Paced: the clock's worth, plus the lead it prefills (0.05 s of mix) over
 	// the run's length.
 	if !pacedRatioOK(after, s1) {
-		t.Errorf("paced real-time ratio %.3f, want between 0.8 and %.3f", after, pacedRatioMax(s1))
+		t.Errorf("paced real-time ratio %.3f, want between %.1f and %.3f", after, pacedRatioMin, pacedRatioMax(s1))
 	}
 	if before > 1.3 && after >= before {
 		t.Errorf("pacing did not lower the ratio: %.3f against %.3f", after, before)
