@@ -195,6 +195,8 @@ github.com/go-pkgx/bottle v0.62.1 h1:nRYT3D3rh7OO5BYMfsYUlCPyUqy1xHQVBtPvwycKdiI
 github.com/go-pkgx/bottle v0.62.1/go.mod h1:9oPPTz08i7RVWFtMHXP2MTyp1GjuWAYRd4sV+EvQUdw=
 github.com/go-quake1/engine v0.22.0 h1:al1dVzJ42NUcYxDEx2EZadd4FI4rBDZClZ+3221W3mQ=
 github.com/go-quake1/engine v0.22.0/go.mod h1:0nVtpnSPHCMK4UUWogYrys+qJho8X3UoMhayeoB5rG0=
+github.com/go-quake1/engine v0.23.1-0.20261116170254-5f650b8c7d11 h1:GI9kUQtLvKmNgaP3ej/G8K6u/I0YTGjB4+oxebCCBzc=
+github.com/go-quake1/engine v0.23.1-0.20261116170254-5f650b8c7d11/go.mod h1:0nVtpnSPHCMK4UUWogYrys+qJho8X3UoMhayeoB5rG0=
 github.com/go-richdoc/richdoc v0.7.0 h1:vhHypa0y26ulrOz6Aw1RIzeLjSMsFJyU1SzK5jd90lg=
 github.com/go-richdoc/richdoc v0.7.0/go.mod h1:RhxAcqwoUg1pnTYCiRdKILzOZwOmraO0dMJI4N6yY70=
 github.com/go-sql-driver/mysql v1.10.1 h1:arlSnNLq6a5yxGxV7qg9lF4j0C+KwD6NbQyKr9QL6ME=

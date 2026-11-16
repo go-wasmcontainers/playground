@@ -31,16 +31,7 @@ func TestQuakeMenuMouse(t *testing.T) {
 		t.Skip("set E2E_GPU=1 on a lane with WebGPU")
 	}
 	for _, mode := range []struct{ name, flag string }{{"cpuworld", " --cpuworld"}, {"gpuworld", ""}} {
-		t.Run(mode.name, func(t *testing.T) {
-			// The GPU world runs out of memory in the start hub, in most runs,
-			// since engine v0.20.0 (go-quake1/engine#123): the guest exits a few
-			// seconds into the game. Run with E2E_QUAKE_GPUWORLD=1 to see it; drop
-			// this skip when the issue is closed.
-			if mode.flag == "" && os.Getenv("E2E_QUAKE_GPUWORLD") != "1" {
-				t.Skip("go-quake1/engine#123: the GPU world exhausts memory in the start hub (E2E_QUAKE_GPUWORLD=1 runs it)")
-			}
-			quakeMenuMouse(t, mode.flag)
-		})
+		t.Run(mode.name, func(t *testing.T) { quakeMenuMouse(t, mode.flag) })
 	}
 }
 
