@@ -60,3 +60,21 @@ func luma(p []byte) []float64 {
 	}
 	return out
 }
+
+// MeanAbsDiff is the mean absolute difference of the bytes of a and b, which
+// must be the same length and not empty: 0 for the same picture, a few for a
+// scene whose lights flicker, tens for a different one.
+func MeanAbsDiff(a, b []byte) (float64, error) {
+	if len(a) == 0 || len(a) != len(b) {
+		return 0, fmt.Errorf("framediff: pictures of %d and %d bytes", len(a), len(b))
+	}
+	var sum int64
+	for i := range a {
+		d := int64(a[i]) - int64(b[i])
+		if d < 0 {
+			d = -d
+		}
+		sum += d
+	}
+	return float64(sum) / float64(len(a)), nil
+}

@@ -21,10 +21,21 @@ import (
 // mouse turns the view, and the frame changes in the direction the mouse
 // says: a motion to the right moves the scene to the left, a motion to the
 // left moves it to the right.
+//
+// It runs once for each world the engine draws with (the GPU's, the default
+// since engine v0.22.0, and --cpuworld). Every wait is on something the page
+// shows, never a sleep that guesses how long the guest takes; and a guest that
+// exits is reported as that (its status), not as a scene that did not move.
 func TestQuakeMenuMouse(t *testing.T) {
 	if os.Getenv("E2E_GPU") != "1" || os.Getenv("E2E_URL") != "" {
 		t.Skip("set E2E_GPU=1 on a lane with WebGPU")
 	}
+	for _, mode := range []struct{ name, flag string }{{"cpuworld", " --cpuworld"}, {"gpuworld", ""}} {
+		t.Run(mode.name, func(t *testing.T) { quakeMenuMouse(t, mode.flag) })
+	}
+}
+
+func quakeMenuMouse(t *testing.T, flag string) {
 	pw, err := playwright.Run()
 	if err != nil {
 		t.Fatal(err)
@@ -76,7 +87,7 @@ func TestQuakeMenuMouse(t *testing.T) {
 	}
 
 	// No flags: the image's default, the main menu.
-	d.run("wctr run -d --gpu -m 512m --name q quake")
+	d.run("wctr run -d --gpu -m 512m --name q quake" + flag)
 	d.until("quake running", 120*time.Second, func(p ui.Probe) bool {
 		return len(p.Containers) == 1 && strings.Contains(p.Status[1], "1 running")
 	})
@@ -135,7 +146,72 @@ func TestQuakeMenuMouse(t *testing.T) {
 		}`, []int{dx, n}); err != nil {
 			t.Fatal(err)
 		}
-		time.Sleep(700 * time.Millisecond) // the last frames reach the pane
+	}
+	// requireAlive fails the test, naming the cause, when the guest has
+	// exited: the pane then shows its last frame greyed and nothing moves, so
+	// every later assertion would blame the mouse (engine#123: the GPU world
+	// ran out of memory in the start hub, exit status 2).
+	requireAlive := func(what string) {
+		t.Helper()
+		if s := d.state(); !strings.Contains(s.Status[1], "1 running") {
+			t.Fatalf("the guest exited %s: surfaces %q, status %q", what, s.Surfaces, s.Status)
+		}
+	}
+	// changed waits until the pane's band differs from before (the menu moved
+	// on, the view turned), and returns it; settled then waits until two
+	// frames 150 ms apart are the same (the scene is at rest).
+	// look is the whole pane, one pixel in four each way: a menu screen, or a
+	// turn of the view, changes it where the middle band alone might not.
+	look := func() []byte {
+		t.Helper()
+		v, err := page.Evaluate(`([x, y, w, h]) => {
+		  const d = document.getElementById("screen").getContext("2d").getImageData(x, y, w, h).data, out = [];
+		  for (let j = 0; j < h; j += 4) for (let i = 0; i < w; i += 4) { const k = 4 * (j * w + i); out.push(d[k], d[k + 1], d[k + 2]); }
+		  return out;
+		}`, []int{box.X, box.Y, box.W, box.H})
+		if err != nil {
+			t.Fatal(err)
+		}
+		a := v.([]any)
+		out := make([]byte, len(a))
+		for i, x := range a {
+			switch n := x.(type) {
+			case int:
+				out[i] = byte(n)
+			case float64:
+				out[i] = byte(n)
+			}
+		}
+		return out
+	}
+	changed := func(what string, before []byte, over float64) []byte {
+		t.Helper()
+		var now []byte
+		d.until(what, 20*time.Second, func(ui.Probe) bool {
+			now = look()
+			diff, err := framediff.MeanAbsDiff(now, before)
+			if err != nil {
+				t.Fatal(err)
+			}
+			return diff > over
+		})
+		return now
+	}
+	settled := func(what string) []byte {
+		t.Helper()
+		prev := look()
+		var now []byte
+		d.until(what, 20*time.Second, func(ui.Probe) bool {
+			time.Sleep(150 * time.Millisecond)
+			now = look()
+			diff, err := framediff.MeanAbsDiff(now, prev)
+			if err != nil {
+				t.Fatal(err)
+			}
+			prev = now
+			return diff < 1.5 // lights flicker, a few levels of grey; a turn is tens
+		})
+		return now
 	}
 
 	// The guest asked for the lock when it opened its surface, before its first
@@ -155,13 +231,18 @@ func TestQuakeMenuMouse(t *testing.T) {
 
 	// The menu is up: the click that grabbed the mouse did not press a row, so
 	// three Enters are Single Player, New Game, and a skill.
+	// Each Enter shows the next screen of the menu, and the last one the game:
+	// wait for the pane to change after each, never a fixed time.
+	menu := look()
 	for i := 0; i < 3; i++ {
+		requireAlive("in the menu")
 		if err := page.Keyboard().Press("Enter"); err != nil {
 			t.Fatal(err)
 		}
-		time.Sleep(500 * time.Millisecond)
+		menu = changed("the next menu screen, or the game", menu, 0.2) // a few words of text on black
 	}
-	time.Sleep(3 * time.Second) // the map loads, the view settles
+	requireAlive("starting the game")
+	settled("the game at rest")
 
 	shift := func(what string, before, after []byte) int {
 		t.Helper()
@@ -172,18 +253,37 @@ func TestQuakeMenuMouse(t *testing.T) {
 		t.Logf("%s: the scene moved %d px (pane %d px wide)", what, s, box.W)
 		return s
 	}
-	start := band()
+	start, before := band(), look()
 	turn(12, 50) // 600 surface pixels to the right: about 13 degrees of yaw
+	requireAlive("turning right")
+	changed("the view turning right", before, 4)
+	settled("the view at rest after turning right")
 	right := band()
 	if s := shift("mouse to the right", start, right); s >= -5 {
 		t.Errorf("mouse to the right: the scene moved %d px, want it to move left by more than 5", s)
 	}
+	before = look()
 	turn(-12, 100) // twice as far back, to the left
+	requireAlive("turning left")
+	changed("the view turning left", before, 4)
+	settled("the view at rest after turning left")
 	left := band()
 	if s := shift("mouse to the left", right, left); s <= 5 {
 		t.Errorf("mouse to the left: the scene moved %d px, want it to move right by more than 5", s)
 	}
 
 	d.press("F6", "ArrowUp") // Surfaces -> Terminal
+	if t.Failed() {
+		st := d.state()
+		t.Logf("surfaces %q containers %q status %q", st.Surfaces, st.Containers, st.Status)
+		d.press("F6", "ArrowUp", "ArrowUp", "ArrowUp", "ArrowUp", "ArrowUp") // Surfaces -> Containers
+		d.press("F6", "ArrowDown")                                           // select q
+		time.Sleep(time.Second)
+		lg := d.state().Logs
+		if len(lg) > 6000 {
+			lg = lg[len(lg)-6000:]
+		}
+		t.Logf("container log:\n%s", lg)
+	}
 	d.run("wctr rm -f q")
 }
