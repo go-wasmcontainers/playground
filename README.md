@@ -201,7 +201,13 @@ picture 0 of the MNIST test set by Y. LeCun, C. Cortes and C. J. C. Burges
   draws it and says so on stderr; `quake --cpuworld` forces the CPU, and
   `--gpuworld` fails instead of falling back. Since v0.22.0 the server's light
   styles reach the world, the explosions' and the entities' dynamic lights
-  are drawn, and the dynamic-light uploads are coalesced. The page serves `webgpu-replay.js` for the
+  are drawn, and the dynamic-light uploads are coalesced. Since v0.24.0 the
+  alias entities (monsters, items) are drawn on the GPU too, in a layer
+  composited after the CPU's sky and water (far models, animated-frame models,
+  the weapon and frames with fewer than three entities stay on the CPU);
+  `TestQuake` compares them on the GPU lane, with a planted skin defect that
+  must fail, and `TestQuakeFrameTime` (`E2E_QUAKE_BENCH=1`) prints the frame
+  phases for abbench. The page serves `webgpu-replay.js` for the
   stream because its CSP forbids the blob URL. Frame time of a level-1 frame in Chromium on an Apple M4 Max:
   **deferred, load 17.7 to 31.7** (1-minute load average; the rule is a load
   of at most 8). For the record only, not a measurement: 20.4 to 21.2 ms per
