@@ -221,8 +221,8 @@ github.com/go-wasmcontainers/dashboard v0.11.0 h1:tVPtrH/PZoQBkB0OK7elKlXZBWlLpF
 github.com/go-wasmcontainers/dashboard v0.11.0/go.mod h1:iQLtsE/MM0XTgRqJpLBtUJPQqVE1gpIHuRkiAeDZO1k=
 github.com/go-wasmcontainers/engine v0.40.1 h1:JyrP4S6VZxAgpG2fQaqPLYkyQOKDryMDHkOYxS/pkzQ=
 github.com/go-wasmcontainers/engine v0.40.1/go.mod h1:BnNR6nUBFR3uOsRVJCMv95Xc9C6CRBmzyvPwtLoyK5I=
-github.com/go-wasmcontainers/gpu v0.14.1 h1:Mc4VIsWbvDYCZNDsz1BOmhN/bTBnQoQuXASDZvMR8/k=
-github.com/go-wasmcontainers/gpu v0.14.1/go.mod h1:4+YzzSE98EIOh+a6jVExWmFjdu7QDPCldlNta4R+unE=
+github.com/go-wasmcontainers/gpu v0.14.3 h1:GAMtjaojyE2vZEZ77jruNNrNLhEJKcoyE4r9BLfMNzo=
+github.com/go-wasmcontainers/gpu v0.14.3/go.mod h1:4+YzzSE98EIOh+a6jVExWmFjdu7QDPCldlNta4R+unE=
 github.com/go-wasmcontainers/llm v0.1.0 h1:gzW0o0RGCZwOW5Tv60L/TDNOqRB340S5X41pQ8l79qc=
 github.com/go-wasmcontainers/llm v0.1.0/go.mod h1:fjqoPPBYFUzTjAFatPonMqFsDmv6QcuWIB19t8gKEGM=
 github.com/go-wasmcontainers/relay v0.3.1 h1:KJBOwZ6L+XHB3VAWVx1n+0TAA4UJTnFwJOMS6wfbd9U=
