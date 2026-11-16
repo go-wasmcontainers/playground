@@ -97,8 +97,12 @@ func TestQuakeAudio(t *testing.T) {
 	}
 	// Paced: the clock's worth, plus the lead it prefills (0.05 s of mix) over
 	// the run's length.
-	if max := 1 + 0.06/s1 + 0.08; after > max || after < 0.95 {
-		t.Errorf("paced real-time ratio %.3f, want between 0.95 and %.3f", after, max)
+	// The lower bound is looser than the upper: a tic longer than the mix-ahead
+	// (0.1 s) is not paid back (a stall is not a debt), so a loaded runner,
+	// which CI's macOS lane is (about 15 frames a second: 0.884 measured), mixes
+	// a little under real time while an idle machine measures 1.01.
+	if max := 1 + 0.06/s1 + 0.08; after > max || after < 0.8 {
+		t.Errorf("paced real-time ratio %.3f, want between 0.8 and %.3f", after, max)
 	}
 	if before > 1.3 && after >= before {
 		t.Errorf("pacing did not lower the ratio: %.3f against %.3f", after, before)
