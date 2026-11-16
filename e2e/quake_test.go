@@ -139,7 +139,7 @@ func TestQuake(t *testing.T) {
 	// one-pixel shift does not explain, at most 2.5 % of a frame). The
 	// software default above is unchanged.
 	b.eval(`() => { window.__q.hashes = []; }`)
-	out = b.must("wctr run --rm --gpu -m 512m quake --gpuworld --gpuworld-check --frames 30", 0, "gpuworld check PASS")
+	out = b.must("wctr run --rm --gpu -m 512m quake --map e1m1 --gpuworld --gpuworld-check --frames 30", 0, "gpuworld check PASS")
 	m = regexp.MustCompile(`gpuworld check: (\d+) frames, (\d+) of (\d+) pixels differ, (\d+) unexplained, worst frame ([0-9.]+)`).FindStringSubmatch(out)
 	if m == nil {
 		t.Fatalf("no gpuworld check line in:\n%s", out)
@@ -150,14 +150,23 @@ func TestQuake(t *testing.T) {
 	}
 	b.until("no GPU-world frame reached the page", `() => window.__q.hashes.length >= 25`, 30e9)
 
-	// 2. Play: 150 frames, no --worldref. They keep changing.
+	// 2. Play: 150 frames, no --worldref. They keep changing. --map e1m1 skips
+	// the menu the image opens on by default (the menu is TestQuakeMenuMouse's).
 	b.eval(`() => { window.__q.hashes = []; }`)
-	out = b.must("wctr run --rm --gpu -m 512m quake --frames 150", 0, "150 frames in ")
+	out = b.must("wctr run --rm --gpu -m 512m quake --map e1m1 --frames 150", 0, "150 frames in ")
 	t.Log(strings.TrimSpace(out[strings.LastIndex(out, "150 frames in"):]))
 	n := int(num(b.eval(`() => window.__q.hashes.length`)))
 	distinct := int(num(b.eval(`() => new Set(window.__q.hashes).size`)))
 	t.Logf("quake: %d frames reached the page, %d distinct", n, distinct)
 	if n < 120 || distinct < 2 {
 		t.Fatalf("quake: %d frames, %d distinct; want at least 120 that change", n, distinct)
+	}
+
+	// 3. The default, with no flag: the main menu, which draws frames too (the
+	// game behind it waits for a skill).
+	b.eval(`() => { window.__q.hashes = []; }`)
+	b.must("wctr run --rm --gpu -m 512m quake --frames 30", 0, "30 frames in ")
+	if n := int(num(b.eval(`() => window.__q.hashes.length`))); n < 25 {
+		t.Errorf("the menu drew %d frames, want at least 25 of 30", n)
 	}
 }

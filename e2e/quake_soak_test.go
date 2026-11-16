@@ -83,7 +83,8 @@ func soak(t *testing.T, flag string, play time.Duration) {
 		t.Skipf("a software adapter (%s): the engine refuses it", adapter)
 	}
 
-	d.run("wctr run -d --gpu -m 512m --name q quake" + flag)
+	// --map e1m1: play, not the menu the image opens on by default.
+	d.run("wctr run -d --gpu -m 512m --name q quake --map e1m1" + flag)
 	d.until("quake running", 120*time.Second, func(p ui.Probe) bool {
 		return len(p.Containers) == 1 && strings.Contains(p.Status[1], "1 running")
 	})

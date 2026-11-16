@@ -83,6 +83,7 @@ func main() {
 	// and the GPU surfaces' frames (drawn, acknowledged) and input.
 	host.ConnectClass(g, worker, app, q)
 	host.ConnectSurfaces(worker, app, q, scene)
+	host.ConnectMouse(scene) // every mouse button, relative motion and the pointer lock for a surface pane
 
 	g.Set("__dashboard", map[string]any{
 		"version": version,

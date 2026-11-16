@@ -143,16 +143,26 @@ picture 0 of the MNIST test set by Y. LeCun, C. Cortes and C. J. C. Burges
   `key-down key-a "A" shift=true`.
 
 - `quake`: **Quake in a container**, level 1. `wctr run --rm --gpu -m 512m quake`
-  plays e1m1 of LibreQuake: [go-quake1/engine](https://github.com/go-quake1/engine)
-  v0.10.0 (`cmd/quake-wctr`) as a wasip1 guest, drawing every frame with its
+  **boots into the main menu**, as the browser build does: Single Player, New
+  Game and a skill (Enter, or a click) start LibreQuake's `start` hub, whose
+  portals change level. `quake --map e1m1` skips the menu and starts on that
+  map from the first tic (`--map` takes `e1m1` to `e1m8`, and `start`).
+  **The mouse works:** the guest asks for the pointer lock, the first click on
+  the pane locks the pointer (that click only grabs the mouse, so it does not
+  press a menu row), the mouse looks around, the left button fires (and acts
+  as Enter in the menu), the right button is `Mouse2`, and Escape releases the
+  lock (a second Escape opens the menu; click again to lock again).
+  The game is [go-quake1/engine](https://github.com/go-quake1/engine)
+  v0.19.1 (`cmd/quake-wctr`) as a wasip1 guest, drawing every frame with its
   *software* renderer (the frame is 640x400, 8 bits per pixel) and showing it
   on a `wasi-gfx:surface`. A guest's bind groups take buffers only, so the
   frame goes up as a storage buffer of packed indices plus a palette buffer,
   and a fragment shader without loops (the host refuses a loop there) looks
   the colour up. Click the pane, then WASD or the arrows move, Space jumps,
-  1-8 select a weapon, Esc opens the menu. There is no sound (no audio path
-  exists for a wasip1 guest) and no mouse look (a surface pointer event has no
-  button). The game data is [go-quake1/freepak](https://github.com/go-quake1/freepak)
+  1-8 select a weapon, Esc opens the menu. There is no sound yet (no audio
+  path exists for a wasip1 guest). The mouse comes through the surface
+  extension of go-wasmcontainers/gpu v0.14.0 (relative motion, buttons and the
+  pointer lock) and the dashboard v0.11.0 pane. The game data is [go-quake1/freepak](https://github.com/go-quake1/freepak)
   v0.2.0, pinned by size and sha256 at build time (the build refuses other
   bytes); id Software's data is not used. The image is **GPL-3.0-or-later**
   and names its source in `/usr/share/doc/quake/copyright`; the data's own
@@ -606,8 +616,19 @@ The e2e has three opt-in parts:
     goldens, the GPU frame passes the worldcheck measure (measured 7 of
     256000 pixels differ, 0 unexplained, on the Apple GPU) and reaches the
     page;
-  - `quake --frames 150` (no `--worldref`): at least 120 frames reach the
-    page and they keep changing.
+  - `quake --map e1m1 --frames 150` (no `--worldref`): at least 120 frames
+    reach the page and they keep changing; `quake --frames 30` (the default,
+    the menu) draws at least 25.
+
+  `E2E_GPU=1` also runs `TestQuakeMenuMouse` and `TestQuakeSoak`. The soak
+  plays `quake --map e1m1` (menu skipped) for 45 s in each mode.
+  `TestQuakeMenuMouse` starts the image with no flag, in the dashboard: the
+  first click locks the pointer, three Enters (Single Player, New Game, a
+  skill) leave the menu, and a mouse motion to the right moves the scene to
+  the left, a motion to the left moves it to the right
+  (`internal/framediff.Shift` over a band of the pane; one run: -80 px, then
+  +159 px for twice the motion, on a 1027 px pane). It fails on the old
+  stack: no pointer lock is ever granted.
 
   The goldens are those of a build without fused multiply-add, which is what
   WebAssembly and amd64 compute: a native arm64 build fuses `x*y+z` and draws
