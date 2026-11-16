@@ -225,13 +225,15 @@ jobs:
       # TestQuake: the quake image's view 4 reaches the page with exactly the
       # RGBA the guest computed, and 150 frames keep changing; a software
       # adapter skips it (and fails it under E2E_GPU_REAL=1).
-      - name: go test -tags e2e -run 'TestGPU|TestGPUSurfaceInput|TestQuake'
+      # TestQuakeSoak plays the quake image for 45 s in each of two modes (about
+      # 100 s in all): TestQuake's 150 frames end after 3 s.
+      - name: go test -tags e2e -run 'TestGPU|TestGPUSurfaceInput|TestQuake|TestQuakeSoak'
         shell: bash
         env:
           E2E_GPU: "1"
           E2E_GPU_REAL: ${{ matrix.real }}
           E2E_GPU_ARGS: ${{ matrix.args }}
-        run: go test -tags e2e -count=1 -v -run '^(TestGPU(SurfaceInput)?|TestQuake)$' -timeout 20m ./e2e/ > "$RUNNER_TEMP/gpu.log" 2>&1 && status=0 || status=$?; tail -60 "$RUNNER_TEMP/gpu.log"; exit "$status"
+        run: go test -tags e2e -count=1 -v -run '^(TestGPU(SurfaceInput)?|TestQuake(Soak)?)$' -timeout 25m ./e2e/ > "$RUNNER_TEMP/gpu.log" 2>&1 && status=0 || status=$?; tail -60 "$RUNNER_TEMP/gpu.log"; exit "$status"
 
   # Every pkgx wasip1/wasm bottle the signed catalogue lists, as an image:
   # --version / --help (or the probe in internal/mirror/testdata/smoke.json)
