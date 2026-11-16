@@ -366,6 +366,10 @@
         return;
       }
       switch (m.t) {
+        case "audio":
+          // A container's sound stream (--audio): audio.js plays it.
+          window.wctrAudio.onEngine(m);
+          break;
         case "ready":
           say("engine " + m.version + " ready · images and containers stored in " + m.storage);
           state.restored = { restored: m.restored, stopped: m.stopped, repaired: m.repaired };

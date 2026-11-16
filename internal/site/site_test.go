@@ -3,6 +3,7 @@ package site
 import (
 	"bytes"
 	"context"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -10,6 +11,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/wasmdesk/wasmbox/audioring"
 )
 
 // TestBuildServeVerify builds the site (without the pkgx pilots, which
@@ -66,6 +69,23 @@ func TestBuildServeVerify(t *testing.T) {
 	}
 	if !bytes.Contains(bytes.ReplaceAll(sw, []byte("\" +\n  \""), nil), []byte(ViewCSP)) {
 		t.Error("sw.js VIEW_CSP differs from site.ViewCSP")
+	}
+	// The audio worklet is wasmbox's embedded asset byte for byte, served
+	// with the isolation headers the page's other scripts get (a worklet module
+	// is a COEP-checked subresource) and listed in the shell.
+	resp, err = http.Get(srv.URL + "/playground/" + AudioWorkletName)
+	if err != nil || resp.StatusCode != 200 || resp.Header.Get("Cross-Origin-Embedder-Policy") != "require-corp" || resp.Header.Get("Cross-Origin-Resource-Policy") == "" {
+		t.Fatalf("%s: %v %v", AudioWorkletName, resp, err)
+	}
+	served, _ := io.ReadAll(resp.Body)
+	resp.Body.Close()
+	if !bytes.Equal(served, audioring.WorkletJS) || len(served) == 0 {
+		t.Error("the served worklet differs from audioring.WorkletJS")
+	}
+	for _, want := range []string{`"audio.js"`, `"` + AudioWorkletName + `"`} {
+		if !bytes.Contains(sw, []byte(want)) {
+			t.Errorf("sw.js shell lacks %s", want)
+		}
 	}
 	if r, _ := http.Get(srv.URL + "/elsewhere"); r.StatusCode != 404 {
 		t.Fatal("served outside the prefix")

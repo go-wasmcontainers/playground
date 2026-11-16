@@ -69,6 +69,34 @@ func TestSessionLifecycle(t *testing.T) {
 	}
 }
 
+// Click is a pointer move, a press and a release in one Perform Actions call
+// (a trusted gesture), and PerformActions sends its sources as they are.
+func TestClickIsPerformActions(t *testing.T) {
+	var got []string
+	c := fake(t, &got)
+	ctx := context.Background()
+	s, err := c.NewSession(ctx, map[string]any{"browserName": "Safari"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	got = nil
+	if err := s.Click(ctx, 12, 34); err != nil {
+		t.Fatal(err)
+	}
+	want := `POST /session/S1/actions {"actions":[{"actions":[{"duration":0,"origin":"viewport","type":"pointerMove","x":12,"y":34},` +
+		`{"button":0,"type":"pointerDown"},{"button":0,"type":"pointerUp"}],"id":"mouse","parameters":{"pointerType":"mouse"},"type":"pointer"}]}`
+	if len(got) != 1 || got[0] != want {
+		t.Fatalf("Click sent %q\nwant %q", got, want)
+	}
+	got = nil
+	if err := s.PerformActions(ctx, []any{map[string]any{"type": "none", "id": "x", "actions": []any{}}}); err != nil {
+		t.Fatal(err)
+	}
+	if len(got) != 1 || got[0] != `POST /session/S1/actions {"actions":[{"actions":[],"id":"x","type":"none"}]}` {
+		t.Fatalf("PerformActions sent %q", got)
+	}
+}
+
 func TestErrorResponse(t *testing.T) {
 	var got []string
 	c := fake(t, &got)

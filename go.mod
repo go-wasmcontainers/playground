@@ -8,16 +8,17 @@ require (
 	github.com/go-wasmcontainers/build v0.4.0
 	github.com/go-wasmcontainers/compose v0.6.0
 	github.com/go-wasmcontainers/dashboard v0.11.0
-	github.com/go-wasmcontainers/engine v0.39.0
+	github.com/go-wasmcontainers/engine v0.40.0
 	github.com/go-wasmcontainers/gpu v0.14.0
 	github.com/go-wasmcontainers/relay v0.3.1
 	github.com/go-widgets/mvvm v0.15.0
 	github.com/go-widgets/toolkit v0.362.0
 	github.com/go-widgets/webcanvas v0.14.0
-	github.com/klauspost/compress v1.20.3
+	github.com/klauspost/compress v1.20.4
 	github.com/mxschmitt/playwright-go v0.6401.0
 	github.com/spf13/cobra v1.10.2
 	github.com/stealthrocket/net v0.2.1
+	github.com/wasmdesk/wasmbox/audioring v0.2.0
 )
 
 require (
@@ -103,7 +104,7 @@ require (
 	github.com/go-opentype/fonts v0.14.0 // indirect
 	github.com/go-opentype/opentype v0.16.2-0.20261027113239-5e69589e9a5e // indirect
 	github.com/go-opentype/shape v0.7.0 // indirect
-	github.com/go-quake1/engine v0.21.0 // indirect
+	github.com/go-quake1/engine v0.22.0 // indirect
 	github.com/go-richdoc/richdoc v0.7.0 // indirect
 	github.com/go-sql-driver/mysql v1.10.1 // indirect
 	github.com/go-stack/stack v1.8.1 // indirect
@@ -167,7 +168,6 @@ require (
 	github.com/tetratelabs/wazero v1.12.0 // indirect
 	github.com/ulikunitz/xz v0.5.17 // indirect
 	github.com/valyala/fastjson v1.6.10 // indirect
-	github.com/wasmdesk/wasmbox/audioring v0.1.0 // indirect
 	github.com/yeqown/go-qrcode/v2 v2.2.5 // indirect
 	github.com/yeqown/reedsolomon v1.0.0 // indirect
 	github.com/zclconf/go-cty v1.19.0 // indirect
@@ -185,8 +185,8 @@ require (
 	golang.org/x/net v0.62.0 // indirect
 	golang.org/x/oauth2 v0.37.0 // indirect
 	golang.org/x/sync v0.24.0 // indirect
-	golang.org/x/sys v0.49.0 // indirect
-	golang.org/x/term v0.47.0 // indirect
+	golang.org/x/sys v0.50.0 // indirect
+	golang.org/x/term v0.48.0 // indirect
 	golang.org/x/text v0.43.0 // indirect
 	golang.org/x/tools v0.52.0 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20260817212433-ac3dfec99bb1 // indirect

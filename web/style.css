@@ -122,6 +122,40 @@ body.dash #classbar {
   border: 0;
   width: 100%;
 }
+/* Sound (audio.js): one row per container playing, and the page-wide mute. A
+   fixed strip at the bottom left, over either UI. */
+#soundbar {
+  position: fixed;
+  z-index: 1;
+  left: 12px;
+  bottom: 12px;
+  max-width: calc(100vw - 24px);
+  padding: 6px 10px;
+  background: rgba(15, 20, 25, 0.92);
+  border: 1px solid #253340;
+  border-radius: 6px;
+  color: var(--fg);
+}
+#soundbar .soundhead, #soundbar .soundrow {
+  display: flex;
+  align-items: center;
+  gap: 0.8em;
+}
+#soundbar button {
+  font: inherit;
+  color: var(--accent);
+  background: none;
+  border: 0;
+  padding: 0;
+  cursor: pointer;
+  text-decoration: underline;
+}
+#soundbar button[aria-pressed="true"] {
+  color: #f07178;
+}
+#soundbar input[type="range"] {
+  width: 8em;
+}
 #joindlg input, #exploredlg input {
   display: block;
   width: 100%;
