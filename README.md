@@ -15,7 +15,8 @@ and sees what they do — no virtual machine, no server: the
 **Open it: <https://go-wasmcontainers.github.io/playground/>** — the
 [dashboard](https://github.com/go-wasmcontainers/dashboard) (Containers,
 Images, Volumes, Terminal; logs and stats of the selected container, stop,
-start and remove buttons that print the `wctr` command they ran). The
+start and remove buttons, which act on every selected row (Shift-click
+selects several), that print the `wctr` command they ran). The
 dashboard's Terminal is [go-widgets/shellterm](https://github.com/go-widgets/shellterm),
 the line-oriented terminal shared with wasmdesk (go-widgets/toolkit#548),
 and it copies and pastes with the system clipboard: select and
