@@ -269,7 +269,7 @@ func TestQuakeAudio(t *testing.T) {
 	}
 
 	// 4. Detached, with --audio: the page plays the stream.
-	a.must("wctr run -d --name qs --gpu --audio -m 512m quake --map e1m1", 0)
+	a.must("wctr run -d --name qs --gpu --audio -m 512m quake --map e1m1 --slowtics 300", 0)
 	a.until("the page got no sound stream from quake", `() => window.__wctrAudio && window.__wctrAudio.stats().some((s) => s.attached)`, 90*time.Second)
 	a.until("the AudioContext is not running", `() => window.__wctrAudio.state() === "running"`, 10*time.Second)
 	a.until("quake's stream played nothing", `() => window.__wctrAudio.stats().some((s) => s.played > 0)`, 30*time.Second)
@@ -298,5 +298,12 @@ func TestQuakeAudio(t *testing.T) {
 		return r.Rms
 	})
 	sk.finish(t)
+	// The same session's own account of its slow tics (--slowtics 300 below): the
+	// game's windows of 300 frames, beside the underruns just counted.
+	logs := a.must("wctr logs qs", 0)
+	t.Logf("the soak game's slow tics, window by window (%d windows):", strings.Count(logs, "slowtics:")+strings.Count(logs, "slowtics: none"))
+	for _, l := range slowTicLines(logs) {
+		t.Log(l)
+	}
 	a.must("wctr rm -f qs", 0)
 }

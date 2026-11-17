@@ -54,7 +54,7 @@ func TestQuakeAudioFirefox(t *testing.T) {
 		t.Errorf("the mixer offered %.3f of the game's time with its stalls added back, want %.2f to %.3f", withStalls, pacedAccountedMin, pacedRatioMax(300/fps))
 	}
 
-	b.must("wctr run -d --gpu --audio -m 512m --name qa quake --map e1m1", 0)
+	b.must("wctr run -d --gpu --audio -m 512m --name qa quake --map e1m1 --slowtics 300", 0)
 	b.until("the page got no sound stream from quake", `() => window.__wctrAudio && window.__wctrAudio.stats().some((s) => s.attached)`, 90*time.Second)
 	b.until("the AudioContext is not running", `() => window.__wctrAudio.state() === "running"`, 20*time.Second)
 	b.until("quake's stream played nothing", `() => window.__wctrAudio.stats().some((s) => s.played > 0)`, 30*time.Second)
@@ -67,5 +67,9 @@ func TestQuakeAudioFirefox(t *testing.T) {
 		return r.Rms
 	})
 	sk.finish(t)
+	_, logs := b.run("wctr logs qa")
+	for _, l := range slowTicLines(logs) {
+		t.Log(l)
+	}
 	b.must("wctr rm -f qa", 0)
 }
