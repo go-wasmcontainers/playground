@@ -251,6 +251,9 @@ func TestQuakeAudio(t *testing.T) {
 	for _, l := range slowTicLines(out) {
 		t.Log(l)
 	}
+	if m := regexp.MustCompile(`phases over \d+ frames: [^$]*?gpu-max-ms=[0-9.]+`).FindString(strings.NewReplacer("\r", "", "\n", "").Replace(out)); m != "" {
+		t.Log(m) // the per-phase means of the whole run, beside the slow tics
+	}
 	if !pacedRatioOK(after, withStalls, s1) {
 		t.Errorf("paced mixer: ratio %.3f, with the %d frames its %d stalled tics dropped %.3f, want %.2f to %.3f: it under-produced or over-produced, which a slow game does not explain",
 			after, dropped, stalls, withStalls, pacedAccountedMin, pacedRatioMax(s1))
