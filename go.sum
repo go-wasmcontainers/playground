@@ -193,8 +193,8 @@ github.com/go-opentype/shape v0.7.0 h1:hXUkI4xdpkzq31ZYf/6zfkDAgRLZnTjI1q8DWLu5M
 github.com/go-opentype/shape v0.7.0/go.mod h1:n8pMQ/MH4Oscxwd9J0B7RiZ5gKlD0yagRQKYsAmJ9Rw=
 github.com/go-pkgx/bottle v0.62.1 h1:nRYT3D3rh7OO5BYMfsYUlCPyUqy1xHQVBtPvwycKdiI=
 github.com/go-pkgx/bottle v0.62.1/go.mod h1:9oPPTz08i7RVWFtMHXP2MTyp1GjuWAYRd4sV+EvQUdw=
-github.com/go-quake1/engine v0.34.0 h1:XyNyyYwsmGME0+x96StzWV+dlUWy/wkHFL3TEOvAHlY=
-github.com/go-quake1/engine v0.34.0/go.mod h1:bVXTBFT4GlFsmndJtV+aKBxCkBQz7jv4StzLdn1qHgc=
+github.com/go-quake1/engine v0.36.0 h1:b38nET+Ka+0MTIKx33ns3mbJBV2zOIKTK8uxCNnAn9k=
+github.com/go-quake1/engine v0.36.0/go.mod h1:FcMd7pWW7qai1Gu6ZYEb77M2tIqmkPzL0nymITFhFx4=
 github.com/go-richdoc/richdoc v0.7.0 h1:vhHypa0y26ulrOz6Aw1RIzeLjSMsFJyU1SzK5jd90lg=
 github.com/go-richdoc/richdoc v0.7.0/go.mod h1:RhxAcqwoUg1pnTYCiRdKILzOZwOmraO0dMJI4N6yY70=
 github.com/go-sql-driver/mysql v1.10.1 h1:arlSnNLq6a5yxGxV7qg9lF4j0C+KwD6NbQyKr9QL6ME=
@@ -221,8 +221,8 @@ github.com/go-wasmcontainers/dashboard v0.12.0 h1:2odMQa6YTe9cpdRIKZR9RJCEFOdSVU
 github.com/go-wasmcontainers/dashboard v0.12.0/go.mod h1:iQLtsE/MM0XTgRqJpLBtUJPQqVE1gpIHuRkiAeDZO1k=
 github.com/go-wasmcontainers/engine v0.40.1 h1:JyrP4S6VZxAgpG2fQaqPLYkyQOKDryMDHkOYxS/pkzQ=
 github.com/go-wasmcontainers/engine v0.40.1/go.mod h1:BnNR6nUBFR3uOsRVJCMv95Xc9C6CRBmzyvPwtLoyK5I=
-github.com/go-wasmcontainers/gpu v0.14.3 h1:GAMtjaojyE2vZEZ77jruNNrNLhEJKcoyE4r9BLfMNzo=
-github.com/go-wasmcontainers/gpu v0.14.3/go.mod h1:4+YzzSE98EIOh+a6jVExWmFjdu7QDPCldlNta4R+unE=
+github.com/go-wasmcontainers/gpu v0.14.4 h1:4JNOSdTMolait9XX0Q3/qFxAadw4zBFiMuucZ6I3nSo=
+github.com/go-wasmcontainers/gpu v0.14.4/go.mod h1:Jzc6WAd1d2/luQ78fNuZCMBSwi85h1Y3c9SGeg/1m5c=
 github.com/go-wasmcontainers/llm v0.1.0 h1:gzW0o0RGCZwOW5Tv60L/TDNOqRB340S5X41pQ8l79qc=
 github.com/go-wasmcontainers/llm v0.1.0/go.mod h1:fjqoPPBYFUzTjAFatPonMqFsDmv6QcuWIB19t8gKEGM=
 github.com/go-wasmcontainers/relay v0.3.1 h1:KJBOwZ6L+XHB3VAWVx1n+0TAA4UJTnFwJOMS6wfbd9U=
