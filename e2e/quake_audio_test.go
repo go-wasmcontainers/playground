@@ -323,5 +323,10 @@ func TestQuakeAudio(t *testing.T) {
 	for _, l := range slowTicLines(logs) {
 		t.Log(l)
 	}
+	// The soak game has more goroutines than the 300-frame run (8 against 1): the
+	// first window's dump names them.
+	if d := goroutineDump(logs); d != "" {
+		t.Logf("the soak game's goroutines:\n%s", d)
+	}
 	a.must("wctr rm -f qs", 0)
 }

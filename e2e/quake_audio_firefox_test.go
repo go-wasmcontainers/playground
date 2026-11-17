@@ -74,5 +74,8 @@ func TestQuakeAudioFirefox(t *testing.T) {
 	for _, l := range slowTicLines(logs) {
 		t.Log(l)
 	}
+	if d := goroutineDump(logs); d != "" {
+		t.Logf("the soak game's goroutines:\n%s", d)
+	}
 	b.must("wctr rm -f qa", 0)
 }
