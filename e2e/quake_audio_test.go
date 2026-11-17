@@ -79,9 +79,12 @@ func goroutineDump(out string) string {
 // an underrun count are read against. Empty on an engine without it.
 func ticTail(out string) string {
 	out = strings.NewReplacer("\r", "", "\n", "").Replace(out)
-	m := regexp.MustCompile(`(\d+ prepaid by the queue)[^;]*; (tics over [0-9. ]+s: \d+ \d+ \d+ \d+, longest [0-9.]+ s)`).FindStringSubmatch(out)
+	m := regexp.MustCompile(`(?:(\d+ prepaid by the queue)[^;]*)?; (tics over [0-9. ]+s: \d+ \d+ \d+ \d+, longest [0-9.]+ s)`).FindStringSubmatch(out)
 	if m == nil {
 		return ""
+	}
+	if m[1] == "" { // engine v0.43.0 and later: no prepaid mix any more
+		return m[2]
 	}
 	return m[1] + "; " + m[2]
 }
@@ -156,6 +159,14 @@ func TestPacedRatioBounds(t *testing.T) {
 	gaps := "audiogap frame=7 gap-ms=250.0 queued-ms=80.0 short-ms=170.0\naudiogap frame=11 gap-ms=130.0 queued-ms=50.0 short-ms=80.\n0\naudiogaps: 2 of 40 writes ran dry, 250 ms short in all, worst 170.0 ms, median queue before a dry gap 65.0 ms; writes more than 50 100 200 ms after the one before: 9 3 1\n"
 	if ls := slowTicLines(gaps); len(ls) != 3 || !strings.HasSuffix(ls[1], "short-ms=80.0") || !strings.HasSuffix(ls[2], "after the one before: 9 3 1") {
 		t.Errorf("slowTicLines on the audio gaps = %q", ls)
+	}
+	// The line of the reference mixahead (no prepaid mix).
+	noPrepaid := "audio: playing, 1 mix frames offered, 1 accepted, in 4.91 s: real-time ratio 0.99; 15.0 frames a second, 13794 mix frames dropped in 7 stalled tics, ratio with them 1.004; tics over 0.1 0.2 0.35 0.5 s: 9 5 3 1, longest 0.620 s\n"
+	if _, _, _, w, ok := stallsLine(noPrepaid); !ok || w != 1.004 {
+		t.Errorf("stallsLine did not read the line without prepaid mix: %v %v", w, ok)
+	}
+	if got, want := ticTail(noPrepaid), "tics over 0.1 0.2 0.35 0.5 s: 9 5 3 1, longest 0.620 s"; got != want {
+		t.Errorf("ticTail without prepaid = %q, want %q", got, want)
 	}
 	if got, want := ticTail(full), "900 prepaid by the queue; tics over 0.1 0.2 0.35 0.5 s: 9 5 3 1, longest 0.620 s"; got != want {
 		t.Errorf("ticTail = %q, want %q", got, want)
