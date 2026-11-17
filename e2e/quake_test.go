@@ -82,10 +82,7 @@ func TestQuake(t *testing.T) {
 // any browser (TestQuake: Chromium; TestQuakeFirefox: Firefox).
 //
 // minCompared is how many of the 120 frames of the GPU-world game loop must have
-// been compared with the CPU's: 25 on a real GPU in Chromium; Firefox on the CI
-// runner (138 ms per frame, software WebRender) compared 7 of 30 frames of the
-// earlier 30-frame run with engine v0.24.0 and all 30 on an Apple M4 Max, so its
-// lane asks for 5.
+// been compared with the CPU's: 25 in either browser.
 func quakeSteps(t *testing.T, b tab, minCompared int) {
 	t.Helper()
 	// Every frame the page receives: its size and a hash of its RGBA, and
@@ -163,14 +160,14 @@ func quakeSteps(t *testing.T, b tab, minCompared int) {
 	}
 	b.until("no GPU-world frame reached the page", `() => window.__q.hashes.length >= 25`, 30e9)
 
-	// 1d. The alias entities on the GPU (--gpu-entities, engine v0.24.0, off by
-	// default since v0.27.0: on the macOS CI lane the device was lost at the first
-	// frame with GPU entities). E2E_GPU_ENTITIES=1 runs the check with them, which
-	// compares them too, requires some in view, and with the planted defect (the
-	// GPU's skins shifted by 16) must fail.
-	if os.Getenv("E2E_GPU_ENTITIES") == "1" {
+	// 1d. The alias entities on the GPU (on by default since engine v0.29.0; on
+	// the macOS CI lane the device had been lost at the first frame with them,
+	// because a handle was collected and its id reused). The check compares them
+	// too, requires some in view, and with the planted defect (the GPU's skins
+	// shifted by 16) must fail.
+	{
 		b.eval(`() => { window.__q.hashes = []; }`)
-		out = b.must("wctr run --rm --gpu -m 512m quake --map e1m1 --gpuworld --gpu-entities --gpuworld-check --frames 120", 0, "gpuworld check PASS")
+		out = b.must("wctr run --rm --gpu -m 512m quake --map e1m1 --gpuworld --gpuworld-check --frames 120", 0, "gpuworld check PASS")
 		me := regexp.MustCompile(`(\d+) alias entities drawn by the GPU over (\d+) frames`).FindStringSubmatch(out)
 		if me == nil {
 			t.Fatalf("no entity line in the check's output:\n%s", out)
@@ -181,7 +178,7 @@ func quakeSteps(t *testing.T, b tab, minCompared int) {
 		}
 		ent := regexp.MustCompile(`gpuworld check: entities: [^\n]*`)
 		t.Logf("%s", ent.FindString(out))
-		out = b.must("wctr run --rm --gpu -m 512m quake --map e1m1 --gpuworld --gpu-entities --gpuworld-check --corrupt-gpu-skins --frames 120", 1, "above the tolerance")
+		out = b.must("wctr run --rm --gpu -m 512m quake --map e1m1 --gpuworld --gpuworld-check --corrupt-gpu-skins --frames 120", 1, "above the tolerance")
 		t.Logf("planted defect (GPU skins shifted by 16): %s", ent.FindString(out))
 	}
 
