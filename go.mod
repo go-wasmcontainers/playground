@@ -3,7 +3,7 @@ module github.com/go-wasmcontainers/playground
 go 1.27.4
 
 require (
-	github.com/go-gfx/webgpu v0.18.0
+	github.com/go-gfx/webgpu v0.19.1
 	github.com/go-pkgx/bottle v0.62.1
 	github.com/go-wasmcontainers/build v0.4.0
 	github.com/go-wasmcontainers/compose v0.6.0
@@ -104,7 +104,7 @@ require (
 	github.com/go-opentype/fonts v0.14.0 // indirect
 	github.com/go-opentype/opentype v0.16.2-0.20261027113239-5e69589e9a5e // indirect
 	github.com/go-opentype/shape v0.7.0 // indirect
-	github.com/go-quake1/engine v0.29.0 // indirect
+	github.com/go-quake1/engine v0.33.0 // indirect
 	github.com/go-richdoc/richdoc v0.7.0 // indirect
 	github.com/go-sql-driver/mysql v1.10.1 // indirect
 	github.com/go-stack/stack v1.8.1 // indirect
