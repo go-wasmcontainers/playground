@@ -57,10 +57,21 @@ func stallsLine(out string) (fps float64, dropped, stalls int, withStalls float6
 func slowTicLines(out string) []string {
 	out = strings.NewReplacer("\r", "", "\n", "").Replace(out)
 	var lines []string
-	for _, m := range regexp.MustCompile(`slowtic(?: frame=\d+ [^;]*?gc-pause-ms=[0-9.]+|s: \d+ over .*?gc-pause [0-9.]+%|s: none over [0-9]+ ms in \d+ frames)|audiogap frame=\d+ gap-ms=[0-9.]+ queued-ms=[0-9.]+ short-ms=[0-9.]+|audiogaps: \d+ of \d+ writes ran dry[^;]*?; writes more than 50 100 200 ms after the one before: \d+ \d+ \d+`).FindAllString(out, -1) {
+	for _, m := range regexp.MustCompile(`slowtic(?: frame=\d+ [^;]*?gc-pause-ms=[0-9.]+|s: \d+ over .*?gc-pause [0-9.]+%|s: none over [0-9]+ ms in \d+ frames)|audiogap frame=\d+ gap-ms=[0-9.]+ queued-ms=[0-9.]+ short-ms=[0-9.]+|audiogaps: \d+ of \d+ writes ran dry[^;]*?; writes more than 50 100 200 ms after the one before: \d+ \d+ \d+|yieldshare: of the \d+ ms the slow tics spent in the yield, collector background mark \d+ ms \(\d+%\), other goroutines \d+ ms \(\d+%\)`).FindAllString(out, -1) {
 		lines = append(lines, m)
 	}
 	return lines
+}
+
+// goroutineDump is the game's dump of its goroutines (go-quake1/engine, printed
+// once after the report), as it came: the terminal wraps its lines, so it is kept
+// whole, from its first line to the end of the output, cut at 6000 bytes.
+func goroutineDump(out string) string {
+	i := strings.Index(out, "goroutines: goroutine profile")
+	if i < 0 {
+		return ""
+	}
+	return out[i:min(len(out), i+6000)]
 }
 
 // ticTail is what the game says about its tic lengths and the mix its queue had
@@ -254,6 +265,9 @@ func TestQuakeAudio(t *testing.T) {
 	t.Logf("paced run: game %.1f fps, ratio %.3f, %d mix frames dropped in %d stalled tics, ratio with them %.3f; %s", gameFPS, after, dropped, stalls, withStalls, ticTail(out))
 	for _, l := range slowTicLines(out) {
 		t.Log(l)
+	}
+	if d := goroutineDump(out); d != "" {
+		t.Logf("the game's goroutines:\n%s", d)
 	}
 	if m := regexp.MustCompile(`phases over \d+ frames: [^$]*?gpu-max-ms=[0-9.]+`).FindString(strings.NewReplacer("\r", "", "\n", "").Replace(out)); m != "" {
 		t.Log(m) // the per-phase means of the whole run, beside the slow tics

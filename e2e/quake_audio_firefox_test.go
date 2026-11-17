@@ -50,6 +50,9 @@ func TestQuakeAudioFirefox(t *testing.T) {
 	for _, l := range slowTicLines(out) {
 		t.Log(l)
 	}
+	if d := goroutineDump(out); d != "" {
+		t.Logf("the game's goroutines:\n%s", d)
+	}
 	if withStalls < pacedAccountedMin || withStalls > pacedRatioMax(300/fps) {
 		t.Errorf("the mixer offered %.3f of the game's time with its stalls added back, want %.2f to %.3f", withStalls, pacedAccountedMin, pacedRatioMax(300/fps))
 	}
