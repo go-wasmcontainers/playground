@@ -208,6 +208,19 @@ func freshTab(t *testing.T, browser playwright.Browser, url, who string) audioTa
 	if err != nil {
 		t.Fatal(err)
 	}
+	// E2E_CPU_THROTTLE=4 slows the page's main thread 4x (CDP
+	// Emulation.setCPUThrottlingRate): the local comparison that tells a VM's
+	// slowness from a code path that scales badly.
+	if v := os.Getenv("E2E_CPU_THROTTLE"); v != "" {
+		rate, err := strconv.ParseFloat(v, 64)
+		if err != nil || rate < 1 {
+			t.Fatalf("E2E_CPU_THROTTLE=%q", v)
+		}
+		if _, err := cdp.Send("Emulation.setCPUThrottlingRate", map[string]interface{}{"rate": rate}); err != nil {
+			t.Fatal(err)
+		}
+		t.Logf("CPU throttling %gx on the page's main thread", rate)
+	}
 	a := audioTab{tab{t, quietPage{cdp}, who}, page}
 	a.ready()
 	return a
