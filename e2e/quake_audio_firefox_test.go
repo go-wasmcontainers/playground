@@ -46,7 +46,7 @@ func TestQuakeAudioFirefox(t *testing.T) {
 	if !found {
 		t.Fatalf("the game's audio line has no stall accounting (go-quake1/engine#133):\n%s", out)
 	}
-	t.Logf("firefox paced run: game %.1f fps, %d mix frames dropped in %d stalled tics, ratio with them %.3f", fps, dropped, stalls, withStalls)
+	t.Logf("firefox paced run: game %.1f fps, %d mix frames dropped in %d stalled tics, ratio with them %.3f; %s", fps, dropped, stalls, withStalls, ticTail(out))
 	if withStalls < pacedAccountedMin || withStalls > pacedRatioMax(300/fps) {
 		t.Errorf("the mixer offered %.3f of the game's time with its stalls added back, want %.2f to %.3f", withStalls, pacedAccountedMin, pacedRatioMax(300/fps))
 	}

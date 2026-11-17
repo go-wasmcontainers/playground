@@ -26,16 +26,32 @@ type soundSoak struct {
 	first, last    reading
 	minBuf, maxBuf uint32
 	fps            []float64
+	line           []soakPoint
 }
 
 func newSoak(lane string, r reading) *soundSoak {
 	return &soundSoak{lane: lane, t0: time.Now(), first: r, last: r, minBuf: r.Buffered, maxBuf: r.Buffered}
 }
 
-// note records one reading of the stream.
+// note records one reading of the stream, and once a second a point of the
+// timeline: when the underruns happen against the ring's fill is what tells a
+// slow tic from a drift.
 func (s *soundSoak) note(r reading) {
 	s.last = r
 	s.minBuf, s.maxBuf = min(s.minBuf, r.Buffered), max(s.maxBuf, r.Buffered)
+	if t := time.Since(s.t0).Seconds(); len(s.line) == 0 || t-s.line[len(s.line)-1].T >= 1 {
+		s.line = append(s.line, soakPoint{T: t, Buffered: r.Buffered, Underruns: r.Underruns - s.first.Underruns,
+			Written: r.Written - s.first.Written, Played: r.Played - s.first.Played})
+	}
+}
+
+// soakPoint is the stream at one second of a soak.
+type soakPoint struct {
+	T         float64 `json:"t"`
+	Buffered  uint32  `json:"buffered"`
+	Underruns uint32  `json:"underruns"` // since the soak began
+	Written   uint32  `json:"written"`   // frames the mixer wrote since the soak began
+	Played    uint32  `json:"played"`    // frames the worklet consumed since the soak began
 }
 
 // noteFPS records the game's frame rate as the lane measured it.
@@ -51,13 +67,17 @@ type soakResult struct {
 	UnderrunsAll uint32  `json:"underrunsTotal"` // since the stream opened (the start-up included)
 	BufferedMin  uint32  `json:"bufferedMin"`
 	BufferedMax  uint32  `json:"bufferedMax"`
+	// Timeline is one point a second; Played over Written shows whether the
+	// worklet consumed faster than the mixer wrote (a drift) or the mixer paused
+	// (a slow tic).
+	Timeline []soakPoint `json:"timeline"`
 }
 
 func (s *soundSoak) result() soakResult {
 	secs := time.Since(s.t0).Seconds()
 	res := soakResult{Lane: s.lane, Seconds: secs,
 		Underruns: s.last.Underruns - s.first.Underruns, UnderrunsAll: s.last.Underruns,
-		BufferedMin: s.minBuf, BufferedMax: s.maxBuf}
+		BufferedMin: s.minBuf, BufferedMax: s.maxBuf, Timeline: s.line}
 	if secs > 0 && s.first.Rate > 0 {
 		res.MixRatio = float64(s.last.Written-s.first.Written) / (secs * s.first.Rate)
 	}

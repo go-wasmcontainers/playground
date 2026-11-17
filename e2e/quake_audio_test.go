@@ -39,7 +39,7 @@ func pacedRatioOK(ratio, withStalls, seconds float64) bool {
 // breaks are taken out first.
 func stallsLine(out string) (fps float64, dropped, stalls int, withStalls float64, ok bool) {
 	out = strings.NewReplacer("\r", "", "\n", "").Replace(out)
-	m := regexp.MustCompile(`real-time ratio [0-9.]+; ([0-9.]+) frames a second, (\d+) mix frames dropped in (\d+) stalled tics, ratio with them ([0-9.]+)`).FindStringSubmatch(out)
+	m := regexp.MustCompile(`real-time ratio [0-9.]+; ([0-9.]+) frames a second, (\d+) mix frames dropped in (\d+) stalled tics, (?:\d+ prepaid by the queue, )?ratio with them ([0-9.]+)`).FindStringSubmatch(out)
 	if m == nil {
 		return 0, 0, 0, 0, false
 	}
@@ -48,6 +48,18 @@ func stallsLine(out string) (fps float64, dropped, stalls int, withStalls float6
 	stalls, _ = strconv.Atoi(m[3])
 	withStalls, _ = strconv.ParseFloat(m[4], 64)
 	return fps, dropped, stalls, withStalls, true
+}
+
+// ticTail is what the game says about its tic lengths and the mix its queue had
+// already paid (go-quake1/engine#136), for the log: the distribution a ratio and
+// an underrun count are read against. Empty on an engine without it.
+func ticTail(out string) string {
+	out = strings.NewReplacer("\r", "", "\n", "").Replace(out)
+	m := regexp.MustCompile(`(\d+ prepaid by the queue)[^;]*; (tics over [0-9. ]+s: \d+ \d+ \d+ \d+, longest [0-9.]+ s)`).FindStringSubmatch(out)
+	if m == nil {
+		return ""
+	}
+	return m[1] + "; " + m[2]
 }
 
 // signalFloor is the worklet's RMS (linear, -60 dBFS) that a window of Quake's
@@ -106,6 +118,14 @@ func TestPacedRatioBounds(t *testing.T) {
 	// The wrapped line, as the terminal printed it on CI (a break after "in 7 ").
 	if _, _, _, w, ok := stallsLine("audio: playing, 1 mix frames offered, 1 accepted, in 4.91 s: real-time ratio 0.746; 15.0 frames a second, 13794 mix frames dropped in 7 \nstalled tics, ratio with them 0.996\n"); !ok || w != 0.996 {
 		t.Errorf("stallsLine did not read the engine's line: %v %v", w, ok)
+	}
+	// The line of engine v0.31.0 and later, wrapped by the terminal as well.
+	full := "audio: playing, 1 mix frames offered, 1 accepted, in 4.91 s: real-time ratio 0.746; 15.0 frames a second, 13794 mix frames dropped in 7 stalled tics, 900 prepaid by the \nqueue, ratio with them 1.004; tics over 0.1 0.2 0.35 0.5 s: 9 5 3 1, longest 0.620 s\n"
+	if _, _, _, w, ok := stallsLine(full); !ok || w != 1.004 {
+		t.Errorf("stallsLine did not read the line with the prepaid mix: %v %v", w, ok)
+	}
+	if got, want := ticTail(full), "900 prepaid by the queue; tics over 0.1 0.2 0.35 0.5 s: 9 5 3 1, longest 0.620 s"; got != want {
+		t.Errorf("ticTail = %q, want %q", got, want)
 	}
 }
 
@@ -209,7 +229,7 @@ func TestQuakeAudio(t *testing.T) {
 	if !ok {
 		t.Fatalf("the game's audio line has no stall accounting (go-quake1/engine#133):\n%s", out)
 	}
-	t.Logf("paced run: game %.1f fps, ratio %.3f, %d mix frames dropped in %d stalled tics, ratio with them %.3f", gameFPS, after, dropped, stalls, withStalls)
+	t.Logf("paced run: game %.1f fps, ratio %.3f, %d mix frames dropped in %d stalled tics, ratio with them %.3f; %s", gameFPS, after, dropped, stalls, withStalls, ticTail(out))
 	if !pacedRatioOK(after, withStalls, s1) {
 		t.Errorf("paced mixer: ratio %.3f, with the %d frames its %d stalled tics dropped %.3f, want %.2f to %.3f: it under-produced or over-produced, which a slow game does not explain",
 			after, dropped, stalls, withStalls, pacedAccountedMin, pacedRatioMax(s1))
