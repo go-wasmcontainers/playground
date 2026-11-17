@@ -223,8 +223,8 @@ github.com/go-wasmcontainers/engine v0.40.1 h1:JyrP4S6VZxAgpG2fQaqPLYkyQOKDryMDH
 github.com/go-wasmcontainers/engine v0.40.1/go.mod h1:BnNR6nUBFR3uOsRVJCMv95Xc9C6CRBmzyvPwtLoyK5I=
 github.com/go-wasmcontainers/gpu v0.14.4 h1:4JNOSdTMolait9XX0Q3/qFxAadw4zBFiMuucZ6I3nSo=
 github.com/go-wasmcontainers/gpu v0.14.4/go.mod h1:Jzc6WAd1d2/luQ78fNuZCMBSwi85h1Y3c9SGeg/1m5c=
-github.com/go-wasmcontainers/llm v0.1.0 h1:gzW0o0RGCZwOW5Tv60L/TDNOqRB340S5X41pQ8l79qc=
-github.com/go-wasmcontainers/llm v0.1.0/go.mod h1:fjqoPPBYFUzTjAFatPonMqFsDmv6QcuWIB19t8gKEGM=
+github.com/go-wasmcontainers/llm v0.5.1 h1:1ZiAkXeNeeGpV//OOQHvhQyDZKJHa5dBXMJCeYpALlI=
+github.com/go-wasmcontainers/llm v0.5.1/go.mod h1:zh/jb7OxlfAVm2KqYQ+r6Q2RqqzIKfjqdOHlRwUNgCk=
 github.com/go-wasmcontainers/relay v0.3.1 h1:KJBOwZ6L+XHB3VAWVx1n+0TAA4UJTnFwJOMS6wfbd9U=
 github.com/go-wasmcontainers/relay v0.3.1/go.mod h1:orl1CRgrYjvsy8pFIGVadebO7EE8x3pT92kAVvJp8Ok=
 github.com/go-widgets/android v0.16.0 h1:XZcVp5c67B4mDHF6g3kccg1gCWiHjCUltR2jECnXBy0=
