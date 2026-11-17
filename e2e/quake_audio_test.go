@@ -57,7 +57,7 @@ func stallsLine(out string) (fps float64, dropped, stalls int, withStalls float6
 func slowTicLines(out string) []string {
 	out = strings.NewReplacer("\r", "", "\n", "").Replace(out)
 	var lines []string
-	for _, m := range regexp.MustCompile(`slowtic(?: frame=\d+ [^;]*?gc-pause-ms=[0-9.]+|s: \d+ over .*?gc-pause [0-9.]+%|s: none over [0-9]+ ms in \d+ frames)`).FindAllString(out, -1) {
+	for _, m := range regexp.MustCompile(`slowtic(?: frame=\d+ [^;]*?gc-pause-ms=[0-9.]+|s: \d+ over .*?gc-pause [0-9.]+%|s: none over [0-9]+ ms in \d+ frames)|audiogap frame=\d+ gap-ms=[0-9.]+ queued-ms=[0-9.]+ short-ms=[0-9.]+|audiogaps: \d+ of \d+ writes ran dry[^;]*?; writes more than 50 100 200 ms after the one before: \d+ \d+ \d+`).FindAllString(out, -1) {
 		lines = append(lines, m)
 	}
 	return lines
@@ -141,6 +141,10 @@ func TestPacedRatioBounds(t *testing.T) {
 	slow := "slowtic frame=5 interval-ms=400.0 sim=20.0 world=50.0 gpu=200.0 copy=50.0 models=0.0 composite=10.0 present=20.0 unstaged=30.0 outside=20.\n0 audio-write=4.00 gc-cycles=2 gc-pause-ms=3.00\nslowtic frame=9 interval-ms=150.0 sim=1.0 world=1.0 gpu=1.0 copy=1.0 models=1.0 composite=1.0 present=1.0 unstaged=1.0 outside=140.0 audio-write=0.00 gc-cycles=0 gc-pause-ms=0.00\nslowtics: 2 over 100 ms, 550 ms in all; share of that time: sim 4% world 9% outside 29%; of it audio-write 0.7% gc-pause 0.5%\n"
 	if ls := slowTicLines(slow); len(ls) != 3 || !strings.HasSuffix(ls[0], "gc-pause-ms=3.00") || !strings.HasPrefix(ls[2], "slowtics: 2 over") || !strings.HasSuffix(ls[2], "gc-pause 0.5%") {
 		t.Errorf("slowTicLines = %q", ls)
+	}
+	gaps := "audiogap frame=7 gap-ms=250.0 queued-ms=80.0 short-ms=170.0\naudiogap frame=11 gap-ms=130.0 queued-ms=50.0 short-ms=80.\n0\naudiogaps: 2 of 40 writes ran dry, 250 ms short in all, worst 170.0 ms, median queue before a dry gap 65.0 ms; writes more than 50 100 200 ms after the one before: 9 3 1\n"
+	if ls := slowTicLines(gaps); len(ls) != 3 || !strings.HasSuffix(ls[1], "short-ms=80.0") || !strings.HasSuffix(ls[2], "after the one before: 9 3 1") {
+		t.Errorf("slowTicLines on the audio gaps = %q", ls)
 	}
 	if got, want := ticTail(full), "900 prepaid by the queue; tics over 0.1 0.2 0.35 0.5 s: 9 5 3 1, longest 0.620 s"; got != want {
 		t.Errorf("ticTail = %q, want %q", got, want)
