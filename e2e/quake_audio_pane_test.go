@@ -246,13 +246,35 @@ func TestQuakeAudioPane(t *testing.T) {
 		path := filepath.Join(traceDir, "pane-main-thread.json")
 		if err := browser.StartTracing(playwright.BrowserStartTracingOptions{
 			Page: page, Path: &path,
-			Categories: []string{"-*", "toplevel", "devtools.timeline", "disabled-by-default-devtools.timeline", "v8.execute", "blink.user_timing", "disabled-by-default-v8.gc"},
+			// toplevel and devtools.timeline: the tasks and their JS calls; the V8 CPU
+			// profile: which wasm (Go) functions fill them; user timing: the marks.
+			Categories: []string{"-*", "toplevel", "devtools.timeline", "disabled-by-default-v8.cpu_profiler", "blink.user_timing"},
 		}); err != nil {
 			t.Fatalf("start tracing: %v", err)
 		}
 		if _, err := page.Evaluate(`() => performance.mark("polled-soak")`); err != nil {
 			t.Fatal(err)
 		}
+	}
+	// What the page's main thread does, as a user's page sees it: the long tasks
+	// (over 50 ms, the Long Tasks API) and the animation frames it ran. The guest
+	// waits for this thread in present.
+	if _, err := page.Evaluate(`() => {
+	  const lt = (window.__lt = { n: 0, max: 0, frames: 0, t0: performance.now() });
+	  try { new PerformanceObserver((l) => { for (const e of l.getEntries()) { lt.n++; lt.max = Math.max(lt.max, e.duration); } }).observe({ type: "longtask", buffered: false }); } catch (e) {}
+	  const tick = () => { lt.frames++; requestAnimationFrame(tick); };
+	  requestAnimationFrame(tick);
+	  return true;
+	}`); err != nil {
+		t.Fatal(err)
+	}
+	pageLoad := func(what string) {
+		v, err := page.Evaluate(`() => { const lt = window.__lt, s = (performance.now() - lt.t0) / 1000, r = { n: lt.n, max: lt.max, fps: lt.frames / s, s }; lt.n = 0; lt.max = 0; lt.frames = 0; lt.t0 = performance.now(); return r; }`)
+		if err != nil {
+			t.Fatal(err)
+		}
+		m, _ := v.(map[string]any)
+		t.Logf("PAGE %s: %.0f s, %.0f animation frames a second, %.0f long tasks over 50 ms, the longest %.0f ms", what, num(m["s"]), num(m["fps"]), num(m["n"]), num(m["max"]))
 	}
 	polls := 0
 	requireSignal(t, "pane", 65-int(time.Since(testStart).Seconds()), func() float64 {
@@ -267,6 +289,12 @@ func TestQuakeAudioPane(t *testing.T) {
 		return r.Rms
 	})
 	sk.finish(t)
+	pageLoad("soak (with the test's polling and keys)")
+	if traceDir == "" {
+		// The quiet period is also measured without a trace: 20 s of no polling.
+		time.Sleep(20 * time.Second)
+		pageLoad("quiet (no polling, no keys)")
+	}
 	if traceDir != "" {
 		// 20 s with no polling and no keys: only the page and the game.
 		before := streamReading(t, page)
@@ -278,6 +306,7 @@ func TestQuakeAudioPane(t *testing.T) {
 		if _, err := page.Evaluate(`() => performance.mark("quiet-end")`); err != nil {
 			t.Fatal(err)
 		}
+		pageLoad("quiet (no polling, no keys)")
 		if _, err := browser.StopTracing(); err != nil {
 			t.Errorf("stop tracing: %v", err)
 		}
