@@ -70,7 +70,7 @@ func TestQuakeAudioPane(t *testing.T) {
 
 	// Typing the command is a user gesture (sticky activation), so the page's
 	// AudioContext starts as soon as the stream opens.
-	d.run("wctr run -d --gpu --audio -m 512m --name q quake")
+	d.run("wctr run -d --gpu --audio -m 512m --name q quake --slowtics 300 --slowtics-brief")
 	d.until("quake running", 120*time.Second, func(p ui.Probe) bool {
 		return len(p.Containers) == 1 && strings.Contains(p.Status[1], "1 running")
 	})
@@ -259,5 +259,14 @@ func TestQuakeAudioPane(t *testing.T) {
 	}
 
 	d.press("F6", "ArrowUp") // Surfaces -> Terminal
+	// The pane game's own account of its slow tics and dry writes (--slowtics 300
+	// --slowtics-brief below), read from the terminal: the summary lines of its
+	// windows, beside the underruns just counted.
+	d.run("clear")
+	d.run("wctr logs q")
+	time.Sleep(2 * time.Second)
+	for _, l := range slowTicLines(d.state().Terminal) {
+		t.Log("pane game: " + l)
+	}
 	d.run("wctr rm -f q")
 }
