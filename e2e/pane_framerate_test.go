@@ -249,6 +249,44 @@ func TestPaneFrameRate(t *testing.T) {
 	row("guest, pane hidden", 12, ew)
 	d.run("wctr rm -f q")
 	time.Sleep(3 * time.Second)
+	// The pane lane's game flags, toggled one at a time (the cells above had
+	// neither): --audio, --slowtics, both. Same row, same probes.
+	for _, cell := range []struct{ name, flags string }{
+		{"guest +audio", "--audio"},
+		{"guest +slowtics", ""},
+		{"guest +audio +slowtics", "--audio"},
+	} {
+		args := "wctr run -d --gpu " + cell.flags + " -m 512m --name q quake"
+		if strings.Contains(cell.name, "slowtics") {
+			args += " --slowtics 300 --slowtics-brief"
+		}
+		d.run(args)
+		d.until("quake running ("+cell.name+")", 120*time.Second, func(p ui.Probe) bool {
+			return len(p.Containers) == 1 && strings.Contains(p.Status[1], "1 running")
+		})
+		show("Surfaces", "ArrowDown")
+		d.until("a frame in the pane ("+cell.name+")", 90*time.Second, func(p ui.Probe) bool {
+			// the earlier cells' panes stay (dismissable) beside the new one
+			return p.View == "Surfaces" && len(p.SurfaceBoxes) >= 1 && p.SurfaceBoxes[len(p.SurfaceBoxes)-1].W > 0
+		})
+		var cw playwright.Worker
+		for _, x := range page.Workers() {
+			if strings.Contains(x.URL(), "engine-worker") {
+				cw = x
+			}
+		}
+		if cw == nil {
+			t.Fatalf("no engine worker for %s", cell.name)
+		}
+		if _, err := cw.Evaluate(workerProbeJS); err != nil {
+			t.Fatal(err)
+		}
+		time.Sleep(3 * time.Second)
+		row(cell.name, 12, cw)
+		show("Terminal", "ArrowUp")
+		d.run("wctr rm -f q")
+		time.Sleep(3 * time.Second)
+	}
 	if w < 16 || h < 16 {
 		w, h = 640, 400
 	}
