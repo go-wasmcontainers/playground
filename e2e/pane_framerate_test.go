@@ -50,13 +50,14 @@ const frameProbeJS = `() => {
 // (onSubmittedWorkDone), what transferToImageBitmap costs, when it posts frames.
 const workerProbeJS = `() => {
   if (self.__wf) return true;
-  const wf = (self.__wf = { done: [], xfer: [], post: [], subm: 0, on: false, t0: 0 });
+  const wf = (self.__wf = { done: [], xfer: [], post: [], subm: 0, on: false, t0: 0, stacks: {} });
   if (self.GPUQueue) {
     const sub = GPUQueue.prototype.submit;
     GPUQueue.prototype.submit = function (c) {
+      if (self.__noKick && c && c.length === 0) return undefined;
       const t = performance.now();
       const r = sub.call(this, c);
-      if (wf.on) { wf.subm++; this.onSubmittedWorkDone().then(() => { wf.done.push(performance.now() - t); }); }
+      if (wf.on) { wf.subm++; const k = (c.length || 0) + " cb " + String(new Error().stack).split("\n").slice(2, 6).map((l) => l.trim().replace(/^at /, "").replace(/\(.*\/|\)$/g, "")).join(" < "); wf.stacks[k] = (wf.stacks[k] || 0) + 1; this.onSubmittedWorkDone().then(() => { wf.done.push(performance.now() - t); }); }
       return r;
     };
   }
@@ -67,8 +68,8 @@ const workerProbeJS = `() => {
   const pm = self.postMessage;
   self.postMessage = function (m, ...r) { if (wf.on && m && m.t === "frame") wf.post.push(performance.now()); return pm.call(this, m, ...r); };
   const stat = (a) => { if (!a.length) return { mean: 0, p95: 0, max: 0 }; const b = [...a].sort((x, y) => x - y); return { mean: a.reduce((s, v) => s + v, 0) / a.length, p95: b[Math.min(b.length - 1, Math.floor(0.95 * b.length))], max: b[b.length - 1] }; };
-  self.__wfStart = () => { wf.done = []; wf.xfer = []; wf.post = []; wf.subm = 0; wf.t0 = performance.now(); wf.on = true; };
-  self.__wfStop = () => { wf.on = false; const s = (performance.now() - wf.t0) / 1000; return { s, submits: wf.subm / s, done: stat(wf.done), xfer: stat(wf.xfer), posted: wf.post.length / s }; };
+  self.__wfStart = () => { wf.done = []; wf.xfer = []; wf.post = []; wf.stacks = {}; wf.subm = 0; wf.t0 = performance.now(); wf.on = true; };
+  self.__wfStop = () => { wf.on = false; const s = (performance.now() - wf.t0) / 1000; return { s, submits: wf.subm / s, done: stat(wf.done), xfer: stat(wf.xfer), posted: wf.post.length / s, stacks: wf.stacks }; };
   return true;
 }`
 
@@ -191,6 +192,16 @@ func TestPaneFrameRate(t *testing.T) {
 				f1(wm["submits"]), ws("done", "mean"), ws("done", "p95"), ws("done", "max"), ws("xfer", "mean"), f1(wm["posted"]))
 		}
 		t.Log(line)
+		if w != nil {
+			sv, _ := w.Evaluate(`() => Object.entries(self.__wf.stacks)`)
+			ents, _ := sv.([]any)
+			for _, e := range ents {
+				kv, _ := e.([]any)
+				if len(kv) == 2 {
+					t.Logf("FRAMERATE   submit site (%s): %.0f x %v", name, f1(kv[1]), kv[0])
+				}
+			}
+		}
 		return f1(m["w"]), f1(m["h"])
 	}
 
@@ -224,6 +235,15 @@ func TestPaneFrameRate(t *testing.T) {
 	}
 	time.Sleep(3 * time.Second) // warm-up
 	w, h := row("guest, pane shown", 12, ew)
+	// The empty submits are the host library's kicks (kick.go: a Firefox-only
+	// workaround, sent on every browser while a wait pends); drop them in the probe.
+	if _, err := ew.Evaluate(`() => { self.__noKick = true; return true; }`); err != nil {
+		t.Fatal(err)
+	}
+	row("guest, kicks dropped", 12, ew)
+	if _, err := ew.Evaluate(`() => { self.__noKick = false; return true; }`); err != nil {
+		t.Fatal(err)
+	}
 	show("Terminal", "ArrowUp") // the pane is hidden, the guest still runs
 	time.Sleep(2 * time.Second)
 	row("guest, pane hidden", 12, ew)
