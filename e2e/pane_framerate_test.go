@@ -255,6 +255,9 @@ func TestPaneFrameRate(t *testing.T) {
 		{"guest +audio", "--audio"},
 		{"guest +slowtics", ""},
 		{"guest +audio +slowtics", "--audio"},
+		// the first cell again, last: the order control (a runner that slows down
+		// over the run would show it here, with no flag)
+		{"guest plain again", ""},
 	} {
 		args := "wctr run -d --gpu " + cell.flags + " -m 512m --name q quake"
 		if strings.Contains(cell.name, "slowtics") {
@@ -316,4 +319,6 @@ func TestPaneFrameRate(t *testing.T) {
 		t.Logf("FRAMERATE both controls: the GPU loop ran %.1f iterations/s, %.0f bitmaps drawn", f1(m["perSec"]), f1(m["bitmaps"]))
 	}
 	_, _ = page.Evaluate(`() => window.__ctl.stopUpload()`)
+	time.Sleep(2 * time.Second)
+	row("idle again", 8, nil)
 }
