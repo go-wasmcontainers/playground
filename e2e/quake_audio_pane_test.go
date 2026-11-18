@@ -5,6 +5,7 @@ package e2e
 import (
 	"math"
 	"os"
+	"path/filepath"
 	"slices"
 	"strings"
 	"testing"
@@ -232,6 +233,27 @@ func TestQuakeAudioPane(t *testing.T) {
 	// the volume at the pane's level, and Quake's sound must be there in every 5 s
 	// window (requireSignal): the ambient sounds loop. The pane's volume is 30 %
 	// and the tap is before the gains, so the floor is the worklet's.
+	// E2E_TRACE_DIR: a Chromium trace (CDP Tracing) of the page's main thread for
+	// the last of the soak and a quiet period after it, kept as a CI artifact. The
+	// soak below polls the stream every 10 ms and sends a key every 60 ms; the quiet
+	// period does neither, so the two are the page with the test's load and without
+	// it (go-wasmcontainers/playground#63: the guest waits in present for the page).
+	traceDir := os.Getenv("E2E_TRACE_DIR")
+	if traceDir != "" {
+		if err := os.MkdirAll(traceDir, 0o755); err != nil {
+			t.Fatal(err)
+		}
+		path := filepath.Join(traceDir, "pane-main-thread.json")
+		if err := browser.StartTracing(playwright.BrowserStartTracingOptions{
+			Page: page, Path: &path,
+			Categories: []string{"-*", "toplevel", "devtools.timeline", "disabled-by-default-devtools.timeline", "v8.execute", "blink.user_timing", "disabled-by-default-v8.gc"},
+		}); err != nil {
+			t.Fatalf("start tracing: %v", err)
+		}
+		if _, err := page.Evaluate(`() => performance.mark("polled-soak")`); err != nil {
+			t.Fatal(err)
+		}
+	}
 	polls := 0
 	requireSignal(t, "pane", 65-int(time.Since(testStart).Seconds()), func() float64 {
 		alive()
@@ -245,6 +267,22 @@ func TestQuakeAudioPane(t *testing.T) {
 		return r.Rms
 	})
 	sk.finish(t)
+	if traceDir != "" {
+		// 20 s with no polling and no keys: only the page and the game.
+		before := streamReading(t, page)
+		if _, err := page.Evaluate(`() => performance.mark("quiet-soak")`); err != nil {
+			t.Fatal(err)
+		}
+		time.Sleep(20 * time.Second)
+		after := streamReading(t, page)
+		if _, err := page.Evaluate(`() => performance.mark("quiet-end")`); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := browser.StopTracing(); err != nil {
+			t.Errorf("stop tracing: %v", err)
+		}
+		t.Logf("QUIET pane: 20 s with no test polling and no keys: %d underruns (the soak above, with them: %d in %.0f s)", after.Underruns-before.Underruns, sk.result().Underruns, sk.result().Seconds)
+	}
 	hb := func() float64 {
 		v, _ := page.Evaluate(`() => { const s = window.__wctrAudio.stats()[0]; return s ? s.heartbeat : -1; }`)
 		return num(v)

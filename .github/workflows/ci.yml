@@ -243,6 +243,7 @@ jobs:
           E2E_GPU_REAL: ${{ matrix.real }}
           E2E_GPU_ARGS: ${{ matrix.args }}
           E2E_AUDIO_REPORT: ${{ runner.temp }}/audio.jsonl
+          E2E_TRACE_DIR: ${{ runner.temp }}/trace
         run: go test -tags e2e -count=1 -v -run '^(TestGPU(SurfaceInput)?|TestQuake(Soak|MenuMouse|Audio|AudioPane|SteadyState)?)$' -timeout 24m ./e2e/ > "$RUNNER_TEMP/gpu.log" 2>&1 && status=0 || status=$?; tail -60 "$RUNNER_TEMP/gpu.log"; grep -n -e 'SOUND ' -e 'paced run' -e 'real-time ratio' "$RUNNER_TEMP/gpu.log" || true; exit "$status"
       # The sound's numbers side by side (game fps, mixer rate, underruns, the
       # ring's fill), one JSON line per soak.
@@ -253,6 +254,7 @@ jobs:
           path: |
             ${{ runner.temp }}/audio.jsonl
             ${{ runner.temp }}/gpu.log
+            ${{ runner.temp }}/trace/pane-main-thread.json
 
   # The quake image in the real Firefox (e2e/firefox_test.go, go-wasmcontainers/
   # playground#56: exit 134 at the second frame, "Canvas not configured").
