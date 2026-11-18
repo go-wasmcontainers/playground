@@ -71,6 +71,12 @@ func TestQuakeAudioPane(t *testing.T) {
 
 	// Typing the command is a user gesture (sticky activation), so the page's
 	// AudioContext starts as soon as the stream opens.
+	// The browser's own animation-frame rate on this runner with the dashboard
+	// idle and no game: the guest is paced by the page's acknowledgements, one
+	// frame per animation frame, so this is the most frames a second it can have.
+	if v, err := page.Evaluate(`() => new Promise((res) => { let n = 0; const t0 = performance.now(); const f = () => { n++; if (performance.now() - t0 < 3000) requestAnimationFrame(f); else res(n / ((performance.now() - t0) / 1000)); }; requestAnimationFrame(f); })`); err == nil {
+		t.Logf("PAGE idle, before the game: %.1f animation frames a second", num(v))
+	}
 	d.run("wctr run -d --gpu --audio -m 512m --name q quake --slowtics 300 --slowtics-brief")
 	d.until("quake running", 120*time.Second, func(p ui.Probe) bool {
 		return len(p.Containers) == 1 && strings.Contains(p.Status[1], "1 running")
