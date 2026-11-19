@@ -193,8 +193,8 @@ github.com/go-opentype/shape v0.7.0 h1:hXUkI4xdpkzq31ZYf/6zfkDAgRLZnTjI1q8DWLu5M
 github.com/go-opentype/shape v0.7.0/go.mod h1:n8pMQ/MH4Oscxwd9J0B7RiZ5gKlD0yagRQKYsAmJ9Rw=
 github.com/go-pkgx/bottle v0.62.1 h1:nRYT3D3rh7OO5BYMfsYUlCPyUqy1xHQVBtPvwycKdiI=
 github.com/go-pkgx/bottle v0.62.1/go.mod h1:9oPPTz08i7RVWFtMHXP2MTyp1GjuWAYRd4sV+EvQUdw=
-github.com/go-quake1/engine v0.46.0 h1:myItD7Cp6sh3CXmQCiDU6ifaxw6x7IDPW/pIBlKEq3M=
-github.com/go-quake1/engine v0.46.0/go.mod h1:XKJ0r1SgQAkeBwK7oZEZLDjj5yI7m2ywQj505/EeYoM=
+github.com/go-quake1/engine v0.47.0 h1:AzmQgIRBT5ACLsVEauZZpm4l2fmUAIYyyMO/+e+KluY=
+github.com/go-quake1/engine v0.47.0/go.mod h1:XKJ0r1SgQAkeBwK7oZEZLDjj5yI7m2ywQj505/EeYoM=
 github.com/go-richdoc/richdoc v0.7.0 h1:vhHypa0y26ulrOz6Aw1RIzeLjSMsFJyU1SzK5jd90lg=
 github.com/go-richdoc/richdoc v0.7.0/go.mod h1:RhxAcqwoUg1pnTYCiRdKILzOZwOmraO0dMJI4N6yY70=
 github.com/go-sql-driver/mysql v1.10.1 h1:arlSnNLq6a5yxGxV7qg9lF4j0C+KwD6NbQyKr9QL6ME=
