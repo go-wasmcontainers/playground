@@ -108,6 +108,7 @@ func TestQuakeAudioPane(t *testing.T) {
 	testStart := time.Now() // the game has been playing since about now
 	// What the user hears is the underruns: counted from here to the end.
 	sk := newSoak("chromium/pane", streamReading(t, page))
+	watchUnderruns(t, page) // the page's underruns, with their wall-clock times
 
 	// alive fails the test, with the container's state and the end of its log,
 	// when the pane is gone: a game that ends cannot be measured.
@@ -338,8 +339,10 @@ func TestQuakeAudioPane(t *testing.T) {
 	d.run("clear")
 	d.run("wctr logs q")
 	time.Sleep(2 * time.Second)
-	for _, l := range slowTicLines(d.state().Terminal) {
+	lines := slowTicLines(d.state().Terminal)
+	for _, l := range lines {
 		t.Log("pane game: " + l)
 	}
+	matchUnderruns(t, takeUnderruns(t, page), parseDryGaps(lines))
 	d.run("wctr rm -f q")
 }
