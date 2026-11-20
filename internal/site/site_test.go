@@ -90,7 +90,10 @@ func TestBuildServeVerify(t *testing.T) {
 	if r, _ := http.Get(srv.URL + "/elsewhere"); r.StatusCode != 404 {
 		t.Fatal("served outside the prefix")
 	}
-	if _, err := Verify(context.Background(), srv.URL+"/playground/", m, time.Millisecond, nil); err != nil {
+	// A deadline, so that a Verify that never returns fails here instead of hanging.
+	vctx, vcancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer vcancel()
+	if _, err := Verify(vctx, srv.URL+"/playground/", m, time.Millisecond, nil); err != nil {
 		t.Fatal(err)
 	}
 	// A changed file is never "live".
