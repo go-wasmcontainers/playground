@@ -41,7 +41,8 @@ func TestBuildNeedsATempDir(t *testing.T) {
 	out := filepath.Join(t.TempDir(), "site")
 	t.Setenv("TMPDIR", filepath.Join(t.TempDir(), "missing"))
 	_, err := Build(context.Background(), Options{Root: "../..", Out: out, Version: "test"})
-	if err == nil || !strings.Contains(err.Error(), "missing") {
+	// The refusal is the temp directory's own, not a later go build's.
+	if err == nil || !strings.Contains(err.Error(), "missing") || strings.HasPrefix(err.Error(), "go build") {
 		t.Fatalf("Build with no temp dir: %v", err)
 	}
 }
@@ -194,9 +195,10 @@ func TestStampRefusals(t *testing.T) {
 		over map[string]string
 		want string
 	}{
-		{"dot-file", map[string]string{".nojekyll": ""}, "dot-files"},
-		{"no index", map[string]string{"index.html": "\x00"}, "index.html"},
-		{"no worker", map[string]string{"sw.js": "\x00"}, "sw.js"},
+		// No worker either: the refusal is the dot-file's, not a later one's.
+		{"dot-file", map[string]string{".nojekyll": "", "sw.js": "\x00"}, "dot-files"},
+		{"no index", map[string]string{"index.html": "\x00"}, "no such file"},
+		{"no worker", map[string]string{"sw.js": "\x00"}, "no such file"},
 		{"worker without BUILD", map[string]string{"sw.js": "{{SHELL}}"}, "placeholder"},
 		{"worker without SHELL", map[string]string{"sw.js": "{{BUILD}}"}, "placeholder"},
 		{"quote in a name", map[string]string{"it's.js": "x"}, "quote or a backslash"},
@@ -290,6 +292,41 @@ func TestVerifyOnce(t *testing.T) {
 	srv.Close()
 	if bad, err := verifyOnce(ctx, base, want); err == nil || bad != "a.js" {
 		t.Errorf("server gone: %q, %v", bad, err)
+	}
+}
+
+// Build returns the refusal of its last step: a web/ without index.html is
+// refused after every build step succeeded, and no manifest comes back.
+func TestBuildRefusesAPageless(t *testing.T) {
+	if testing.Short() {
+		t.Skip("builds the engine")
+	}
+	root := t.TempDir()
+	real, err := filepath.Abs("../..")
+	if err != nil {
+		t.Fatal(err)
+	}
+	top, err := os.ReadDir(real)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, e := range top {
+		if e.Name() == "web" || e.Name() == ".git" {
+			continue
+		}
+		if err := os.Symlink(filepath.Join(real, e.Name()), filepath.Join(root, e.Name())); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := os.CopyFS(filepath.Join(root, "web"), os.DirFS(filepath.Join(real, "web"))); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Remove(filepath.Join(root, "web", "index.html")); err != nil {
+		t.Fatal(err)
+	}
+	m, err := Build(context.Background(), Options{Root: root, Out: filepath.Join(t.TempDir(), "site"), Version: "test"})
+	if err == nil || m != nil || !strings.Contains(err.Error(), "index.html") {
+		t.Fatalf("Build = %v, %v; want the stamp's refusal and no manifest", m, err)
 	}
 }
 

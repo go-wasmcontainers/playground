@@ -464,9 +464,10 @@ func stamp(out, version string) (*Manifest, error) {
 	if err := os.WriteFile(swp, sw, 0o644); err != nil {
 		return nil, err
 	}
-	m, err = hashTree(out)
-	if err != nil {
-		return nil, err
+	// Only the page and the worker changed since the tree was hashed.
+	for name, b := range map[string][]byte{"index.html": page, "sw.js": sw} {
+		s := sha256.Sum256(b)
+		m.Files[name] = hex.EncodeToString(s[:])
 	}
 	m.Build = build
 	b, _ := json.MarshalIndent(m, "", " ")
