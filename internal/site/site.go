@@ -261,19 +261,9 @@ func Build(ctx context.Context, o Options) (*Manifest, error) {
 			return nil, err
 		}
 		if o.SmokeSpec != "" {
-			raw, err := os.ReadFile(o.SmokeSpec)
+			spec, wtBin, err := smokeTools(o.SmokeSpec)
 			if err != nil {
 				return nil, err
-			}
-			var spec mirror.Spec
-			dec := json.NewDecoder(bytes.NewReader(raw))
-			dec.DisallowUnknownFields()
-			if err := dec.Decode(&spec); err != nil {
-				return nil, fmt.Errorf("%s: %w", o.SmokeSpec, err)
-			}
-			wtBin, err := exec.LookPath("wasmtime")
-			if err != nil {
-				return nil, fmt.Errorf("--smoke needs wasmtime on PATH: %w", err)
 			}
 			_, sf := mirror.SmokeImages(ctx, der.Images, spec, mirror.Native{EngineWASI: true}, mirror.Wasmtime{Bin: wtBin}, mirror.DefaultBottleLimits)
 			der.Findings = append(der.Findings, sf...)
@@ -326,20 +316,10 @@ func Build(ctx context.Context, o Options) (*Manifest, error) {
 	if err := goBuild(o.Root, ExplorerModule, filepath.Join(o.Out, "explorer.wasm"), []string{"GOOS=js", "GOARCH=wasm", "CGO_ENABLED=0"}, "-s -w"); err != nil {
 		return nil, err
 	}
-	exDir, err := moduleDir(o.Root, ExplorerModule)
-	if err != nil {
+	if err := copyExplorerPages(o.Root, o.Out); err != nil {
 		return nil, err
 	}
-	for from, to := range ExplorerFiles {
-		if err := copyFile(filepath.Join(exDir, "web", from), filepath.Join(o.Out, to)); err != nil {
-			return nil, err
-		}
-	}
-	gr, err := goRoot()
-	if err != nil {
-		return nil, err
-	}
-	if err := copyFile(filepath.Join(gr, "lib", "wasm", "wasm_exec.js"), filepath.Join(o.Out, "wasm_exec.js")); err != nil {
+	if err := copyWasmExec(o.Out); err != nil {
 		return nil, err
 	}
 	if err := os.WriteFile(filepath.Join(o.Out, "container-worker.js"), browser.WorkerJS, 0o644); err != nil {
@@ -358,23 +338,78 @@ func Build(ctx context.Context, o Options) (*Manifest, error) {
 		return nil, err
 	}
 	// Static files.
-	web := filepath.Join(o.Root, "web")
-	err = filepath.WalkDir(web, func(p string, d fs.DirEntry, err error) error {
-		if err != nil || d.IsDir() {
-			return err
-		}
-		rel, _ := filepath.Rel(web, p)
-		return copyFile(p, filepath.Join(o.Out, rel))
-	})
+	if err := copyTree(filepath.Join(o.Root, "web"), o.Out); err != nil {
+		return nil, err
+	}
+	m, err := stamp(o.Out, o.Version)
 	if err != nil {
 		return nil, err
 	}
+	logf("site %s: build %s, %d files (%s)", o.Out, m.Build, len(m.Files), runtime.Version())
+	return m, nil
+}
+
+// smokeTools reads the --smoke spec (unknown fields refused) and finds wasmtime.
+func smokeTools(specPath string) (mirror.Spec, string, error) {
+	var spec mirror.Spec
+	raw, err := os.ReadFile(specPath)
+	if err != nil {
+		return spec, "", err
+	}
+	dec := json.NewDecoder(bytes.NewReader(raw))
+	dec.DisallowUnknownFields()
+	if err := dec.Decode(&spec); err != nil {
+		return spec, "", fmt.Errorf("%s: %w", specPath, err)
+	}
+	wtBin, err := exec.LookPath("wasmtime")
+	if err != nil {
+		return spec, "", fmt.Errorf("--smoke needs wasmtime on PATH: %w", err)
+	}
+	return spec, wtBin, nil
+}
+
+// copyExplorerPages copies the explorer module's web files into out.
+func copyExplorerPages(root, out string) error {
+	exDir, err := moduleDir(root, ExplorerModule)
+	if err != nil {
+		return err
+	}
+	for from, to := range ExplorerFiles {
+		if err := copyFile(filepath.Join(exDir, "web", from), filepath.Join(out, to)); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// copyWasmExec copies the toolchain's wasm_exec.js into out.
+func copyWasmExec(out string) error {
+	gr, err := goRoot()
+	if err != nil {
+		return err
+	}
+	return copyFile(filepath.Join(gr, "lib", "wasm", "wasm_exec.js"), filepath.Join(out, "wasm_exec.js"))
+}
+
+// copyTree copies every file under src into dst, keeping the layout.
+func copyTree(src, dst string) error {
+	return filepath.WalkDir(src, func(p string, d fs.DirEntry, err error) error {
+		if err != nil || d.IsDir() {
+			return err
+		}
+		rel, _ := filepath.Rel(src, p)
+		return copyFile(p, filepath.Join(dst, rel))
+	})
+}
+
+// stamp names the build in out's index.html and sw.js and writes build.json.
+func stamp(out, version string) (*Manifest, error) {
 	// No .nojekyll: a site deployed by an Actions workflow is not built by
 	// Jekyll, and Pages does not serve dot-files (a .nojekyll here 404s).
 	// The build id is the hash of everything but index.html (sw.js counts
 	// as its template), which then names it on every asset URL, so a cached
 	// page asks for matching files.
-	m, err := hashTree(o.Out)
+	m, err := hashTree(out)
 	if err != nil {
 		return nil, err
 	}
@@ -390,13 +425,13 @@ func Build(ctx context.Context, o Options) (*Manifest, error) {
 		}
 	}
 	build := hex.EncodeToString(h.Sum(nil))[:12]
-	idx := filepath.Join(o.Out, "index.html")
+	idx := filepath.Join(out, "index.html")
 	page, err := os.ReadFile(idx)
 	if err != nil {
 		return nil, err
 	}
 	page = bytes.ReplaceAll(page, []byte("{{BUILD}}"), []byte(build))
-	page = bytes.ReplaceAll(page, []byte("{{VERSION}}"), []byte(o.Version))
+	page = bytes.ReplaceAll(page, []byte("{{VERSION}}"), []byte(version))
 	if err := os.WriteFile(idx, page, 0o644); err != nil {
 		return nil, err
 	}
@@ -416,7 +451,7 @@ func Build(ctx context.Context, o Options) (*Manifest, error) {
 		}
 	}
 	sl, _ := json.Marshal(shell)
-	swp := filepath.Join(o.Out, "sw.js")
+	swp := filepath.Join(out, "sw.js")
 	sw, err := os.ReadFile(swp)
 	if err != nil {
 		return nil, err
@@ -429,16 +464,16 @@ func Build(ctx context.Context, o Options) (*Manifest, error) {
 	if err := os.WriteFile(swp, sw, 0o644); err != nil {
 		return nil, err
 	}
-	m, err = hashTree(o.Out)
-	if err != nil {
-		return nil, err
+	// Only the page and the worker changed since the tree was hashed.
+	for name, b := range map[string][]byte{"index.html": page, "sw.js": sw} {
+		s := sha256.Sum256(b)
+		m.Files[name] = hex.EncodeToString(s[:])
 	}
 	m.Build = build
 	b, _ := json.MarshalIndent(m, "", " ")
-	if err := os.WriteFile(filepath.Join(o.Out, "build.json"), b, 0o644); err != nil {
+	if err := os.WriteFile(filepath.Join(out, "build.json"), b, 0o644); err != nil {
 		return nil, err
 	}
-	logf("site %s: build %s, %d files (%s)", o.Out, build, len(m.Files), runtime.Version())
 	return m, nil
 }
 

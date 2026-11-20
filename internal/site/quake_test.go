@@ -54,8 +54,57 @@ func TestFetchPinned(t *testing.T) {
 	if _, err := FetchPinned(ctx, srv.Client(), PinnedFile{URL: "http://127.0.0.1:1/x", Size: 1}); err == nil {
 		t.Error("unreachable server accepted")
 	}
-	if _, err := FetchPinned(ctx, nil, PinnedFile{URL: "://bad"}); err == nil {
-		t.Error("bad URL accepted")
+	if _, err := FetchPinned(ctx, nil, PinnedFile{URL: "://bad"}); err == nil || !strings.Contains(err.Error(), "missing protocol scheme") {
+		t.Errorf("bad URL: %v", err)
+	}
+}
+
+// Each refusal of FetchPinned is held by its own check: a status that is not
+// 200 is refused whatever the body, a body that stops short is a transport
+// error (never a pin mismatch), and a size that differs is refused even when
+// the hash of the bytes read is the pinned one.
+func TestFetchPinnedEachGuard(t *testing.T) {
+	good := []byte("the pinned bytes")
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/404-right-body":
+			w.WriteHeader(404)
+			w.Write(good)
+		case "/cut":
+			w.Header().Set("Content-Length", "1000")
+			w.Write(good[:3])
+			w.(http.Flusher).Flush()
+			panic(http.ErrAbortHandler)
+		case "/long":
+			w.Write(append(append([]byte(nil), good...), "extra"...))
+		}
+	}))
+	defer srv.Close()
+	ctx := context.Background()
+
+	var pe *ErrPinned
+	_, err := FetchPinned(ctx, srv.Client(), pinnedOf(srv.URL+"/404-right-body", good))
+	if !errors.As(err, &pe) || !strings.Contains(pe.Why, "HTTP 404") {
+		t.Errorf("404 with the pinned bytes: %v", err)
+	}
+
+	_, err = FetchPinned(ctx, srv.Client(), pinnedOf(srv.URL+"/cut", good))
+	if err == nil || errors.As(err, &pe) {
+		t.Errorf("a body cut short: %v, want a transport error", err)
+	}
+
+	// The pinned hash is that of the first len(good)+1 bytes, which are what
+	// FetchPinned reads of a longer body: only the size check refuses it.
+	pf := pinnedOf(srv.URL+"/long", good)
+	s := sha256.Sum256(append(append([]byte(nil), good...), 'e'))
+	pf.SHA256 = hex.EncodeToString(s[:])
+	_, err = FetchPinned(ctx, srv.Client(), pf)
+	if !errors.As(err, &pe) || !strings.Contains(pe.Why, "pinned") || strings.Contains(pe.Why, "sha256") {
+		t.Errorf("longer than pinned, hash of what was read right: %v", err)
+	}
+
+	if _, err := FetchPinned(ctx, srv.Client(), PinnedFile{URL: "http://127.0.0.1:1/x", Size: 1}); err == nil || errors.As(err, &pe) {
+		t.Errorf("unreachable server: %v, want a transport error", err)
 	}
 }
 
