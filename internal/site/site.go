@@ -316,14 +316,7 @@ func Build(ctx context.Context, o Options) (*Manifest, error) {
 		return nil, err
 	}
 	// The main UI: the dashboard on a canvas, in the page.
-	// PLAYGROUND_WASM_NAMES=1 keeps the dashboard's function names (no -s -w), so a
-	// Chrome trace of the page names the Go functions that fill the main thread
-	// (e2e TestQuakeAudioPane, E2E_TRACE_DIR). The published site stays stripped.
-	dashLD := ld
-	if os.Getenv("PLAYGROUND_WASM_NAMES") == "1" {
-		dashLD = "-X main.version=" + o.Version
-	}
-	if err := goBuild(o.Root, "./cmd/dashboard", filepath.Join(o.Out, "dashboard.wasm"), []string{"GOOS=js", "GOARCH=wasm", "CGO_ENABLED=0"}, dashLD); err != nil {
+	if err := goBuild(o.Root, "./cmd/dashboard", filepath.Join(o.Out, "dashboard.wasm"), []string{"GOOS=js", "GOARCH=wasm", "CGO_ENABLED=0"}, ld); err != nil {
 		return nil, err
 	}
 	// The go-fileshare explorer, a WebDAV client the ports bar opens on a
