@@ -144,3 +144,65 @@ func TestMatchUnderruns(t *testing.T) {
 		t.Errorf("orphan underruns %d, orphan gaps %d; want 1 and 1", oe, og)
 	}
 }
+
+// The engine worker's event-loop lag probe: the guest's every host call (a sound
+// write, a poll_oneoff sleep, each call of a frame) is a message to this worker's
+// event loop, so a loop that is busy for 40 ms delays the guest's call by 40 ms.
+// A 2 ms timer is read back: how late it ran says how long the loop was busy,
+// with the wall-clock time of each late one (Date.now(), the clock of the page's
+// underruns and of the game's audiodry lines).
+const loopLagProbeJS = `() => {
+  if (self.__lag) return true;
+  const lag = (self.__lag = { ev: [], n: 0, last: 0 });
+  const tick = () => {
+    const now = performance.now();
+    if (lag.last) {
+      const late = now - lag.last - 2;
+      lag.n++;
+      if (late > 15) lag.ev.push({ wall: Date.now(), late });
+    }
+    lag.last = now;
+    setTimeout(tick, 2);
+  };
+  setTimeout(tick, 2);
+  return true;
+}`
+
+// lagEvent is one late tick of the worker's loop.
+type lagEvent struct {
+	Wall int64
+	Late float64
+}
+
+func watchLoopLag(t *testing.T, w playwright.Worker) {
+	t.Helper()
+	if _, err := w.Evaluate(loopLagProbeJS); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func takeLoopLag(t *testing.T, w playwright.Worker) (events []lagEvent, ticks int) {
+	t.Helper()
+	v, err := w.Evaluate(`() => ({ ev: self.__lag ? self.__lag.ev : [], n: self.__lag ? self.__lag.n : 0 })`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	m, _ := v.(map[string]any)
+	list, _ := m["ev"].([]any)
+	for _, e := range list {
+		x, _ := e.(map[string]any)
+		events = append(events, lagEvent{Wall: int64(num(x["wall"])), Late: num(x["late"])})
+	}
+	return events, int(num(m["n"]))
+}
+
+// lagNear returns the worker-loop stalls that ended within 150 ms before wall.
+func lagNear(events []lagEvent, wall int64) []lagEvent {
+	var out []lagEvent
+	for _, e := range events {
+		if e.Wall <= wall+30 && e.Wall >= wall-150 {
+			out = append(out, e)
+		}
+	}
+	return out
+}

@@ -109,6 +109,15 @@ func TestQuakeAudioPane(t *testing.T) {
 	// What the user hears is the underruns: counted from here to the end.
 	sk := newSoak("chromium/pane", streamReading(t, page))
 	watchUnderruns(t, page) // the page's underruns, with their wall-clock times
+	var engineWorker playwright.Worker
+	for _, w := range page.Workers() {
+		if strings.Contains(w.URL(), "engine-worker") {
+			engineWorker = w
+		}
+	}
+	if engineWorker != nil {
+		watchLoopLag(t, engineWorker) // how late the engine worker's event loop runs a 2 ms timer
+	}
 
 	// alive fails the test, with the container's state and the end of its log,
 	// when the pane is gone: a game that ends cannot be measured.
@@ -343,6 +352,24 @@ func TestQuakeAudioPane(t *testing.T) {
 	for _, l := range lines {
 		t.Log("pane game: " + l)
 	}
-	matchUnderruns(t, takeUnderruns(t, page), parseDryGaps(lines))
+	evs := takeUnderruns(t, page)
+	matchUnderruns(t, evs, parseDryGaps(lines))
+	if engineWorker != nil {
+		lag, ticks := takeLoopLag(t, engineWorker)
+		over := map[int]int{20: 0, 50: 0, 100: 0}
+		worst := 0.0
+		for _, e := range lag {
+			worst = max(worst, e.Late)
+			for b := range over {
+				if e.Late > float64(b) {
+					over[b]++
+				}
+			}
+		}
+		t.Logf("LOOPLAG engine worker: %d ticks of 2 ms, %d late by more than 15 ms (>20: %d, >50: %d, >100: %d), worst %.0f ms", ticks, len(lag), over[20], over[50], over[100], worst)
+		for _, e := range evs {
+			t.Logf("LOOPLAG underrun at %d: worker-loop stalls in the 150 ms before: %v", e.Wall, lagNear(lag, e.Wall))
+		}
+	}
 	d.run("wctr rm -f q")
 }
