@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -82,6 +83,13 @@ func unwrapPath(err error) error {
 
 func TestCopyExplorerPages(t *testing.T) {
 	out := t.TempDir()
+	// `go list -m` names no directory for a module not yet in the module cache
+	// (a cold CI), and Build's own go build is what downloads it first.
+	dl := exec.Command("go", "mod", "download", ExplorerModule)
+	dl.Dir = "../.."
+	if b, err := dl.CombinedOutput(); err != nil {
+		t.Fatalf("go mod download: %v\n%s", err, b)
+	}
 	if err := copyExplorerPages("../..", out); err != nil {
 		t.Fatal(err)
 	}
