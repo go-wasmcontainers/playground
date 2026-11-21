@@ -295,6 +295,7 @@ jobs:
       # is pending), interleaved; it answers whether our own queue traffic
       # contributes to Firefox's ~100 ms context.present stall.
       - name: kicks A/B (measurement only)
+        if: always()
         continue-on-error: true
         env:
           E2E_BROWSERS: firefox
