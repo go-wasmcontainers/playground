@@ -269,7 +269,7 @@ jobs:
   firefox:
     name: Firefox (macOS, WebGPU)
     runs-on: macos-latest
-    timeout-minutes: 25
+    timeout-minutes: 40
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-go@v7
@@ -289,7 +289,17 @@ jobs:
         env:
           E2E_BROWSERS: firefox
           E2E_AUDIO_REPORT: ${{ runner.temp }}/audio.jsonl
-        run: go test -tags e2e -count=1 -v -run '^(TestQuakeFirefox|TestQuakeSoakFirefox|TestQuakeAudioFirefox)$' -timeout 20m ./e2e/ > "$RUNNER_TEMP/firefox.log" 2>&1 && status=0 || status=$?; grep -n -m 30 -e '--- FAIL' -e 'exited' -e 'fatal error' -e 'panic:' -e 'firefox_test.go' "$RUNNER_TEMP/firefox.log" || true; tail -150 "$RUNNER_TEMP/firefox.log"; grep -n -e 'SOUND ' -e 'paced run' -e 'real-time ratio' "$RUNNER_TEMP/firefox.log" || true; exit "$status"
+        run: go test -tags e2e -count=1 -v -run '^(TestQuakeFirefox|TestQuakeSoakFirefox|TestQuakeAudioFirefox)$' -timeout 20m ./e2e/ > "$RUNNER_TEMP/firefox.log" 2>&1 && status=0 || status=$?; grep -n -m 60 -A 6 -e '--- FAIL' -e 'exited' -e 'fatal error' -e 'panic:' -e 'firefox_test.go' -e 'Error: wasi_' -e 'overran its GPU time budget' "$RUNNER_TEMP/firefox.log" || true; tail -150 "$RUNNER_TEMP/firefox.log"; grep -n -e 'SOUND ' -e 'paced run' -e 'real-time ratio' "$RUNNER_TEMP/firefox.log" || true; exit "$status"
+      # Measurement only (never the lane's verdict): the same paced quake run with
+      # and without the host library's kicks (empty queue.submit while a GPU wait
+      # is pending), interleaved; it answers whether our own queue traffic
+      # contributes to Firefox's ~100 ms context.present stall.
+      - name: kicks A/B (measurement only)
+        continue-on-error: true
+        env:
+          E2E_BROWSERS: firefox
+          E2E_KICK_AB: '1'
+        run: go test -tags e2e -count=1 -v -run '^TestQuakeFirefoxKickAB$' -timeout 12m ./e2e/ > "$RUNNER_TEMP/kickab.log" 2>&1 && status=0 || status=$?; grep -n -e 'kickab' -e 'round ' -e '--- FAIL' -e 'ok  ' "$RUNNER_TEMP/kickab.log" || true; exit "$status"
       - uses: actions/upload-artifact@v7
         if: always()
         with:
@@ -297,6 +307,7 @@ jobs:
           path: |
             ${{ runner.temp }}/firefox.log
             ${{ runner.temp }}/audio.jsonl
+            ${{ runner.temp }}/kickab.log
 
   # Every pkgx wasip1/wasm bottle the signed catalogue lists, as an image:
   # --version / --help (or the probe in internal/mirror/testdata/smoke.json)

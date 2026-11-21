@@ -119,9 +119,15 @@ func (k ffKeys) Type(text string, o ...playwright.KeyboardTypeOptions) error {
 // engine, and checks the adapter is a hardware one.
 func firefoxTab(t *testing.T) (tab, string, func()) {
 	t.Helper()
+	return firefoxTabAt(t, "?ui=terminal")
+}
+
+// firefoxTabAt is firefoxTab on the page's URL with the given query.
+func firefoxTabAt(t *testing.T, query string) (tab, string, func()) {
+	t.Helper()
 	page, logPath, stop := firefoxSession(t)
 	b := tab{t, ffPage{page}, "firefox"}
-	if err := page.s.Navigate(page.ctx, serve(t, true)+"?ui=terminal"); err != nil {
+	if err := page.s.Navigate(page.ctx, serve(t, true)+query); err != nil {
 		stop()
 		t.Fatal(err)
 	}

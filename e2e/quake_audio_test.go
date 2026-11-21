@@ -57,7 +57,7 @@ func stallsLine(out string) (fps float64, dropped, stalls int, withStalls float6
 func slowTicLines(out string) []string {
 	out = strings.NewReplacer("\r", "", "\n", "").Replace(out)
 	var lines []string
-	for _, m := range regexp.MustCompile(`slowtic(?: frame=\d+ [^;]*?gc-pause-ms=[0-9.]+|s: \d+ over .*?gc-pause [0-9.]+%|s: none over [0-9]+ ms in \d+ frames)|audiogap frame=\d+ gap-ms=[0-9.]+ queued-ms=[0-9.]+ short-ms=[0-9.]+|audiodry unix-ms=\d+ gap-ms=[0-9.]+ queued-ms=[0-9.]+ short-ms=[0-9.]+ from=[a-z-]*#\d+ to=[a-z-]*#\d+(?: present-wait-ms=[0-9.]+ sleep-over-ms=[0-9.]+ draw-ms=[0-9.]+ yield-ms=[0-9.]+ gc-ms=[0-9.]+ audio-write-ms=[0-9.]+(?: draw-slowest=\S+)?)?|audiogaps: \d+ of \d+ writes ran dry[^;]*?; writes more than 50 100 200 ms after the one before: \d+ \d+ \d+|yieldshare: of the \d+ ms the slow tics spent in the yield, collector background mark \d+ ms \(\d+%\), other goroutines \d+ ms \(\d+%\)|yieldwho: of the other goroutines' \d+ ms: scavenger \d+ ms; \d+ cleanups and \d+ finalizers ran in those yields \(\d+ cleanups in the whole frames of the slow tics\); sweeper and the rest \d+ ms`).FindAllString(out, -1) {
+	for _, m := range regexp.MustCompile(`slowtic(?: frame=\d+ [^;]*?gc-pause-ms=[0-9.]+|s: \d+ over .*?gc-pause [0-9.]+%|s: none over [0-9]+ ms in \d+ frames)|audiogap frame=\d+ gap-ms=[0-9.]+ queued-ms=[0-9.]+ short-ms=[0-9.]+|audiodry unix-ms=\d+ gap-ms=[0-9.]+ queued-ms=[0-9.]+ short-ms=[0-9.]+ from=[a-z-]*#\d+ to=[a-z-]*#\d+(?: present-wait-ms=[0-9.]+ sleep-over-ms=[0-9.]+ draw-ms=[0-9.]+ yield-ms=[0-9.]+ gc-ms=[0-9.]+ audio-write-ms=[0-9.]+(?: draw-slowest=\S+)?(?: world-gpu-ms=[0-9.]+ world-copy-ms=[0-9.]+ world-slowest=\S+)?)?|audiogaps: \d+ of \d+ writes ran dry[^;]*?; writes more than 50 100 200 ms after the one before: \d+ \d+ \d+|yieldshare: of the \d+ ms the slow tics spent in the yield, collector background mark \d+ ms \(\d+%\), other goroutines \d+ ms \(\d+%\)|yieldwho: of the other goroutines' \d+ ms: scavenger \d+ ms; \d+ cleanups and \d+ finalizers ran in those yields \(\d+ cleanups in the whole frames of the slow tics\); sweeper and the rest \d+ ms`).FindAllString(out, -1) {
 		lines = append(lines, m)
 	}
 	return lines
@@ -160,6 +160,11 @@ func TestPacedRatioBounds(t *testing.T) {
 	if ls := slowTicLines(gaps); len(ls) != 3 || !strings.HasSuffix(ls[1], "short-ms=80.0") || !strings.HasSuffix(ls[2], "after the one before: 9 3 1") {
 		t.Errorf("slowTicLines on the audio gaps = %q", ls)
 	}
+	// An audiodry line with the world draw of its frame (engine v0.49.0), wrapped.
+	dry := "audiodry unix-ms=1 gap-ms=101.5 queued-ms=100.3 short-ms=1.2 from=tic-end#2 to=world#3 present-wait-ms=0.0 sleep-over-ms=0.0 draw-ms=24.8 yield-ms=0.1 gc-ms=0.0 audio-write-ms=0.2 draw-slowest=[method]context.present:20.0 world-gpu-ms=76.1 \nworld-copy-ms=2.0 world-slowest=queue.submit:70.2\n"
+	if ls := slowTicLines(dry); len(ls) != 1 || !strings.HasSuffix(ls[0], "world-slowest=queue.submit:70.2") {
+		t.Errorf("slowTicLines dropped the world draw of an audiodry line: %q", ls)
+	}
 	// The line of the reference mixahead (no prepaid mix).
 	noPrepaid := "audio: playing, 1 mix frames offered, 1 accepted, in 4.91 s: real-time ratio 0.99; 15.0 frames a second, 13794 mix frames dropped in 7 stalled tics, ratio with them 1.004; tics over 0.1 0.2 0.35 0.5 s: 9 5 3 1, longest 0.620 s\n"
 	if _, _, _, w, ok := stallsLine(noPrepaid); !ok || w != 1.004 {
@@ -222,7 +227,10 @@ func TestQuakeAudio(t *testing.T) {
 		if os.Getenv("E2E_GPU_REAL") == "1" {
 			t.Fatalf("a software adapter on the GPU lane: %s", info)
 		}
-		t.Skipf("no real GPU adapter (%s)", info)
+		// Quake draws through a WebGPU surface (every quake run of this suite is
+		// `wctr run --gpu`), and wctr refuses a software adapter: no game, no sound
+		// stream, so no underruns to count on this runner.
+		t.Skipf("SOUND not measured: no real GPU adapter (%s), quake cannot draw", info)
 	}
 	t.Logf("1-minute load %s (above 8 the frame rate, not the ratio, is not a measurement)", loadAvg())
 

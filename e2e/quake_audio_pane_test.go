@@ -66,7 +66,7 @@ func TestQuakeAudioPane(t *testing.T) {
 		if os.Getenv("E2E_GPU_REAL") == "1" {
 			t.Fatalf("no hardware adapter on the GPU lane: %s", adapter)
 		}
-		t.Skipf("a software adapter (%s): the engine refuses it", adapter)
+		t.Skipf("SOUND not measured: a software adapter (%s), the engine refuses it and quake cannot draw", adapter)
 	}
 
 	// Typing the command is a user gesture (sticky activation), so the page's
