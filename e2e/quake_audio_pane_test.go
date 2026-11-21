@@ -77,7 +77,7 @@ func TestQuakeAudioPane(t *testing.T) {
 	if v, err := page.Evaluate(`() => new Promise((res) => { let n = 0; const t0 = performance.now(); const f = () => { n++; if (performance.now() - t0 < 3000) requestAnimationFrame(f); else res(n / ((performance.now() - t0) / 1000)); }; requestAnimationFrame(f); })`); err == nil {
 		t.Logf("PAGE idle, before the game: %.1f animation frames a second", num(v))
 	}
-	d.run("wctr run -d --gpu --audio -m 512m --name q quake --slowtics 300 --slowtics-brief")
+	d.run("wctr run -d --gpu --audio -m 512m --name q quake --slowtics 300")
 	d.until("quake running", 120*time.Second, func(p ui.Probe) bool {
 		return len(p.Containers) == 1 && strings.Contains(p.Status[1], "1 running")
 	})
@@ -343,12 +343,12 @@ func TestQuakeAudioPane(t *testing.T) {
 
 	d.press("F6", "ArrowUp") // Surfaces -> Terminal
 	// The pane game's own account of its slow tics and dry writes (--slowtics 300
-	// --slowtics-brief below), read from the terminal: the summary lines of its
-	// windows, beside the underruns just counted.
-	d.run("clear")
-	d.run("wctr logs q")
-	time.Sleep(2 * time.Second)
-	lines := slowTicLines(d.state().Terminal)
+	// --slowtics-brief below), read from the engine's logs endpoint, whole: the
+	// terminal is a screen, which lost the lines of the earlier windows. The dry,
+	// tight and unfed lines of the soak lane, with the count of what the log held.
+	pane := containerLogs(t, page, "q")
+	t.Logf("pane game log: %s", paneGameCounts(pane))
+	lines := slowTicLines(pane)
 	for _, l := range lines {
 		t.Log("pane game: " + l)
 	}
