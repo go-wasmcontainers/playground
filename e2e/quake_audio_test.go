@@ -57,7 +57,7 @@ func stallsLine(out string) (fps float64, dropped, stalls int, withStalls float6
 func slowTicLines(out string) []string {
 	out = strings.NewReplacer("\r", "", "\n", "").Replace(out)
 	var lines []string
-	for _, m := range regexp.MustCompile(`slowtic(?: frame=\d+ [^;]*?gc-pause-ms=[0-9.]+|s: \d+ over .*?gc-pause [0-9.]+%|s: none over [0-9]+ ms in \d+ frames)|audiogap frame=\d+ gap-ms=[0-9.]+ queued-ms=[0-9.]+ short-ms=[0-9.]+|audiodry unix-ms=\d+ gap-ms=[0-9.]+ queued-ms=[0-9.]+ short-ms=[0-9.]+ from=[a-z-]*#\d+ to=[a-z-]*#\d+(?: present-wait-ms=[0-9.]+ sleep-over-ms=[0-9.]+ draw-ms=[0-9.]+ yield-ms=[0-9.]+ gc-ms=[0-9.]+ audio-write-ms=[0-9.]+(?: draw-slowest=\S+)?(?: world-gpu-ms=[0-9.]+ world-copy-ms=[0-9.]+ world-slowest=\S+)?)?|audiogaps: \d+ of \d+ writes ran dry[^;]*?; writes more than 50 100 200 ms after the one before: \d+ \d+ \d+|yieldshare: of the \d+ ms the slow tics spent in the yield, collector background mark \d+ ms \(\d+%\), other goroutines \d+ ms \(\d+%\)|yieldwho: of the other goroutines' \d+ ms: scavenger \d+ ms; \d+ cleanups and \d+ finalizers ran in those yields \(\d+ cleanups in the whole frames of the slow tics\); sweeper and the rest \d+ ms`).FindAllString(out, -1) {
+	for _, m := range regexp.MustCompile(`slowtic(?: frame=\d+ [^;]*?gc-pause-ms=[0-9.]+|s: \d+ over .*?gc-pause [0-9.]+%|s: none over [0-9]+ ms in \d+ frames)|audiogap frame=\d+ gap-ms=[0-9.]+ queued-ms=[0-9.]+ short-ms=[0-9.]+|audiodry unix-ms=\d+ gap-ms=[0-9.]+ queued-ms=[0-9.]+ short-ms=[0-9.]+ from=[a-z-]*#\d+ to=[a-z-]*#\d+(?: present-wait-ms=[0-9.]+ sleep-over-ms=[0-9.]+ draw-ms=[0-9.]+ yield-ms=[0-9.]+ gc-ms=[0-9.]+ audio-write-ms=[0-9.]+(?: draw-slowest=\S+)?(?: world-gpu-ms=[0-9.]+ world-copy-ms=[0-9.]+ world-slowest=\S+(?: world-cpu-ms=[0-9.]+ world-wait-ms=[0-9.]+ world-idle-ms=[0-9.]+ world-bake-ms=[0-9.]+ world-upload-ms=[0-9.]+)?)?)?|audiogaps: \d+ of \d+ writes ran dry[^;]*?; writes more than 50 100 200 ms after the one before: \d+ \d+ \d+|yieldshare: of the \d+ ms the slow tics spent in the yield, collector background mark \d+ ms \(\d+%\), other goroutines \d+ ms \(\d+%\)|yieldwho: of the other goroutines' \d+ ms: scavenger \d+ ms; \d+ cleanups and \d+ finalizers ran in those yields \(\d+ cleanups in the whole frames of the slow tics\); sweeper and the rest \d+ ms`).FindAllString(out, -1) {
 		lines = append(lines, m)
 	}
 	return lines
@@ -164,6 +164,11 @@ func TestPacedRatioBounds(t *testing.T) {
 	dry := "audiodry unix-ms=1 gap-ms=101.5 queued-ms=100.3 short-ms=1.2 from=tic-end#2 to=world#3 present-wait-ms=0.0 sleep-over-ms=0.0 draw-ms=24.8 yield-ms=0.1 gc-ms=0.0 audio-write-ms=0.2 draw-slowest=[method]context.present:20.0 world-gpu-ms=76.1 \nworld-copy-ms=2.0 world-slowest=queue.submit:70.2\n"
 	if ls := slowTicLines(dry); len(ls) != 1 || !strings.HasSuffix(ls[0], "world-slowest=queue.submit:70.2") {
 		t.Errorf("slowTicLines dropped the world draw of an audiodry line: %q", ls)
+	}
+	// The world draw's split (engine v0.51.0): guest CPU, GPU wait, idle refill, bake, upload.
+	split := dry[:len(dry)-1] + " world-cpu-ms=14.1 world-wait-ms=62.0 world-idle-ms=20.0 world-bake-ms=9.0 world-upload-ms=3.0\n"
+	if ls := slowTicLines(split); len(ls) != 1 || !strings.HasSuffix(ls[0], "world-upload-ms=3.0") {
+		t.Errorf("slowTicLines dropped the world draw's split: %q", ls)
 	}
 	// The line of the reference mixahead (no prepaid mix).
 	noPrepaid := "audio: playing, 1 mix frames offered, 1 accepted, in 4.91 s: real-time ratio 0.99; 15.0 frames a second, 13794 mix frames dropped in 7 stalled tics, ratio with them 1.004; tics over 0.1 0.2 0.35 0.5 s: 9 5 3 1, longest 0.620 s\n"
