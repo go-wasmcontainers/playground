@@ -7,13 +7,13 @@ require (
 	github.com/go-pkgx/bottle v0.62.1
 	github.com/go-wasmcontainers/build v0.4.0
 	github.com/go-wasmcontainers/compose v0.6.0
-	github.com/go-wasmcontainers/dashboard v0.11.0
-	github.com/go-wasmcontainers/engine v0.40.1
-	github.com/go-wasmcontainers/gpu v0.14.4
+	github.com/go-wasmcontainers/dashboard v0.13.0
+	github.com/go-wasmcontainers/engine v0.41.0
+	github.com/go-wasmcontainers/gpu v0.19.0
 	github.com/go-wasmcontainers/relay v0.3.1
 	github.com/go-widgets/mvvm v0.15.0
 	github.com/go-widgets/toolkit v0.362.0
-	github.com/go-widgets/webcanvas v0.14.0
+	github.com/go-widgets/webcanvas v0.15.0
 	github.com/klauspost/compress v1.20.4
 	github.com/mxschmitt/playwright-go v0.6401.0
 	github.com/spf13/cobra v1.10.2
@@ -104,7 +104,7 @@ require (
 	github.com/go-opentype/fonts v0.14.0 // indirect
 	github.com/go-opentype/opentype v0.16.2-0.20261027113239-5e69589e9a5e // indirect
 	github.com/go-opentype/shape v0.7.0 // indirect
-	github.com/go-quake1/engine v0.35.0 // indirect
+	github.com/go-quake1/engine v0.53.0 // indirect
 	github.com/go-richdoc/richdoc v0.7.0 // indirect
 	github.com/go-sql-driver/mysql v1.10.1 // indirect
 	github.com/go-stack/stack v1.8.1 // indirect
@@ -117,7 +117,7 @@ require (
 	github.com/go-widgets/android v0.16.0 // indirect
 	github.com/go-widgets/lineedit v0.1.1 // indirect
 	github.com/go-widgets/mvvmtk v0.15.0 // indirect
-	github.com/go-widgets/painter v0.17.0 // indirect
+	github.com/go-widgets/painter v0.17.1 // indirect
 	github.com/go-widgets/shellterm v0.1.0 // indirect
 	github.com/go-widgets/textinput v0.1.1 // indirect
 	github.com/go-widgets/window v0.89.1 // indirect

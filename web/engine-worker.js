@@ -6,6 +6,18 @@
 const v = "?" + self.location.search.slice(1).split("&")[0]; // ?v=<build> only
 importScripts("wasm_exec.js" + v);
 
+// ?nokick=1 (loopback pages only, for the e2e's A/B of the host library's kicks:
+// go-gfx/webgpu kick.go, empty queue.submit([]) calls while a GPU wait is
+// pending): the worker drops them. Every submit with a command buffer goes
+// through, and so does the rest of the traffic.
+if (/[?&]nokick=1\b/.test(self.location.search) && self.GPUQueue) {
+  const submit = GPUQueue.prototype.submit;
+  GPUQueue.prototype.submit = function (c) {
+    if (c && c.length === 0) return undefined;
+    return submit.call(this, c);
+  };
+}
+
 self.idb = {
   // Version 2 adds "state": the engine's containers, logs and writable
   // layers (engine package state), next to the image blobs.

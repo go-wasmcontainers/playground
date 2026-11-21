@@ -19,9 +19,10 @@
 // the engine discards what the guest writes: sound made before the click is
 // never played late.
 //
-// Volume and mute live at two levels: one pair per container (the Sound bar's
-// row) and one page-wide mute. They are gain nodes, so a guest cannot undo
-// them. window.__wctrAudio is the test hook.
+// Volume and mute live at two levels: one pair per container (the dashboard's
+// pane calls setContainer(container, volume, muted); no controls of their own
+// here) and the page-wide mute (the Sound strip's button). They are gain
+// nodes, so a guest cannot undo them. window.__wctrAudio is the test hook.
 "use strict";
 window.wctrAudio = (() => {
   const MAX_STREAMS = 8; // per page, as the engine's module
@@ -106,7 +107,7 @@ window.wctrAudio = (() => {
     return ctx;
   }
 
-  // ---- the Sound bar: one row per container with a stream, and the page mute ----
+  // ---- the Sound strip: the page-wide mute (per container is the dashboard pane's) ----
   function ensureBar() {
     if (bar) return bar;
     bar = document.createElement("div");
@@ -140,57 +141,43 @@ window.wctrAudio = (() => {
 
   function apply(row) {
     row.gain.gain.value = row.muted ? 0 : row.volume;
-    prefs.set(row.name, { volume: row.volume, muted: row.muted });
-    row.mute.setAttribute("aria-pressed", String(row.muted));
-    row.mute.textContent = row.muted ? "unmute" : "mute";
   }
 
+  // A container's gain node. Its volume and mute are set by the dashboard's
+  // pane (setContainer); the level is remembered by container, so a pane that
+  // sets it before the stream opens, or a container that is run again, keeps it.
   function rowFor(name) {
     let row = rows.get(name);
     if (row) return row;
     const p = prefs.get(name) || { volume: 1, muted: false };
     row = { name, volume: p.volume, muted: p.muted, ids: new Set(), gain: ctx.createGain() };
     row.gain.connect(pageGain);
-    const el = document.createElement("div");
-    el.className = "soundrow";
-    el.dataset.container = name;
-    const label = document.createElement("span");
-    label.textContent = name;
-    const vol = document.createElement("input");
-    vol.type = "range";
-    vol.min = "0";
-    vol.max = "100";
-    vol.step = "1";
-    vol.value = String(Math.round(row.volume * 100));
-    vol.setAttribute("aria-label", "volume of " + name);
-    vol.addEventListener("input", () => {
-      row.volume = Math.min(1, Math.max(0, Number(vol.value) / 100));
-      apply(row);
-    });
-    const mute = document.createElement("button");
-    mute.type = "button";
-    mute.setAttribute("aria-label", "mute " + name);
-    mute.addEventListener("click", () => {
-      row.muted = !row.muted;
-      apply(row);
-    });
-    row.el = el;
-    row.vol = vol;
-    row.mute = mute;
-    el.append(label, vol, mute);
-    ensureBar().append(el);
     rows.set(name, row);
     apply(row);
+    ensureBar();
     return row;
   }
 
   function dropRow(row) {
     row.gain.disconnect();
-    row.el.remove();
     rows.delete(row.name);
     if (rows.size === 0 && bar) {
       bar.remove();
       bar = null;
+    }
+  }
+
+  // setContainer is the dashboard pane's entry point (dashboard host
+  // ConnectSurfaces): volume 0..1 and mute for the sound of one container.
+  function setContainer(name, volume, muted) {
+    if (typeof name !== "string" || typeof volume !== "number" || !Number.isFinite(volume)) return;
+    const p = { volume: Math.min(1, Math.max(0, volume)), muted: !!muted };
+    prefs.set(name, p);
+    const row = rows.get(name);
+    if (row) {
+      row.volume = p.volume;
+      row.muted = p.muted;
+      apply(row);
     }
   }
 
@@ -296,6 +283,7 @@ window.wctrAudio = (() => {
           stream: s.id, container: s.container, context: ctx ? ctx.state : "none", attached: !!s.node,
           sampleRate: s.rate, channels: s.ch, capacityFrames: s.cap,
           played: Atomics.load(s.hdr, 3) >>> 0, underruns: Atomics.load(s.hdr, 2) >>> 0,
+          written: Atomics.load(s.hdr, 0) >>> 0,
           heartbeat: Atomics.load(s.hdr, 6) >>> 0,
           buffered: (Atomics.load(s.hdr, 0) - Atomics.load(s.hdr, 1)) >>> 0,
         };
@@ -304,5 +292,5 @@ window.wctrAudio = (() => {
     },
   };
 
-  return { onEngine, state, setGlobalMute };
+  return { onEngine, state, setGlobalMute, setContainer };
 })();

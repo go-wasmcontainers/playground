@@ -352,7 +352,10 @@
     // and sha256 like any other. Ignored on every other host.
     const ms = /^(localhost|127\.0\.0\.1)$/.test(location.hostname) ? new URLSearchParams(location.search).get("modelstub") : null;
     const mp = ms ? "&modelstub=" + encodeURIComponent(ms) : "";
-    engine = new Worker("engine-worker.js?v=" + build + cc + rp + mp);
+    // ?nokick=1 (loopback pages only): the e2e's control for the host library's
+    // empty-submit kicks; engine-worker.js drops them.
+    const nk = /^(localhost|127\.0\.0\.1)$/.test(location.hostname) && /[?&]nokick=1\b/.test(location.search) ? "&nokick=1" : "";
+    engine = new Worker("engine-worker.js?v=" + build + cc + rp + mp + nk);
     window.__wctrEngine = engine;
     window.__wctrBuild = build;
     // The dashboard's bridge listens on the worker too (addEventListener);

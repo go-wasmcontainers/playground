@@ -121,7 +121,7 @@ func TestQuakeImagePins(t *testing.T) {
 			t.Error("description lacks the licence")
 		}
 		lic := im.Files["usr/share/doc/quake/copyright"]
-		for _, want := range []string{"GPL-3.0-or-later", "https://github.com/go-quake1/engine", "https://github.com/go-quake1/freepak", "d08670904b5f6fe466135374b6c64e44a0c3a6dbee915c436f8f82bcb286652f"} {
+		for _, want := range []string{"GPL-3.0-or-later", "https://github.com/go-quake1/engine", "https://github.com/go-quake1/freepak", "924c2f93ac43b085fbeb7ccc6f4fdecbca6782e3eea35bbfa0f995669fdc2ed8"} {
 			if !strings.Contains(lic, want) {
 				t.Errorf("copyright lacks %q", want)
 			}
@@ -138,7 +138,7 @@ func TestQuakeImagePins(t *testing.T) {
 				t.Errorf("image lacks usr/share/quake/%s", want)
 			}
 		}
-		if p := paths["usr/share/quake/pak0.pak"]; p.Size != 36931086 {
+		if p := paths["usr/share/quake/pak0.pak"]; p.Size != 36931122 {
 			t.Errorf("pak size %d", p.Size)
 		}
 	}
