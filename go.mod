@@ -9,7 +9,7 @@ require (
 	github.com/go-wasmcontainers/compose v0.6.0
 	github.com/go-wasmcontainers/dashboard v0.13.0
 	github.com/go-wasmcontainers/engine v0.40.2
-	github.com/go-wasmcontainers/gpu v0.18.0
+	github.com/go-wasmcontainers/gpu v0.19.0
 	github.com/go-wasmcontainers/relay v0.3.1
 	github.com/go-widgets/mvvm v0.15.0
 	github.com/go-widgets/toolkit v0.362.0
@@ -104,7 +104,7 @@ require (
 	github.com/go-opentype/fonts v0.14.0 // indirect
 	github.com/go-opentype/opentype v0.16.2-0.20261027113239-5e69589e9a5e // indirect
 	github.com/go-opentype/shape v0.7.0 // indirect
-	github.com/go-quake1/engine v0.50.0 // indirect
+	github.com/go-quake1/engine v0.51.0 // indirect
 	github.com/go-richdoc/richdoc v0.7.0 // indirect
 	github.com/go-sql-driver/mysql v1.10.1 // indirect
 	github.com/go-stack/stack v1.8.1 // indirect
