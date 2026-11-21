@@ -289,7 +289,7 @@ jobs:
         env:
           E2E_BROWSERS: firefox
           E2E_AUDIO_REPORT: ${{ runner.temp }}/audio.jsonl
-        run: go test -tags e2e -count=1 -v -run '^(TestQuakeFirefox|TestQuakeSoakFirefox|TestQuakeAudioFirefox)$' -timeout 20m ./e2e/ > "$RUNNER_TEMP/firefox.log" 2>&1 && status=0 || status=$?; grep -n -m 60 -A 6 -e '--- FAIL' -e 'exited' -e 'fatal error' -e 'panic:' -e 'firefox_test.go' -e 'Error: wasi_' -e 'overran its GPU time budget' "$RUNNER_TEMP/firefox.log" || true; tail -150 "$RUNNER_TEMP/firefox.log"; grep -n -e 'SOUND ' -e 'paced run' -e 'real-time ratio' "$RUNNER_TEMP/firefox.log" || true; exit "$status"
+        run: go test -tags e2e -count=1 -v -run '^(TestQuakeFirefox|TestQuakeSoakFirefox|TestQuakeAudioFirefox)$' -timeout 20m ./e2e/ > "$RUNNER_TEMP/firefox.log" 2>&1 && status=0 || status=$?; grep -n -m 60 -A 6 -e '--- FAIL' -e 'exited' -e 'fatal error' -e 'panic:' -e 'firefox_test.go' -e 'wasi_webgpu_batch' -e 'overran its GPU time budget' "$RUNNER_TEMP/firefox.log" || true; tail -150 "$RUNNER_TEMP/firefox.log"; grep -n -e 'SOUND ' -e 'paced run' -e 'real-time ratio' "$RUNNER_TEMP/firefox.log" || true; exit "$status"
       # Measurement only (never the lane's verdict): the same paced quake run with
       # and without the host library's kicks (empty queue.submit while a GPU wait
       # is pending), interleaved; it answers whether our own queue traffic
