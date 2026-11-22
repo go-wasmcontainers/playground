@@ -21,6 +21,48 @@ type hostCall struct {
 	Name                   string
 	At                     float64
 	Total, Wait, Exec, Ret float64
+	// The return trip split (engine worker.js, v0.46.0): from the engine's answer to
+	// the guest worker's Atomics.wait coming back (Wake: the browser's wake-up), and
+	// from there to the call returning (Post: the guest's own code, the realloc
+	// rounds), with the wake-ups without an answer and the realloc rounds.
+	Wake, Post      float64
+	Wakes, Reallocs int
+}
+
+// batchSub is one slow submit of the wasi_webgpu_batch module as the host
+// module saw it (gpu v0.21.0, self.__batchSlow): when it ended (epoch ms, the
+// engine worker's clock), how long its frame ran and waited for the GPU's turn,
+// and what the frame held.
+type batchSub struct {
+	At, Ran, Waited          float64
+	Bytes, Commands, Creates int
+}
+
+// takeBatchSlow reads the engine worker's list of slow submits.
+func takeBatchSlow(t *testing.T, w playwright.Worker) []batchSub {
+	t.Helper()
+	v, err := w.Evaluate("() => (self.__batchSlow || []).map((m) => ({ at: m.at, ran: m.ran, waited: m.waited, bytes: m.bytes, commands: m.commands, creates: m.creates }))")
+	if err != nil {
+		t.Fatal(err)
+	}
+	list, _ := v.([]any)
+	var out []batchSub
+	for _, e := range list {
+		x, _ := e.(map[string]any)
+		out = append(out, batchSub{num(x["at"]), num(x["ran"]), num(x["waited"]), int(num(x["bytes"])), int(num(x["commands"])), int(num(x["creates"]))})
+	}
+	return out
+}
+
+// batchFor is the slow submit that ended inside the host call c (its window
+// widened by 5 ms for the two clocks), if there is one.
+func batchFor(c hostCall, subs []batchSub) (batchSub, bool) {
+	for _, s := range subs {
+		if s.At >= c.At && s.At <= c.At+c.Total+5 {
+			return s, true
+		}
+	}
+	return batchSub{}, false
 }
 
 // takeHostSlow reads the engine worker's list of slow calls (self.__hostSlow).
@@ -28,7 +70,7 @@ type hostCall struct {
 // offset, "off", is already taken out), the clock of the busy log.
 func takeHostSlow(t *testing.T, w playwright.Worker) []hostCall {
 	t.Helper()
-	v, err := w.Evaluate(`() => (self.__hostSlow || []).map((m) => ({ name: m.name, at: m.at, total: m.total, wait: m.wait, exec: m.exec, ret: m.ret }))`)
+	v, err := w.Evaluate(`() => (self.__hostSlow || []).map((m) => ({ name: m.name, at: m.at, total: m.total, wait: m.wait, exec: m.exec, ret: m.ret, wake: m.wake, post: m.post, wakes: m.wakes, reallocs: m.reallocs }))`)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -37,7 +79,7 @@ func takeHostSlow(t *testing.T, w playwright.Worker) []hostCall {
 	for _, e := range list {
 		x, _ := e.(map[string]any)
 		name, _ := x["name"].(string)
-		out = append(out, hostCall{name, num(x["at"]), num(x["total"]), num(x["wait"]), num(x["exec"]), num(x["ret"])})
+		out = append(out, hostCall{name, num(x["at"]), num(x["total"]), num(x["wait"]), num(x["exec"]), num(x["ret"]), num(x["wake"]), num(x["post"]), int(num(x["wakes"])), int(num(x["reallocs"]))})
 	}
 	return out
 }
@@ -164,7 +206,7 @@ func longWaitsLackLabels(calls []hostCall, slices []browser.BusySlice) (string, 
 // part over all, and the slowest calls one by one. Which part dominates says
 // where the time goes: waiting for the engine's thread, the browser's API, or the
 // way back.
-func hostSlowReport(calls []hostCall, show int) []string {
+func hostSlowReport(calls []hostCall, show int, subs ...batchSub) []string {
 	if len(calls) == 0 {
 		return []string{"host calls: none took 10 ms or more"}
 	}
@@ -185,7 +227,11 @@ func hostSlowReport(calls []hostCall, show int) []string {
 		return 0
 	})
 	for _, c := range sorted[:min(show, len(sorted))] {
-		out = append(out, fmt.Sprintf("host call at %.0f: %s total %.1f ms = wait %.1f + exec %.1f + return %.1f", c.At, c.Name, c.Total, c.Wait, c.Exec, c.Ret))
+		line := fmt.Sprintf("host call at %.0f: %s total %.1f ms = wait %.1f + exec %.1f + return %.1f (browser wake-up %.1f + guest code %.1f; %d wake-ups, %d reallocs)", c.At, c.Name, c.Total, c.Wait, c.Exec, c.Ret, c.Wake, c.Post, c.Wakes, c.Reallocs)
+		if b, ok := batchFor(c, subs); ok {
+			line += fmt.Sprintf("; its frame: %d bytes, %d commands (%d creates), ran %.1f ms after waiting %.1f ms for the GPU's turn", b.Bytes, b.Commands, b.Creates, b.Ran, b.Waited)
+		}
+		out = append(out, line)
 	}
 	return out
 }
@@ -195,8 +241,8 @@ func TestHostSlowReportSplitsTheTotal(t *testing.T) {
 		t.Errorf("no calls: %q", got)
 	}
 	calls := []hostCall{
-		{"[method]gpu-queue.submit", 1000, 40, 30, 8, 2},
-		{"[method]gpu-command-encoder.finish", 2000, 60, 10, 45, 5},
+		{"[method]gpu-queue.submit", 1000, 40, 30, 8, 2, 0, 0, 0, 0},
+		{"[method]gpu-command-encoder.finish", 2000, 60, 10, 45, 5, 0, 0, 0, 0},
 	}
 	got := hostSlowReport(calls, 1)
 	if len(got) != 2 {
@@ -210,10 +256,28 @@ func TestHostSlowReportSplitsTheTotal(t *testing.T) {
 	}
 }
 
+func TestHostSlowReportNamesTheReturnTripAndTheBatch(t *testing.T) {
+	calls := []hostCall{{"wasi_webgpu_batch submit", 1000, 380, 3, 373, 4, 1.5, 2.5, 1, 0}}
+	subs := []batchSub{{1376, 370, 2, 20480, 311, 0}, {9000, 50, 0, 1, 1, 0}}
+	got := hostSlowReport(calls, 1, subs...)
+	if len(got) != 2 {
+		t.Fatalf("report = %q", got)
+	}
+	for _, want := range []string{"browser wake-up 1.5 + guest code 2.5; 1 wake-ups, 0 reallocs", "its frame: 20480 bytes, 311 commands (0 creates), ran 370.0 ms after waiting 2.0 ms"} {
+		if !strings.Contains(got[1], want) {
+			t.Errorf("%q lacks %q", got[1], want)
+		}
+	}
+	// A submit that ended outside the call's window is not its frame.
+	if b, ok := batchFor(calls[0], subs[1:]); ok {
+		t.Errorf("matched a submit that ended at 9000: %+v", b)
+	}
+}
+
 func TestLongWaitsLackLabels(t *testing.T) {
 	calls := []hostCall{
-		{"[method]gpu-queue.submit", 1000, 90, 80, 8, 2},
-		{"clock_time_get", 2000, 60, 55, 3, 2},
+		{"[method]gpu-queue.submit", 1000, 90, 80, 8, 2, 0, 0, 0, 0},
+		{"clock_time_get", 2000, 60, 55, 3, 2, 0, 0, 0, 0},
 	}
 	named := []browser.BusySlice{
 		{At: 990, Dur: 100, Trigger: "msg:call", Labels: []browser.BusyLabel{{Name: "call:gpu.queue-submit", Ms: 95}}},

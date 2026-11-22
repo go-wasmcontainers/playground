@@ -371,7 +371,7 @@ func TestQuakeAudioPane(t *testing.T) {
 			t.Logf("LOOPLAG underrun at %d: worker-loop stalls in the 150 ms before: %v", e.Wall, lagNear(lag, e.Wall))
 		}
 		calls, busy := takeHostSlow(t, engineWorker), takeBusy(t, engineWorker)
-		for _, l := range hostSlowReport(calls, 40) {
+		for _, l := range hostSlowReport(calls, 40, takeBatchSlow(t, engineWorker)...) {
 			t.Log("HOSTCALL " + l)
 		}
 		for _, l := range busyReport(calls, busy, 15) {
