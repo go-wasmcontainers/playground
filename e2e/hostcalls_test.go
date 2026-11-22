@@ -8,6 +8,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/go-wasmcontainers/engine/runtime/browser"
 	"github.com/mxschmitt/playwright-go"
 )
 
@@ -22,6 +23,8 @@ type hostCall struct {
 }
 
 // takeHostSlow reads the engine worker's list of slow calls (self.__hostSlow).
+// Since engine v0.42.0 the times are on the engine worker's clock (the guest's
+// offset, "off", is already taken out), the clock of the busy log.
 func takeHostSlow(t *testing.T, w playwright.Worker) []hostCall {
 	t.Helper()
 	v, err := w.Evaluate(`() => (self.__hostSlow || []).map((m) => ({ name: m.name, at: m.at, total: m.total, wait: m.wait, exec: m.exec, ret: m.ret }))`)
@@ -36,6 +39,95 @@ func takeHostSlow(t *testing.T, w playwright.Worker) []hostCall {
 		out = append(out, hostCall{name, num(x["at"]), num(x["total"]), num(x["wait"]), num(x["exec"]), num(x["ret"])})
 	}
 	return out
+}
+
+// takeBusy reads what the engine worker was doing (engine runtime/browser
+// busy.js): every slice of its work of 1 ms or more, with its trigger and the
+// Go sites' labels, beside self.__hostSlow. A page without the log (an engine
+// before v0.42.0) gives none, and the report says so.
+func takeBusy(t *testing.T, w playwright.Worker) []browser.BusySlice {
+	t.Helper()
+	v, err := w.Evaluate(`() => (self.__busy ? self.__busy.slices(1) : [])`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	list, _ := v.([]any)
+	var out []browser.BusySlice
+	for _, e := range list {
+		x, _ := e.(map[string]any)
+		s := browser.BusySlice{At: num(x["at"]), Dur: num(x["dur"]), GC: int(num(x["gc"]))}
+		s.Trigger, _ = x["trigger"].(string)
+		ls, _ := x["labels"].([]any)
+		for _, l := range ls {
+			m, _ := l.(map[string]any)
+			name, _ := m["name"].(string)
+			s.Labels = append(s.Labels, browser.BusyLabel{Name: name, Ms: num(m["ms"])})
+		}
+		out = append(out, s)
+	}
+	return out
+}
+
+// waitAttribution attributes the wait of every slow call (the time before the
+// engine's thread began it) to what the engine worker was doing then: the
+// shares by cause, largest first, and the part of the waits nothing names.
+func waitAttribution(calls []hostCall, busy []browser.BusySlice) (shares []browser.Share, waited, unattributed float64) {
+	by := map[string]float64{}
+	for _, c := range calls {
+		if c.Wait <= 0 {
+			continue
+		}
+		waited += c.Wait
+		unattributed += browser.Unattributed(c.At, c.At+c.Wait, busy)
+		for _, s := range browser.Explain(c.At, c.At+c.Wait, busy) {
+			by[s.Cause] += s.Ms
+		}
+	}
+	for cause, ms := range by {
+		shares = append(shares, browser.Share{Cause: cause, Ms: ms})
+	}
+	slices.SortFunc(shares, func(a, b browser.Share) int {
+		switch {
+		case a.Ms > b.Ms:
+			return -1
+		case a.Ms < b.Ms:
+			return 1
+		}
+		return strings.Compare(a.Cause, b.Cause)
+	})
+	return shares, waited, unattributed
+}
+
+// busyReport is the wait attribution for the log: where the time the guest
+// waited for the engine went, by cause.
+func busyReport(calls []hostCall, slices []browser.BusySlice, show int) []string {
+	if len(slices) == 0 {
+		return []string{"busy log: none (the engine worker has no busy log)"}
+	}
+	shares, waited, un := waitAttribution(calls, slices)
+	if waited == 0 {
+		return []string{fmt.Sprintf("busy log: %d slices of 1 ms or more, no slow call waited", len(slices))}
+	}
+	out := []string{fmt.Sprintf("busy log: %d slices of 1 ms or more; the slow calls waited %.0f ms in all, %.0f ms (%.0f%%) under no label", len(slices), waited, un, 100*un/waited)}
+	for _, s := range shares[:min(show, len(shares))] {
+		out = append(out, fmt.Sprintf("busy wait %.0f ms (%.0f%%): %s", s.Ms, 100*s.Ms/waited, s.Cause))
+	}
+	return out
+}
+
+// longWaitsLackLabels says whether the slow calls' waits are mostly unexplained:
+// with 100 ms or more of wait in all, more than half under no label is a hole in
+// the log (the engine worker was busy with something this log cannot see), and
+// the engine's thread is then not shown to be the cause of anything.
+func longWaitsLackLabels(calls []hostCall, slices []browser.BusySlice) (string, bool) {
+	if len(slices) == 0 {
+		return "", false
+	}
+	_, waited, un := waitAttribution(calls, slices)
+	if waited < 100 || un <= waited/2 {
+		return "", false
+	}
+	return fmt.Sprintf("the slow host calls waited %.0f ms for the engine, %.0f ms (%.0f%%) of it under no label: the busy log does not see what occupied the engine worker", waited, un, 100*un/waited), true
 }
 
 // hostSlowReport is the split of the slow calls, for the log: the totals of each
@@ -85,5 +177,38 @@ func TestHostSlowReportSplitsTheTotal(t *testing.T) {
 	}
 	if !strings.Contains(got[1], "finish total 60.0 ms = wait 10.0 + exec 45.0 + return 5.0") {
 		t.Errorf("slowest = %q", got[1])
+	}
+}
+
+func TestLongWaitsLackLabels(t *testing.T) {
+	calls := []hostCall{
+		{"[method]gpu-queue.submit", 1000, 90, 80, 8, 2},
+		{"clock_time_get", 2000, 60, 55, 3, 2},
+	}
+	named := []browser.BusySlice{
+		{At: 990, Dur: 100, Trigger: "msg:call", Labels: []browser.BusyLabel{{Name: "call:gpu.queue-submit", Ms: 95}}},
+		{At: 1990, Dur: 70, Trigger: "msg:http.req GET /containers/q/logs"},
+	}
+	if msg, bad := longWaitsLackLabels(calls, named); bad {
+		t.Errorf("waits covered by named slices were flagged: %s", msg)
+	}
+	// The same waits with the worker busy under nothing the log names.
+	bare := []browser.BusySlice{
+		{At: 990, Dur: 100, Trigger: "timer"},
+		{At: 1990, Dur: 70, Trigger: "callback"},
+	}
+	if msg, bad := longWaitsLackLabels(calls, bare); !bad || !strings.Contains(msg, "no label") {
+		t.Errorf("waits under bare timers were not flagged: %q %v", msg, bad)
+	}
+	// And with no slice at all in the waits (the worker was busy outside Go).
+	if _, bad := longWaitsLackLabels(calls, []browser.BusySlice{{At: 5000, Dur: 3, Trigger: "timer"}}); !bad {
+		t.Error("waits no slice covers were not flagged")
+	}
+	// No busy log at all is reported by the log, not failed here.
+	if _, bad := longWaitsLackLabels(calls, nil); bad {
+		t.Error("a missing busy log was flagged as a hole in it")
+	}
+	if got := busyReport(calls, named, 3); len(got) < 2 || !strings.Contains(got[0], "under no label") {
+		t.Errorf("report = %q", got)
 	}
 }
