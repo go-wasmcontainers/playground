@@ -5,6 +5,8 @@
 
 const v = "?" + self.location.search.slice(1).split("&")[0]; // ?v=<build> only
 importScripts("wasm_exec.js" + v);
+// The busy log wraps Go's resume loop, so it follows the glue and precedes Go.
+importScripts("busy.js" + v);
 
 // ?nokick=1 (loopback pages only, for the e2e's A/B of the host library's kicks:
 // go-gfx/webgpu kick.go, empty queue.submit([]) calls while a GPU wait is

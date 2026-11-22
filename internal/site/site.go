@@ -189,6 +189,9 @@ digit.png: picture 0 of the MNIST test set (label 7), Y. LeCun, C. Cortes,
   C. J. C. Burges, CC BY-SA 3.0; extracted unmodified.
 `
 
+// writeServed writes one served file; a test replaces it to make a write fail.
+var writeServed = func(name string, b []byte) error { return os.WriteFile(name, b, 0o644) }
+
 // Build assembles the site into o.Out.
 func Build(ctx context.Context, o Options) (*Manifest, error) {
 	logf := func(format string, a ...any) {
@@ -323,6 +326,11 @@ func Build(ctx context.Context, o Options) (*Manifest, error) {
 		return nil, err
 	}
 	if err := os.WriteFile(filepath.Join(o.Out, "container-worker.js"), browser.WorkerJS, 0o644); err != nil {
+		return nil, err
+	}
+	// busy.js: the engine worker's busy log, loaded by engine-worker.js with
+	// importScripts (the CSP forbids evaluating it from a string).
+	if err := writeServed(filepath.Join(o.Out, "busy.js"), []byte(browser.BusyJS)); err != nil {
 		return nil, err
 	}
 	// replay.js: the JavaScript half of the batched stream (wasi_webgpu_batch),
