@@ -5,6 +5,7 @@ package e2e
 import (
 	"fmt"
 	"slices"
+	"sort"
 	"strings"
 	"testing"
 
@@ -112,6 +113,17 @@ func busyReport(calls []hostCall, slices []browser.BusySlice, show int) []string
 	for _, s := range shares[:min(show, len(shares))] {
 		out = append(out, fmt.Sprintf("busy wait %.0f ms (%.0f%%): %s", s.Ms, 100*s.Ms/waited, s.Cause))
 	}
+	// The longest slices themselves: what the engine's thread did for tens of
+	// milliseconds at a time, with the time under each label and the GCs.
+	longest := append([]browser.BusySlice(nil), slices...)
+	sort.SliceStable(longest, func(i, j int) bool { return longest[i].Dur > longest[j].Dur })
+	for _, s := range longest[:min(6, len(longest))] {
+		var ls []string
+		for _, l := range s.Labels {
+			ls = append(ls, fmt.Sprintf("%s %.1f", l.Name, l.Ms))
+		}
+		out = append(out, fmt.Sprintf("busy slice at %.0f: %.1f ms, %s, gc %d, labels [%s]", s.At, s.Dur, s.Trigger, s.GC, strings.Join(ls, "; ")))
+	}
 	return out
 }
 
@@ -210,5 +222,10 @@ func TestLongWaitsLackLabels(t *testing.T) {
 	}
 	if got := busyReport(calls, named, 3); len(got) < 2 || !strings.Contains(got[0], "under no label") {
 		t.Errorf("report = %q", got)
+	}
+	// The longest slice is listed with its trigger and labels.
+	all := strings.Join(busyReport(calls, bare, 3), "\n")
+	if !strings.Contains(all, "busy slice at 990: 100.0 ms, timer") {
+		t.Errorf("the longest slice is not listed: %s", all)
 	}
 }
