@@ -127,6 +127,24 @@ func busyReport(calls []hostCall, slices []browser.BusySlice, show int) []string
 	return out
 }
 
+// gcSplitLine is the long busy slices split by whether a garbage collection ran
+// in them (browser.GCSplit): how many, how long, how much under no label.
+func gcSplitLine(slices []browser.BusySlice, minDur float64) string {
+	g := browser.GCSplit(slices, minDur)
+	f := func(c browser.SliceClass) string {
+		return fmt.Sprintf("%d slices, %.0f ms, %.0f ms unlabelled, longest %.0f ms", c.N, c.Ms, c.Unlabelled, c.Max)
+	}
+	return fmt.Sprintf("GC split of the slices of %.0f ms or more: with a collection: %s; without: %s", minDur, f(g.With), f(g.Without))
+}
+
+func TestGCSplitLine(t *testing.T) {
+	got := gcSplitLine([]browser.BusySlice{{Dur: 33, GC: 1}, {Dur: 12}}, 10)
+	want := "GC split of the slices of 10 ms or more: with a collection: 1 slices, 33 ms, 33 ms unlabelled, longest 33 ms; without: 1 slices, 12 ms, 12 ms unlabelled, longest 12 ms"
+	if got != want {
+		t.Errorf("got %q\nwant %q", got, want)
+	}
+}
+
 // longWaitsLackLabels says whether the slow calls' waits are mostly unexplained:
 // with 100 ms or more of wait in all, more than half under no label is a hole in
 // the log (the engine worker was busy with something this log cannot see), and

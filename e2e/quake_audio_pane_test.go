@@ -377,6 +377,9 @@ func TestQuakeAudioPane(t *testing.T) {
 		for _, l := range busyReport(calls, busy, 15) {
 			t.Log("BUSY " + l)
 		}
+		// The GC question: of the engine worker's slices of 10 ms or more, the ones a
+		// collection ran in and the others, with the time under no label.
+		t.Log("BUSY " + gcSplitLine(busy, 10))
 		if msg, bad := longWaitsLackLabels(calls, busy); bad {
 			t.Error("BUSY " + msg)
 		}

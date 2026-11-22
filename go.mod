@@ -8,8 +8,8 @@ require (
 	github.com/go-wasmcontainers/build v0.4.0
 	github.com/go-wasmcontainers/compose v0.6.0
 	github.com/go-wasmcontainers/dashboard v0.13.0
-	github.com/go-wasmcontainers/engine v0.43.0
-	github.com/go-wasmcontainers/gpu v0.19.0
+	github.com/go-wasmcontainers/engine v0.44.0
+	github.com/go-wasmcontainers/gpu v0.20.0
 	github.com/go-wasmcontainers/relay v0.3.1
 	github.com/go-widgets/mvvm v0.15.0
 	github.com/go-widgets/toolkit v0.362.0
