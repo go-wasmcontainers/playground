@@ -259,12 +259,12 @@ func TestHostSlowReportSplitsTheTotal(t *testing.T) {
 
 func TestHostSlowReportNamesTheReturnTripAndTheBatch(t *testing.T) {
 	calls := []hostCall{{"wasi_webgpu_batch submit", 1000, 380, 3, 373, 4, 1.5, 2.5, 1, 0}}
-	subs := []batchSub{{1376, 370, 2, 20480, 311, 0}, {9000, 50, 0, 1, 1, 0}}
+	subs := []batchSub{{1376, 370, 2, 20480, 311, 0, "texture 96B 301.5ms, pipeline 800B 40.2ms"}, {9000, 50, 0, 1, 1, 0, ""}}
 	got := hostSlowReport(calls, 1, subs...)
 	if len(got) != 2 {
 		t.Fatalf("report = %q", got)
 	}
-	for _, want := range []string{"browser wake-up 1.5 + guest code 2.5; 1 wake-ups, 0 reallocs", "its frame: 20480 bytes, 311 commands (0 creates), ran 370.0 ms after waiting 2.0 ms"} {
+	for _, want := range []string{"browser wake-up 1.5 + guest code 2.5; 1 wake-ups, 0 reallocs", "its frame: 20480 bytes, 311 commands (0 creates), ran 370.0 ms after waiting 2.0 ms", "creations [texture 96B 301.5ms, pipeline 800B 40.2ms]"} {
 		if !strings.Contains(got[1], want) {
 			t.Errorf("%q lacks %q", got[1], want)
 		}
