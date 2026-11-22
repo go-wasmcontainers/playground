@@ -36,12 +36,13 @@ type hostCall struct {
 type batchSub struct {
 	At, Ran, Waited          float64
 	Bytes, Commands, Creates int
+	Made                     string // each creation: kind, descriptor bytes, provider ms (gpu v0.22.0)
 }
 
 // takeBatchSlow reads the engine worker's list of slow submits.
 func takeBatchSlow(t *testing.T, w playwright.Worker) []batchSub {
 	t.Helper()
-	v, err := w.Evaluate("() => (self.__batchSlow || []).map((m) => ({ at: m.at, ran: m.ran, waited: m.waited, bytes: m.bytes, commands: m.commands, creates: m.creates }))")
+	v, err := w.Evaluate("() => (self.__batchSlow || []).map((m) => ({ at: m.at, ran: m.ran, waited: m.waited, bytes: m.bytes, commands: m.commands, creates: m.creates, made: (m.made || []).map((k) => k.kind + ' ' + k.bytes + 'B ' + k.ran + 'ms').join(', ') }))")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -49,7 +50,7 @@ func takeBatchSlow(t *testing.T, w playwright.Worker) []batchSub {
 	var out []batchSub
 	for _, e := range list {
 		x, _ := e.(map[string]any)
-		out = append(out, batchSub{num(x["at"]), num(x["ran"]), num(x["waited"]), int(num(x["bytes"])), int(num(x["commands"])), int(num(x["creates"]))})
+		out = append(out, batchSub{num(x["at"]), num(x["ran"]), num(x["waited"]), int(num(x["bytes"])), int(num(x["commands"])), int(num(x["creates"])), fmt.Sprint(x["made"])})
 	}
 	return out
 }
@@ -229,7 +230,7 @@ func hostSlowReport(calls []hostCall, show int, subs ...batchSub) []string {
 	for _, c := range sorted[:min(show, len(sorted))] {
 		line := fmt.Sprintf("host call at %.0f: %s total %.1f ms = wait %.1f + exec %.1f + return %.1f (browser wake-up %.1f + guest code %.1f; %d wake-ups, %d reallocs)", c.At, c.Name, c.Total, c.Wait, c.Exec, c.Ret, c.Wake, c.Post, c.Wakes, c.Reallocs)
 		if b, ok := batchFor(c, subs); ok {
-			line += fmt.Sprintf("; its frame: %d bytes, %d commands (%d creates), ran %.1f ms after waiting %.1f ms for the GPU's turn", b.Bytes, b.Commands, b.Creates, b.Ran, b.Waited)
+			line += fmt.Sprintf("; its frame: %d bytes, %d commands (%d creates), ran %.1f ms after waiting %.1f ms for the GPU's turn; creations [%s]", b.Bytes, b.Commands, b.Creates, b.Ran, b.Waited, b.Made)
 		}
 		out = append(out, line)
 	}
