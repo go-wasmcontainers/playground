@@ -66,6 +66,41 @@ func batchFor(c hostCall, subs []batchSub) (batchSub, bool) {
 	return batchSub{}, false
 }
 
+// presentSlow is one slow context.present split by the provider (gpu v0.23.0,
+// self.__presentSlow): the pacer's sleep, the wait for the page's ack of an
+// earlier frame, and the hand-over (transferToImageBitmap plus the frame event).
+type presentSlow struct{ At, Paced, Acked, Handed float64 }
+
+// takePresentSlow reads the engine worker's list of slow presents.
+func takePresentSlow(t *testing.T, w playwright.Worker) []presentSlow {
+	t.Helper()
+	v, err := w.Evaluate("() => (self.__presentSlow || []).map((m) => ({ at: m.at, paced: m.paced, acked: m.acked, handed: m.handed }))")
+	if err != nil {
+		t.Fatal(err)
+	}
+	list, _ := v.([]any)
+	var out []presentSlow
+	for _, e := range list {
+		x, _ := e.(map[string]any)
+		out = append(out, presentSlow{num(x["at"]), num(x["paced"]), num(x["acked"]), num(x["handed"])})
+	}
+	return out
+}
+
+// presentSlowLine says where the time of the slow presents went: the count, the
+// sum and the worst of each phase.
+func presentSlowLine(ps []presentSlow) string {
+	if len(ps) == 0 {
+		return "no present took 10 ms or more"
+	}
+	var sp, sa, sh, mp, ma, mh float64
+	for _, p := range ps {
+		sp, sa, sh = sp+p.Paced, sa+p.Acked, sh+p.Handed
+		mp, ma, mh = max(mp, p.Paced), max(ma, p.Acked), max(mh, p.Handed)
+	}
+	return fmt.Sprintf("%d slow presents: pacer sleep %.0f ms (worst %.1f), ack wait %.0f ms (worst %.1f), hand-over %.0f ms (worst %.1f)", len(ps), sp, mp, sa, ma, sh, mh)
+}
+
 // takeHostSlow reads the engine worker's list of slow calls (self.__hostSlow).
 // Since engine v0.42.0 the times are on the engine worker's clock (the guest's
 // offset, "off", is already taken out), the clock of the busy log.
@@ -272,6 +307,17 @@ func TestHostSlowReportNamesTheReturnTripAndTheBatch(t *testing.T) {
 	// A submit that ended outside the call's window is not its frame.
 	if b, ok := batchFor(calls[0], subs[1:]); ok {
 		t.Errorf("matched a submit that ended at 9000: %+v", b)
+	}
+}
+
+func TestPresentSlowLineSplitsThePhases(t *testing.T) {
+	got := presentSlowLine([]presentSlow{{1, 14, 3, 8}, {2, 2, 20, 4}})
+	want := "2 slow presents: pacer sleep 16 ms (worst 14.0), ack wait 23 ms (worst 20.0), hand-over 12 ms (worst 8.0)"
+	if got != want {
+		t.Fatalf("got %q, want %q", got, want)
+	}
+	if presentSlowLine(nil) != "no present took 10 ms or more" {
+		t.Fatal("an empty list is not said to be empty")
 	}
 }
 
