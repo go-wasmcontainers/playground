@@ -87,6 +87,26 @@ func takePresentSlow(t *testing.T, w playwright.Worker) []presentSlow {
 	return out
 }
 
+// takeCreated reads how many objects the engine worker's GPU submits have
+// created so far (gpu v0.24.0, self.__batchCreated; 0 when none has).
+func takeCreated(t *testing.T, w playwright.Worker) int {
+	t.Helper()
+	v, err := w.Evaluate("() => self.__batchCreated || 0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	return int(num(v))
+}
+
+// steadyCreatesMsg is the failure of a game that kept creating GPU objects
+// after its start-up (a steady frame creates none), or "" when the count held.
+func steadyCreatesMsg(atSteady, atEnd int) string {
+	if atEnd == atSteady {
+		return ""
+	}
+	return fmt.Sprintf("the game created %d GPU objects after start-up (%d -> %d): a steady frame creates none", atEnd-atSteady, atSteady, atEnd)
+}
+
 // presentSlowLine says where the time of the slow presents went: the count, the
 // sum and the worst of each phase.
 func presentSlowLine(ps []presentSlow) string {
@@ -318,6 +338,15 @@ func TestPresentSlowLineSplitsThePhases(t *testing.T) {
 	}
 	if presentSlowLine(nil) != "no present took 10 ms or more" {
 		t.Fatal("an empty list is not said to be empty")
+	}
+}
+
+func TestSteadyCreatesMsg(t *testing.T) {
+	if m := steadyCreatesMsg(21, 21); m != "" {
+		t.Fatalf("a held count was reported: %q", m)
+	}
+	if m := steadyCreatesMsg(21, 24); m != "the game created 3 GPU objects after start-up (21 -> 24): a steady frame creates none" {
+		t.Fatalf("got %q", m)
 	}
 }
 

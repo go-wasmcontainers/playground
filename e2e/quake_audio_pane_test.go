@@ -292,11 +292,14 @@ func TestQuakeAudioPane(t *testing.T) {
 		m, _ := v.(map[string]any)
 		t.Logf("PAGE %s: %.0f s, %.0f animation frames a second, %.0f long tasks over 50 ms, the longest %.0f ms", what, num(m["s"]), num(m["fps"]), num(m["n"]), num(m["max"]))
 	}
-	polls := 0
+	polls, createdSteady := 0, -1
 	requireSignal(t, "pane", 65-int(time.Since(testStart).Seconds()), func() float64 {
 		alive()
 		r := streamReading(t, page)
 		sk.note(r)
+		if polls == 20 && engineWorker != nil {
+			createdSteady = takeCreated(t, engineWorker) // start-up is over: a steady frame creates nothing
+		}
 		if polls++; polls%7 == 1 && len(d.state().Surfaces) == 1 {
 			if f, ok := paneFPS(d.state().Surfaces[0]); ok {
 				sk.noteFPS(f)
@@ -381,6 +384,13 @@ func TestQuakeAudioPane(t *testing.T) {
 		// collection ran in and the others, with the time under no label.
 		t.Log("BUSY " + gcSplitLine(busy, 10))
 		t.Log("PRESENT " + presentSlowLine(takePresentSlow(t, engineWorker)))
+		if createdSteady >= 0 {
+			end := takeCreated(t, engineWorker)
+			t.Logf("CREATED %d objects by poll 20, %d at the end", createdSteady, end)
+			if msg := steadyCreatesMsg(createdSteady, end); msg != "" {
+				t.Error("CREATED " + msg)
+			}
+		}
 		if msg, bad := longWaitsLackLabels(calls, busy); bad {
 			t.Error("BUSY " + msg)
 		}
