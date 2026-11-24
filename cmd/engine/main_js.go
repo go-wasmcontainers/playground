@@ -18,6 +18,11 @@
 // channels, capacityFrames, sab} and {t:"audio", op:"close", stream}.
 // The dashboard's http.* messages (package bridge) carry the engine's API
 // to the canvas UI.
+//
+// The same binary runs a second worker with role=host in its URL, the GPU host
+// worker (hostMain), which serves the GPU host calls; it posts the surface
+// messages above, and takes {t:"frame-ack"} and a surface's {t:"input"} from
+// the page, and {t:"host-port", port} (to the engine's worker) links the two.
 package main
 
 import (
@@ -125,9 +130,54 @@ func surfaceInput(data js.Value) {
 	})
 }
 
+// hostModules lists the host modules beside wasi_snapshot_preview1, in the
+// order both workers index them by: the GPU ones first (nn, the batched
+// stream, wasi:webgpu and wasi-gfx:surface), then WASIX and the sound stream.
+// The engine's worker and the GPU host worker build the same list.
+func hostModules(base string) []wasi.HostModule {
+	return append(append([]wasi.HostModule{nnwebgpu.NewModule(), gpubatch.NewModule(gpubatch.Browser{ReplayURL: base + wgpu.ReplayJSName})},
+		webgpu.HostModules(webgpu.Browser{OnSurface: postSurface})...), wasi.WASIX, audio.New(&audio.Browser{Post: postAudio}))
+}
+
+// hostMain is the GPU host worker (role=host in the worker's URL): it serves
+// the GPU host calls of every container (browser.HostWorker) and nothing
+// else. Its surface events go to the page, which created it; the page sends
+// it the frame acknowledgements and the surface input, and the port to the
+// engine's worker ({t:"engine", port}).
+func hostMain(base string) {
+	hw, err := browser.NewHostWorker(hostModules(base))
+	if err != nil {
+		post(map[string]any{"t": "fatal", "message": "gpu host: " + err.Error()})
+		return
+	}
+	js.Global().Set("onmessage", js.FuncOf(func(_ js.Value, a []js.Value) any {
+		data := a[0].Get("data")
+		if hw.Handle(data) {
+			return nil
+		}
+		switch data.Get("t").String() {
+		case "frame-ack":
+			if s, q, ok := frameAck(data); ok {
+				webgpu.AckFrame(s, q)
+			}
+		case "input":
+			if data.Get("kind").Type() == js.TypeString && data.Get("surface").Type() == js.TypeNumber {
+				surfaceInput(data)
+			}
+		}
+		return nil
+	}))
+	post(map[string]any{"t": "gpu-host-ready"})
+	select {}
+}
+
 func main() {
 	href := js.Global().Get("location").Get("href").String()
 	base := href[:strings.LastIndexByte(href, '/')+1]
+	if q, err := url.ParseQuery(strings.TrimPrefix(js.Global().Get("location").Get("search").String(), "?")); err == nil && q.Get("role") == "host" {
+		hostMain(base)
+		return
+	}
 	v := js.Global().Get("location").Get("search").String() // ?v=<build>, kept on every asset
 
 	storage := "IndexedDB"
@@ -158,6 +208,11 @@ func main() {
 		codeCache = "wctr-modules"
 	}
 	v = "?" + strings.SplitN(strings.TrimPrefix(v, "?"), "&", 2)[0] // the build only, on assets
+	mods := hostModules(base)
+	var remote []string
+	for _, m := range mods[:len(mods)-2] { // the GPU modules: all but WASIX and audio
+		remote = append(remote, m.Module())
+	}
 	exec := browser.New(browser.Options{
 		WorkerURL: base + "container-worker.js" + v, DefaultMemoryLimitBytes: 256 << 20,
 		// Host modules beside wasi_snapshot_preview1:
@@ -177,8 +232,15 @@ func main() {
 		//    submit; go-wasmcontainers/gpu gpubatch), which the quake image
 		//    draws its world through (--gpuworld). Same grant as wasi:webgpu
 		//    (--gpu), software adapters refused.
-		HostModules: append(append([]wasi.HostModule{nnwebgpu.NewModule(), gpubatch.NewModule(gpubatch.Browser{ReplayURL: base + wgpu.ReplayJSName})},
-			webgpu.HostModules(webgpu.Browser{OnSurface: postSurface})...), wasi.WASIX, audio.New(&audio.Browser{Post: postAudio})),
+		//
+		// The GPU modules (every one before wasi.WASIX in hostModules) are
+		// served by the page's GPU host worker, this same engine.wasm started
+		// with role=host (hostMain), once the page has handed this worker the
+		// port to it ({t:"host-port"}): a game that waits for a present or a
+		// submit no longer waits for this worker, which also runs Go's garbage
+		// collector and every other container's calls (engine#84). Without
+		// the port they stay here.
+		HostModules: mods, RemoteModules: remote,
 		// Compiled modules across reloads; the URLs are never fetched.
 		CodeCache: codeCache, CodeCacheURL: base + "module-cache/",
 		OnCompile: func(s browser.CompileStat) {
@@ -288,6 +350,9 @@ func main() {
 			return nil
 		}
 		switch data.Get("t").String() {
+		case "host-port":
+			// The port to the GPU host worker (the page made the channel).
+			exec.SetHostPort(data.Get("port"))
 		case "frame-ack":
 			if s, q, ok := frameAck(data); ok {
 				webgpu.AckFrame(s, q)
