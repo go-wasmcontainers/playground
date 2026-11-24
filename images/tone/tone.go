@@ -29,11 +29,21 @@ const (
 type pacer struct {
 	rate, target, capacity int
 	owed                   float64
+	playing                bool // the page plays this stream (not "waiting")
 }
 
 // due returns the frames to write after elapsed, with queued frames in the
 // ring.
+//
+// While the page plays the stream (p.playing), the producer keeps the lead it
+// states: it writes up to target frames queued, as tyrquake mixes up to
+// soundtime + _snd_mixahead. Pacing by the clock alone would leave the queue at
+// one tic, and a late tic would starve the page (playground#80).
 func (p *pacer) due(elapsed time.Duration, queued int) int {
+	if p.playing {
+		p.owed = 0
+		return min(max(p.target-queued, 0), p.capacity)
+	}
 	p.owed += elapsed.Seconds() * float64(p.rate)
 	if max := float64(p.target); p.owed > max {
 		p.owed = max // a stall is not a debt: do not burst to catch up

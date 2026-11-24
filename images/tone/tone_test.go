@@ -45,6 +45,32 @@ func TestPacerTracksTheClock(t *testing.T) {
 	}
 }
 
+// The producer keeps the lead it states (target frames queued), so that a late
+// tic does not starve the page: playground#80 found the e2e's tone queued about
+// one tic (10 ms) instead of 60 ms, and a 20 ms hiccup on a loaded runner was an
+// underrun. The stream is playing from the first tic (the page has clicked) and
+// the consumer drains in real time.
+func TestPacerKeepsItsLead(t *testing.T) {
+	p := &pacer{rate: rate, target: target, capacity: capacity, playing: true}
+	queued := 0
+	const tic = 10 * time.Millisecond
+	for k := 0; k < 200; k++ {
+		play := min(int(tic.Seconds()*rate), queued)
+		queued -= play
+		n := p.due(tic, queued)
+		p.wrote(n)
+		queued += n
+		if k >= 20 && queued < target-int(tic.Seconds()*rate)-1 {
+			t.Fatalf("tic %d: %d frames queued after the write, the lead is %d (a late tic of 40 ms would starve the page)", k, queued, target)
+		}
+	}
+	// A 40 ms stall of the producer is survived: the page finds frames for all of it.
+	stall := int((40 * time.Millisecond).Seconds() * rate)
+	if queued < stall {
+		t.Errorf("%d frames queued, a 40 ms stall needs %d", queued, stall)
+	}
+}
+
 // While the stream waits for the page (queued stays 0, the host discards), the
 // pacer still hands out frames at the clock's rate, not a full target a tic.
 func TestPacerWhileWaiting(t *testing.T) {
