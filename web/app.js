@@ -352,7 +352,57 @@
     // and sha256 like any other. Ignored on every other host.
     const ms = /^(localhost|127\.0\.0\.1)$/.test(location.hostname) ? new URLSearchParams(location.search).get("modelstub") : null;
     const mp = ms ? "&modelstub=" + encodeURIComponent(ms) : "";
-    engine = new Worker("engine-worker.js?v=" + build + cc + rp + mp);
+    const real = new Worker("engine-worker.js?v=" + build + cc + rp + mp);
+    // The GPU host worker (engine#84): the same engine.wasm started with
+    // role=host serves every container's GPU calls, so that a game waiting
+    // for a present or a submit does not wait for the engine's worker (which
+    // also runs Go's garbage collector and every other container's calls).
+    // It posts the surface events (frames, open, capture) to this page and
+    // takes the frame acknowledgements and the surface input from it. The
+    // engine's executor reaches it on a MessageChannel made here.
+    const gpuHost = new Worker("engine-worker.js?v=" + build + "&role=host");
+    const hostChan = new MessageChannel();
+    // A worker drops a message that arrives before its Go code has set
+    // onmessage (engine.wasm starts asynchronously), so each end gets its port
+    // when it says it is ready: gpu-host-ready, and the engine's ready.
+    const once = (w, type, send) => {
+      const f = (e) => {
+        if (!e.data || e.data.t !== type) return;
+        w.removeEventListener("message", f);
+        send();
+      };
+      w.addEventListener("message", f);
+    };
+    once(gpuHost, "gpu-host-ready", () => gpuHost.postMessage({ t: "engine", port: hostChan.port1 }, [hostChan.port1]));
+    once(real, "ready", () => real.postMessage({ t: "host-port", port: hostChan.port2 }, [hostChan.port2]));
+    window.__wctrGpuHost = gpuHost;
+    // What the rest of the page (the dashboard, ports.js, the e2e) knows as
+    // "the engine": it posts to the engine's worker, except the messages the
+    // GPU host worker owns (a surface's frame-ack and input), and listens to
+    // both workers.
+    const gpuMsg = (m) => !!m && (m.t === "frame-ack" || (m.t === "input" && typeof m.surface === "number"));
+    engine = new Proxy(real, {
+      get(w, k) {
+        if (k === "postMessage") return (m, tr) => (gpuMsg(m) ? gpuHost : w).postMessage(m, tr);
+        if (k === "addEventListener")
+          return (...a) => {
+            gpuHost.addEventListener(...a);
+            return w.addEventListener(...a);
+          };
+        if (k === "removeEventListener")
+          return (...a) => {
+            gpuHost.removeEventListener(...a);
+            return w.removeEventListener(...a);
+          };
+        const v = w[k];
+        return typeof v === "function" ? v.bind(w) : v;
+      },
+      set(w, k, v) {
+        w[k] = v;
+        if (k === "onmessage") gpuHost.onmessage = v;
+        return true;
+      },
+    });
     window.__wctrEngine = engine;
     window.__wctrBuild = build;
     // The dashboard's bridge listens on the worker too (addEventListener);
