@@ -475,9 +475,15 @@
           state.compiles.push({ source: m.source, bytes: m.bytes, ms: m.ms, compileMs: m.compileMs, error: m.error });
           break;
         case "done":
-          state.transcript.push({ line: m.line, code: m.code, ms: m.ms });
-          window.wctrPorts.refresh(); // a command may have published or freed a port
-          if (m.code === 0 && /^\s*wctr\s+(pull|run)\b/.test(m.line)) askPersist();
+          // The command's output went through term.write, which xterm parses
+          // later: the entry (what the tests wait on) is made once the screen
+          // holds it, the callback of an empty write running after every write
+          // queued before it.
+          term.write("", () => {
+            state.transcript.push({ line: m.line, code: m.code, ms: m.ms });
+            window.wctrPorts.refresh(); // a command may have published or freed a port
+            if (m.code === 0 && /^\s*wctr\s+(pull|run)\b/.test(m.line)) askPersist();
+          });
           break;
         case "fatal":
           say("engine failed: " + m.message);
