@@ -293,7 +293,9 @@ jobs:
       - uses: actions/upload-artifact@v7
         if: always()
         with:
-          name: firefox
+          # One artifact per attempt: a re-run of the workflow replaced the
+          # log of the attempt before it (engine#84 lost a 19-underrun log).
+          name: firefox-attempt-${{ github.run_attempt }}
           path: |
             ${{ runner.temp }}/firefox.log
             ${{ runner.temp }}/audio.jsonl
