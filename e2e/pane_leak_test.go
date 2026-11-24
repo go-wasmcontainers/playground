@@ -154,10 +154,7 @@ func TestPaneRunRmCycles(t *testing.T) {
 			t.Fatal(err)
 		}
 		time.Sleep(8 * time.Second)
-		v, err := page.Evaluate(`() => window.__frStop()`)
-		if err != nil {
-			t.Fatal(err)
-		}
+		v := evalBounded(t, page, "() => window.__frStop()", 60*time.Second)
 		m, _ := v.(map[string]any)
 		fps = append(fps, f1(m["frames"]))
 		before := cycleState(t, page, ew, d)
