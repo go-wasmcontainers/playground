@@ -29,6 +29,7 @@ const (
 type pacer struct {
 	rate, target, capacity int
 	owed                   float64
+	playing                bool // the page plays this stream (not "waiting")
 }
 
 // due returns the frames to write after elapsed, with queued frames in the
