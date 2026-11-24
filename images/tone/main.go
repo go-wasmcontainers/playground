@@ -101,6 +101,10 @@ func main() {
 		elapsed := now.Sub(last)
 		last = now
 		queued := int(write(0)) // a poll: the host reports what is queued
+		var st [4]uint32
+		if streamStats(handle, unsafe.Pointer(&st)) == 0 {
+			p.playing = st[3] == 1 // 1 = playing: the page consumes, keep the lead
+		}
 		n := p.due(elapsed, queued)
 		if n == 0 {
 			continue
