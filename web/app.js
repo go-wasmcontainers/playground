@@ -362,8 +362,19 @@
     // engine's executor reaches it on a MessageChannel made here.
     const gpuHost = new Worker("engine-worker.js?v=" + build + "&role=host");
     const hostChan = new MessageChannel();
-    gpuHost.postMessage({ t: "engine", port: hostChan.port1 }, [hostChan.port1]);
-    real.postMessage({ t: "host-port", port: hostChan.port2 }, [hostChan.port2]);
+    // A worker drops a message that arrives before its Go code has set
+    // onmessage (engine.wasm starts asynchronously), so each end gets its port
+    // when it says it is ready: gpu-host-ready, and the engine's ready.
+    const once = (w, type, send) => {
+      const f = (e) => {
+        if (!e.data || e.data.t !== type) return;
+        w.removeEventListener("message", f);
+        send();
+      };
+      w.addEventListener("message", f);
+    };
+    once(gpuHost, "gpu-host-ready", () => gpuHost.postMessage({ t: "engine", port: hostChan.port1 }, [hostChan.port1]));
+    once(real, "ready", () => real.postMessage({ t: "host-port", port: hostChan.port2 }, [hostChan.port2]));
     window.__wctrGpuHost = gpuHost;
     // What the rest of the page (the dashboard, ports.js, the e2e) knows as
     // "the engine": it posts to the engine's worker, except the messages the

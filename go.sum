@@ -219,8 +219,8 @@ github.com/go-wasmcontainers/compose v0.6.0 h1:p23ShWPYKGQXKdod8jiC0n83uENOK2/fx
 github.com/go-wasmcontainers/compose v0.6.0/go.mod h1:HBwoF9Y5jCX9KUYbyhl8ZCUv0S61y5fULl2CbV4dVdE=
 github.com/go-wasmcontainers/dashboard v0.11.0 h1:tVPtrH/PZoQBkB0OK7elKlXZBWlLpFnZoI33suwfCKQ=
 github.com/go-wasmcontainers/dashboard v0.11.0/go.mod h1:iQLtsE/MM0XTgRqJpLBtUJPQqVE1gpIHuRkiAeDZO1k=
-github.com/go-wasmcontainers/engine v0.48.0 h1:37NMLh4Jda+VoWVP0uTf80kCI0kwRqBBpCVbtbndnLk=
-github.com/go-wasmcontainers/engine v0.48.0/go.mod h1:BnNR6nUBFR3uOsRVJCMv95Xc9C6CRBmzyvPwtLoyK5I=
+github.com/go-wasmcontainers/engine v0.48.1 h1:DLf/ih/rzf0gNqH8meVjMZn1y0/Hb2v4xq6PBfKlEqM=
+github.com/go-wasmcontainers/engine v0.48.1/go.mod h1:BnNR6nUBFR3uOsRVJCMv95Xc9C6CRBmzyvPwtLoyK5I=
 github.com/go-wasmcontainers/gpu v0.14.4 h1:4JNOSdTMolait9XX0Q3/qFxAadw4zBFiMuucZ6I3nSo=
 github.com/go-wasmcontainers/gpu v0.14.4/go.mod h1:Jzc6WAd1d2/luQ78fNuZCMBSwi85h1Y3c9SGeg/1m5c=
 github.com/go-wasmcontainers/llm v0.5.1 h1:1ZiAkXeNeeGpV//OOQHvhQyDZKJHa5dBXMJCeYpALlI=
