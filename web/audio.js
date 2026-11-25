@@ -41,7 +41,25 @@ window.wctrAudio = (() => {
   const isInt = (v) => typeof v === "number" && Number.isInteger(v);
 
   // validate reads an untrusted open message once and returns what it will use.
+  const BANK_BYTES = 16 << 20; // audioring.MaxBankBytes
+  const CTL_MIN_BYTES = (16 + 2 * 128) * 4; // the header and the slots' snapshot
+
+  // validateVoices is validate for {kind:"voices"}: the mixer that runs in the
+  // worklet (engine docs/audio-design.md section 10) has a control buffer and a
+  // sample bank instead of a ring.
+  function validateVoices(m) {
+    if (!isInt(m.stream) || m.stream < 1 || streams.has(m.stream)) return null;
+    if (typeof m.container !== "string" || m.container.length > 256) return null;
+    if (!isInt(m.mixRate) || m.mixRate < 8000 || m.mixRate > 48000) return null;
+    if (!isInt(m.aheadFrames) || m.aheadFrames < 1 || m.aheadFrames > 8192) return null;
+    if (typeof SharedArrayBuffer === "undefined" || !(m.ctl instanceof SharedArrayBuffer) || !(m.bank instanceof SharedArrayBuffer)) return null;
+    if (m.ctl.byteLength < CTL_MIN_BYTES || m.bank.byteLength !== BANK_BYTES) return null;
+    if (streams.size >= MAX_STREAMS) return null;
+    return { id: m.stream, container: m.container, voices: true, rate: m.mixRate, ch: 2, cap: 0, ahead: m.aheadFrames, ctl: m.ctl, bank: m.bank };
+  }
+
   function validate(m) {
+    if (m.kind === "voices") return validateVoices(m);
     if (!isInt(m.stream) || m.stream < 1 || streams.has(m.stream)) return null;
     if (typeof m.container !== "string" || m.container.length > 256) return null;
     const rate = m.sampleRate, ch = m.channels, cap = m.capacityFrames, sab = m.sab;
@@ -187,7 +205,7 @@ window.wctrAudio = (() => {
     if (!v) return;
     const c = context();
     if (!c) return;
-    const s = { ...v, hdr: new Int32Array(v.sab, 0, 16), node: null, closed: false, analyser: null, tap: null };
+    const s = { ...v, hdr: new Int32Array(v.voices ? v.ctl : v.sab, 0, 16), node: null, closed: false, analyser: null, tap: null };
     streams.set(v.id, s);
     state.streams = streams.size;
     try {
@@ -201,9 +219,11 @@ window.wctrAudio = (() => {
     const row = rowFor(v.container);
     row.ids.add(v.id);
     s.row = row;
-    s.node = new AudioWorkletNode(c, "wasmbox-ring", {
+    s.node = new AudioWorkletNode(c, v.voices ? "wasmbox-voices" : "wasmbox-ring", {
       numberOfInputs: 0, numberOfOutputs: 1, outputChannelCount: [2],
-      processorOptions: { sab: v.sab, sampleRate: v.rate, channels: v.ch, capacityFrames: v.cap },
+      processorOptions: v.voices
+        ? { ctl: v.ctl, bank: v.bank, aheadFrames: v.ahead, mixRate: v.rate }
+        : { sab: v.sab, sampleRate: v.rate, channels: v.ch, capacityFrames: v.cap },
     });
     s.node.connect(row.gain);
     // The test tap, before the gains: what the worklet produced.
@@ -287,6 +307,16 @@ window.wctrAudio = (() => {
           heartbeat: Atomics.load(s.hdr, 6) >>> 0,
           buffered: (Atomics.load(s.hdr, 0) - Atomics.load(s.hdr, 1)) >>> 0,
         };
+        if (s.voices) {
+          // The mixer's own counters (audioring VStarved, VPainted, VBadCmd): what it
+          // painted is what a ring's "written" is, and it keeps no queue.
+          o.voices = true;
+          o.starved = Atomics.load(s.hdr, 7) >>> 0;
+          o.painted = Atomics.load(s.hdr, 8) >>> 0;
+          o.badCommands = Atomics.load(s.hdr, 9) >>> 0;
+          o.written = o.painted;
+          o.buffered = 0;
+        }
         return s.analyser ? Object.assign(o, analyse(s)) : o;
       });
     },

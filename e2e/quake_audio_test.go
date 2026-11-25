@@ -282,7 +282,10 @@ func TestQuakeAudio(t *testing.T) {
 	out := a.must(run+" --fixed-mixer", 0, "sound on (wctr_audio_out, 11025 Hz stereo)", "audio: playing")
 	before, n0, s0 := ratio(out)
 	// 2. After: paced.
-	out = a.must(run, 0, "sound on (wctr_audio_out, 11025 Hz stereo)", "audio: playing")
+	// The mixer runs in the worklet now (go-quake1/engine v0.55.0), so "offered" is
+	// what the worklet painted and the ratio is its output pace: painted frames per
+	// wall second over 11025 (same tolerance as the stream's).
+	out = a.must(run, 0, "sound on (wctr_audio_out voices, mixed in the page)", "audio: playing", "voices: painted")
 	after, n1, s1 := ratio(out)
 	t.Logf("real-time ratio in Chromium: fixed chunk %.3f (%d mix frames in %.2f s), paced %.3f (%d in %.2f s)", before, n0, s0, after, n1, s1)
 	// The fixed chunk is 512 frames a tic: its ratio is the frame rate over
@@ -363,4 +366,20 @@ func TestQuakeAudio(t *testing.T) {
 		t.Logf("the soak game's goroutines:\n%s", d)
 	}
 	a.must("wctr rm -f qs", 0)
+
+	// 5. A game that stalls on demand (go-quake1/engine v0.56.0 --stall-ms: 250 ms
+	// every 60 frames, far past the 100 ms the stream's queue could carry). The
+	// mixer is in the worklet: it must keep painting, with no underrun and no dip
+	// of the signal, while the game is held.
+	a.must("wctr run -d --name qstall --gpu --audio -m 512m quake --map e1m1 --stall-ms 250 --stall-every 60 --slowtics 300", 0)
+	a.until("the page got no voices stream from the stalling quake", `() => window.__wctrAudio && window.__wctrAudio.stats().some((s) => s.attached && s.voices)`, 90*time.Second)
+	a.until("the stalling quake's mixer painted nothing", `() => window.__wctrAudio.stats().some((s) => s.painted > 0)`, 30*time.Second)
+	watchUnderruns(t, a.page)
+	base := a.streams()[0]
+	requireSignal(t, "quake with stalls", 30, func() float64 { return a.streams()[0].Rms })
+	end := a.streams()[0]
+	if evs := takeUnderruns(t, a.page); len(evs) != 0 || end.Underruns != base.Underruns {
+		t.Errorf("the worklet underran %d times (%d -> %d) while the game stalled 250 ms every 60 frames: the mixer must not depend on the game's pace", len(evs), base.Underruns, end.Underruns)
+	}
+	a.must("wctr rm -f qstall", 0)
 }

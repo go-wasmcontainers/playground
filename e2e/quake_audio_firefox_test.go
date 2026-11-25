@@ -41,7 +41,7 @@ func TestQuakeAudioFirefox(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	out := b.must("wctr run --rm --gpu --audio -m 512m quake --map e1m1 --frames 300", 0, "audio: playing")
+	out := b.must("wctr run --rm --gpu --audio -m 512m quake --map e1m1 --frames 300", 0, "sound on (wctr_audio_out voices, mixed in the page)", "audio: playing", "voices: painted")
 	fps, dropped, stalls, withStalls, found := stallsLine(out)
 	if !found {
 		t.Fatalf("the game's audio line has no stall accounting (go-quake1/engine#133):\n%s", out)
