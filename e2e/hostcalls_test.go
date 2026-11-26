@@ -167,15 +167,46 @@ func takeBusy(t *testing.T, w playwright.Worker) []browser.BusySlice {
 	return out
 }
 
+// gpuHostSuffix ends the name of a call the GPU host worker served (engine
+// worker.js adds it for the calls of its second channel).
+const gpuHostSuffix = " (gpu host)"
+
+// busyLogs are the busy logs of the two threads that serve a guest's host
+// calls: the engine worker's and, since engine#84, the GPU host worker's (the
+// same engine.wasm, role=host, which loads busy.js too). A call waits for the
+// thread that serves it, so its wait is explained by that thread's log and no
+// other.
+type busyLogs struct{ Engine, Host []browser.BusySlice }
+
+// of is the log of the thread that served the call c.
+func (l busyLogs) of(c hostCall) []browser.BusySlice {
+	if strings.HasSuffix(c.Name, gpuHostSuffix) {
+		return l.Host
+	}
+	return l.Engine
+}
+
+// takeBusyLogs reads both threads' logs; host is nil when the page has no GPU
+// host worker.
+func takeBusyLogs(t *testing.T, engine, host playwright.Worker) busyLogs {
+	t.Helper()
+	l := busyLogs{Engine: takeBusy(t, engine)}
+	if host != nil {
+		l.Host = takeBusy(t, host)
+	}
+	return l
+}
+
 // waitAttribution attributes the wait of every slow call (the time before the
 // engine's thread began it) to what the engine worker was doing then: the
 // shares by cause, largest first, and the part of the waits nothing names.
-func waitAttribution(calls []hostCall, busy []browser.BusySlice) (shares []browser.Share, waited, unattributed float64) {
+func waitAttribution(calls []hostCall, logs busyLogs) (shares []browser.Share, waited, unattributed float64) {
 	by := map[string]float64{}
 	for _, c := range calls {
 		if c.Wait <= 0 {
 			continue
 		}
+		busy := logs.of(c)
 		waited += c.Wait
 		unattributed += browser.Unattributed(c.At, c.At+c.Wait, busy)
 		for _, s := range browser.Explain(c.At, c.At+c.Wait, busy) {
@@ -199,15 +230,16 @@ func waitAttribution(calls []hostCall, busy []browser.BusySlice) (shares []brows
 
 // busyReport is the wait attribution for the log: where the time the guest
 // waited for the engine went, by cause.
-func busyReport(calls []hostCall, slices []browser.BusySlice, show int) []string {
+func busyReport(calls []hostCall, logs busyLogs, show int) []string {
+	slices := append(append([]browser.BusySlice(nil), logs.Engine...), logs.Host...)
 	if len(slices) == 0 {
 		return []string{"busy log: none (the engine worker has no busy log)"}
 	}
-	shares, waited, un := waitAttribution(calls, slices)
+	shares, waited, un := waitAttribution(calls, logs)
 	if waited == 0 {
 		return []string{fmt.Sprintf("busy log: %d slices of 1 ms or more, no slow call waited", len(slices))}
 	}
-	out := []string{fmt.Sprintf("busy log: %d slices of 1 ms or more; the slow calls waited %.0f ms in all, %.0f ms (%.0f%%) under no label", len(slices), waited, un, 100*un/waited)}
+	out := []string{fmt.Sprintf("busy log: %d slices of 1 ms or more (engine worker %d, gpu host worker %d); the slow calls waited %.0f ms in all, %.0f ms (%.0f%%) under no label", len(slices), len(logs.Engine), len(logs.Host), waited, un, 100*un/waited)}
 	for _, s := range shares[:min(show, len(shares))] {
 		out = append(out, fmt.Sprintf("busy wait %.0f ms (%.0f%%): %s", s.Ms, 100*s.Ms/waited, s.Cause))
 	}
@@ -247,11 +279,11 @@ func TestGCSplitLine(t *testing.T) {
 // with 100 ms or more of wait in all, more than half under no label is a hole in
 // the log (the engine worker was busy with something this log cannot see), and
 // the engine's thread is then not shown to be the cause of anything.
-func longWaitsLackLabels(calls []hostCall, slices []browser.BusySlice) (string, bool) {
-	if len(slices) == 0 {
+func longWaitsLackLabels(calls []hostCall, logs busyLogs) (string, bool) {
+	if len(logs.Engine) == 0 && len(logs.Host) == 0 {
 		return "", false
 	}
-	_, waited, un := waitAttribution(calls, slices)
+	_, waited, un := waitAttribution(calls, logs)
 	if waited < 100 || un <= waited/2 {
 		return "", false
 	}
@@ -350,6 +382,36 @@ func TestSteadyCreatesMsg(t *testing.T) {
 	}
 }
 
+// A call to the GPU host worker waits for THAT worker's thread, not the engine's
+// (engine#84): its wait is explained by the host worker's busy log. Judged
+// against the engine's log it is "no slice" however busy the host worker was,
+// which is how the pane test failed on run 45696648860 attempt 1 (303 of 335 ms
+// of waits, every one of them a "(gpu host)" call).
+func TestLongWaitsAreAttributedToTheWorkerThatServedThem(t *testing.T) {
+	calls := []hostCall{
+		{"[method]context.ready-to-present (gpu host)", 1000, 90, 80, 8, 2, 0, 0, 0, 0},
+		{"fd_pread", 2000, 60, 55, 3, 2, 0, 0, 0, 0},
+	}
+	engine := []browser.BusySlice{{At: 1990, Dur: 70, Trigger: "msg:http.cancel"}}
+	host := []browser.BusySlice{{At: 990, Dur: 100, Trigger: "msg:call", Labels: []browser.BusyLabel{{Name: "call:gpu.present", Ms: 95}}}}
+	logs := busyLogs{Engine: engine, Host: host}
+	if msg, bad := longWaitsLackLabels(calls, logs); bad {
+		t.Errorf("each wait is covered by the log of the worker that served it, flagged: %s", msg)
+	}
+	// Swapped, neither wait is covered by the log it is judged against.
+	if _, bad := longWaitsLackLabels(calls, busyLogs{Engine: host, Host: engine}); !bad {
+		t.Error("waits judged against the other worker's log were not flagged")
+	}
+	// A GPU host call with the host worker's log missing is unexplained, not skipped.
+	if _, bad := longWaitsLackLabels(calls, busyLogs{Engine: engine}); !bad {
+		t.Error("a gpu host call with no host busy log was passed over")
+	}
+	// The report names both logs.
+	if got := busyReport(calls, logs, 3); len(got) < 2 || !strings.Contains(got[0], "0 ms (0%) under no label") {
+		t.Errorf("report = %q", got)
+	}
+}
+
 func TestLongWaitsLackLabels(t *testing.T) {
 	calls := []hostCall{
 		{"[method]gpu-queue.submit", 1000, 90, 80, 8, 2, 0, 0, 0, 0},
@@ -359,7 +421,7 @@ func TestLongWaitsLackLabels(t *testing.T) {
 		{At: 990, Dur: 100, Trigger: "msg:call", Labels: []browser.BusyLabel{{Name: "call:gpu.queue-submit", Ms: 95}}},
 		{At: 1990, Dur: 70, Trigger: "msg:http.req GET /containers/q/logs"},
 	}
-	if msg, bad := longWaitsLackLabels(calls, named); bad {
+	if msg, bad := longWaitsLackLabels(calls, busyLogs{Engine: named}); bad {
 		t.Errorf("waits covered by named slices were flagged: %s", msg)
 	}
 	// The same waits with the worker busy under nothing the log names.
@@ -367,22 +429,22 @@ func TestLongWaitsLackLabels(t *testing.T) {
 		{At: 990, Dur: 100, Trigger: "timer"},
 		{At: 1990, Dur: 70, Trigger: "callback"},
 	}
-	if msg, bad := longWaitsLackLabels(calls, bare); !bad || !strings.Contains(msg, "no label") {
+	if msg, bad := longWaitsLackLabels(calls, busyLogs{Engine: bare}); !bad || !strings.Contains(msg, "no label") {
 		t.Errorf("waits under bare timers were not flagged: %q %v", msg, bad)
 	}
 	// And with no slice at all in the waits (the worker was busy outside Go).
-	if _, bad := longWaitsLackLabels(calls, []browser.BusySlice{{At: 5000, Dur: 3, Trigger: "timer"}}); !bad {
+	if _, bad := longWaitsLackLabels(calls, busyLogs{Engine: []browser.BusySlice{{At: 5000, Dur: 3, Trigger: "timer"}}}); !bad {
 		t.Error("waits no slice covers were not flagged")
 	}
 	// No busy log at all is reported by the log, not failed here.
-	if _, bad := longWaitsLackLabels(calls, nil); bad {
+	if _, bad := longWaitsLackLabels(calls, busyLogs{}); bad {
 		t.Error("a missing busy log was flagged as a hole in it")
 	}
-	if got := busyReport(calls, named, 3); len(got) < 2 || !strings.Contains(got[0], "under no label") {
+	if got := busyReport(calls, busyLogs{Engine: named}, 3); len(got) < 2 || !strings.Contains(got[0], "under no label") {
 		t.Errorf("report = %q", got)
 	}
 	// The longest slice is listed with its trigger and labels.
-	all := strings.Join(busyReport(calls, bare, 3), "\n")
+	all := strings.Join(busyReport(calls, busyLogs{Engine: bare}, 3), "\n")
 	if !strings.Contains(all, "busy slice at 990: 100.0 ms, timer") {
 		t.Errorf("the longest slice is not listed: %s", all)
 	}

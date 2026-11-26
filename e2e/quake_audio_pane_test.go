@@ -109,9 +109,12 @@ func TestQuakeAudioPane(t *testing.T) {
 	// What the user hears is the underruns: counted from here to the end.
 	sk := newSoak("chromium/pane", streamReading(t, page))
 	watchUnderruns(t, page) // the page's underruns, with their wall-clock times
-	var engineWorker playwright.Worker
+	var engineWorker, gpuHostWorker playwright.Worker
 	for _, w := range page.Workers() {
-		if strings.Contains(w.URL(), "engine-worker") {
+		switch {
+		case strings.Contains(w.URL(), "engine-worker") && strings.Contains(w.URL(), "role=host"):
+			gpuHostWorker = w // the GPU host worker (engine#84): same script, role=host
+		case strings.Contains(w.URL(), "engine-worker"):
 			engineWorker = w
 		}
 	}
@@ -373,16 +376,17 @@ func TestQuakeAudioPane(t *testing.T) {
 		for _, e := range evs {
 			t.Logf("LOOPLAG underrun at %d: worker-loop stalls in the 150 ms before: %v", e.Wall, lagNear(lag, e.Wall))
 		}
-		calls, busy := takeHostSlow(t, engineWorker), takeBusy(t, engineWorker)
+		calls, logs := takeHostSlow(t, engineWorker), takeBusyLogs(t, engineWorker, gpuHostWorker)
 		for _, l := range hostSlowReport(calls, 40, takeBatchSlow(t, engineWorker)...) {
 			t.Log("HOSTCALL " + l)
 		}
-		for _, l := range busyReport(calls, busy, 15) {
+		for _, l := range busyReport(calls, logs, 15) {
 			t.Log("BUSY " + l)
 		}
 		// The GC question: of the engine worker's slices of 10 ms or more, the ones a
 		// collection ran in and the others, with the time under no label.
-		t.Log("BUSY " + gcSplitLine(busy, 10))
+		t.Log("BUSY " + gcSplitLine(logs.Engine, 10))
+		t.Log("BUSY gpu host worker " + gcSplitLine(logs.Host, 10))
 		t.Log("PRESENT " + presentSlowLine(takePresentSlow(t, engineWorker)))
 		if createdSteady >= 0 {
 			end := takeCreated(t, engineWorker)
@@ -391,7 +395,7 @@ func TestQuakeAudioPane(t *testing.T) {
 				t.Error("CREATED " + msg)
 			}
 		}
-		if msg, bad := longWaitsLackLabels(calls, busy); bad {
+		if msg, bad := longWaitsLackLabels(calls, logs); bad {
 			t.Error("BUSY " + msg)
 		}
 	}
