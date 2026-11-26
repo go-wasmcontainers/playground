@@ -121,6 +121,9 @@ func TestQuakeAudioPane(t *testing.T) {
 	if engineWorker != nil {
 		watchLoopLag(t, engineWorker) // how late the engine worker's event loop runs a 2 ms timer
 	}
+	if gpuHostWorker != nil {
+		watchLoopLag(t, gpuHostWorker) // the same for the thread that serves the GPU calls
+	}
 
 	// alive fails the test, with the container's state and the end of its log,
 	// when the pane is gone: a game that ends cannot be measured.
@@ -394,6 +397,15 @@ func TestQuakeAudioPane(t *testing.T) {
 			if msg := steadyCreatesMsg(createdSteady, end); msg != "" {
 				t.Error("CREATED " + msg)
 			}
+		}
+		lags := loopLags{Engine: lag}
+		if gpuHostWorker != nil {
+			var hticks int
+			lags.Host, hticks = takeLoopLag(t, gpuHostWorker)
+			t.Logf("LOOPLAG gpu host worker: %d ticks of 2 ms, %d late by more than 15 ms", hticks, len(lags.Host))
+		}
+		for _, l := range waitHoles(calls, logs, lags) {
+			t.Log("BUSY " + l)
 		}
 		if msg, bad := longWaitsLackLabels(calls, logs); bad {
 			t.Error("BUSY " + msg)
