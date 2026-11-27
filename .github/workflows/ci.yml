@@ -271,6 +271,15 @@ jobs:
           E2E_GPU_REAL: ${{ matrix.real }}
           E2E_GPU_ARGS: ${{ matrix.args }}
         run: go test -tags e2e -count=1 -v -run '^(TestGPU(SurfaceInput)?|TestQuake(Soak|MenuMouse|Audio|SteadyState)?)$' -timeout 22m ./e2e/ > "$RUNNER_TEMP/gpu.log" 2>&1 && status=0 || status=$?; tail -60 "$RUNNER_TEMP/gpu.log"; exit "$status"
+      # The whole log: the tail above cuts the guest's own error (a quake-wctr
+      # --gpuworld-check failure was undiagnosable from 60 lines).
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: gpu-log-${{ matrix.os }}
+          path: ${{ runner.temp }}/gpu.log
+          retention-days: 7
+          if-no-files-found: ignore
 
   # The quake image in the real Firefox (e2e/firefox_test.go, go-wasmcontainers/
   # playground#56: exit 134 at the second frame, "Canvas not configured").
