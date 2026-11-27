@@ -176,7 +176,17 @@ const gpuHostSuffix = " (gpu host)"
 // same engine.wasm, role=host, which loads busy.js too). A call waits for the
 // thread that serves it, so its wait is explained by that thread's log and no
 // other.
-type busyLogs struct{ Engine, Host []browser.BusySlice }
+//
+// Beside the slices each thread measured two kinds of interval (engine
+// busy.js): the stretches its event loop ran no timer (LateTicks, "worker not
+// scheduled") and the transit of the messages it received (Transits, "message
+// in flight"). EngineLate and EngineTransits belong to the engine worker,
+// HostLate and HostTransits to the GPU host worker.
+type busyLogs struct {
+	Engine, Host               []browser.BusySlice
+	EngineLate, EngineTransits []browser.Interval
+	HostLate, HostTransits     []browser.Interval
+}
 
 // of is the log of the thread that served the call c.
 func (l busyLogs) of(c hostCall) []browser.BusySlice {
@@ -186,13 +196,40 @@ func (l busyLogs) of(c hostCall) []browser.BusySlice {
 	return l.Engine
 }
 
+// evidence is everything the thread that served the call c measured.
+func (l busyLogs) evidence(c hostCall) browser.Evidence {
+	if strings.HasSuffix(c.Name, gpuHostSuffix) {
+		return browser.Evidence{Slices: l.Host, LateTicks: l.HostLate, Transits: l.HostTransits}
+	}
+	return browser.Evidence{Slices: l.Engine, LateTicks: l.EngineLate, Transits: l.EngineTransits}
+}
+
+// takeIntervals reads the intervals self.__busy.<fn>() measured: lateTicks or
+// transits. A page without them (an engine before v0.50.0) gives none.
+func takeIntervals(t *testing.T, w playwright.Worker, fn string) []browser.Interval {
+	t.Helper()
+	v, err := w.Evaluate(`() => (self.__busy && self.__busy.` + fn + ` ? self.__busy.` + fn + `() : [])`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	list, _ := v.([]any)
+	var out []browser.Interval
+	for _, e := range list {
+		x, _ := e.(map[string]any)
+		out = append(out, browser.Interval{From: num(x["from"]), To: num(x["to"])})
+	}
+	return out
+}
+
 // takeBusyLogs reads both threads' logs; host is nil when the page has no GPU
 // host worker.
 func takeBusyLogs(t *testing.T, engine, host playwright.Worker) busyLogs {
 	t.Helper()
 	l := busyLogs{Engine: takeBusy(t, engine)}
+	l.EngineLate, l.EngineTransits = takeIntervals(t, engine, "lateTicks"), takeIntervals(t, engine, "transits")
 	if host != nil {
 		l.Host = takeBusy(t, host)
+		l.HostLate, l.HostTransits = takeIntervals(t, host, "lateTicks"), takeIntervals(t, host, "transits")
 	}
 	return l
 }
