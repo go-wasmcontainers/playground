@@ -12,7 +12,7 @@ import (
 	"io/fs"
 	"regexp"
 	"sort"
-	"sync/atomic"
+	"sync"
 	"testing/fstest"
 )
 
@@ -38,7 +38,20 @@ type File struct {
 // Store is a flat, read-only directory that Import replaces whole. It is an
 // fs.FS; the zero value is an empty directory.
 type Store struct {
-	cur atomic.Pointer[fstest.MapFS]
+	mu  sync.RWMutex
+	cur fstest.MapFS // nil: empty; replaced, never edited
+}
+
+func (s *Store) get() fstest.MapFS {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return s.cur
+}
+
+func (s *Store) set(m fstest.MapFS) {
+	s.mu.Lock()
+	s.cur = m
+	s.mu.Unlock()
 }
 
 // Check reports why files cannot be imported, naming the bound, or nil.
@@ -81,21 +94,18 @@ func (s *Store) Import(files []File) error {
 	for _, f := range files {
 		m[f.Name] = &fstest.MapFile{Data: append([]byte(nil), f.Data...), Mode: 0o444}
 	}
-	s.cur.Store(&m)
+	s.set(m)
 	return nil
 }
 
 // Clear empties the directory.
-func (s *Store) Clear() { s.cur.Store(nil) }
+func (s *Store) Clear() { s.set(nil) }
 
 // Names lists the files, sorted.
 func (s *Store) Names() []string {
-	m := s.cur.Load()
-	if m == nil {
-		return nil
-	}
-	out := make([]string, 0, len(*m))
-	for n := range *m {
+	m := s.get()
+	out := make([]string, 0, len(m))
+	for n := range m {
 		out = append(out, n)
 	}
 	sort.Strings(out)
@@ -103,10 +113,4 @@ func (s *Store) Names() []string {
 }
 
 // Open implements fs.FS.
-func (s *Store) Open(name string) (fs.File, error) {
-	m := s.cur.Load()
-	if m == nil {
-		return fstest.MapFS(nil).Open(name)
-	}
-	return m.Open(name)
-}
+func (s *Store) Open(name string) (fs.File, error) { return s.get().Open(name) }

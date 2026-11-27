@@ -1,6 +1,7 @@
 package composefs
 
 import (
+	"errors"
 	"io/fs"
 	"strings"
 	"testing"
@@ -52,6 +53,16 @@ func TestBoundsNameTheBound(t *testing.T) {
 		if len(s.Names()) != 0 {
 			t.Errorf("%s: kept files after a refusal", c.name)
 		}
+	}
+}
+
+func TestZeroStoreIsEmpty(t *testing.T) {
+	var s Store
+	if n := s.Names(); len(n) != 0 {
+		t.Fatalf("names of a zero store: %v", n)
+	}
+	if _, err := s.Open("compose.yaml"); !errors.Is(err, fs.ErrNotExist) {
+		t.Fatalf("open on a zero store: %v", err)
 	}
 }
 
