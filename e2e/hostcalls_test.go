@@ -243,10 +243,10 @@ func waitAttribution(calls []hostCall, logs busyLogs) (shares []browser.Share, w
 		if c.Wait <= 0 {
 			continue
 		}
-		busy := logs.of(c)
+		ev := logs.evidence(c)
 		waited += c.Wait
-		unattributed += browser.Unattributed(c.At, c.At+c.Wait, busy)
-		for _, s := range browser.Explain(c.At, c.At+c.Wait, busy) {
+		unattributed += browser.UnattributedWith(c.At, c.At+c.Wait, ev)
+		for _, s := range browser.ExplainWith(c.At, c.At+c.Wait, ev) {
 			by[s.Cause] += s.Ms
 		}
 	}
@@ -320,11 +320,22 @@ func longWaitsLackLabels(calls []hostCall, logs busyLogs) (string, bool) {
 	if len(logs.Engine) == 0 && len(logs.Host) == 0 {
 		return "", false
 	}
-	_, waited, un := waitAttribution(calls, logs)
+	shares, waited, un := waitAttribution(calls, logs)
 	if waited < 100 || un <= waited/2 {
 		return "", false
 	}
-	return fmt.Sprintf("the slow host calls waited %.0f ms for the engine, %.0f ms (%.0f%%) of it under no label: the busy log does not see what occupied the engine worker", waited, un, 100*un/waited), true
+	// The two causes measured outside the busy log (engine#90), each credited
+	// only for its overlap with a wait.
+	var sched, flight float64
+	for _, s := range shares {
+		switch s.Cause {
+		case browser.CauseNotScheduled:
+			sched = s.Ms
+		case browser.CauseInFlight:
+			flight = s.Ms
+		}
+	}
+	return fmt.Sprintf("the slow host calls waited %.0f ms for the engine, %.0f ms (%.0f%%) of it under no label: the busy log does not see what occupied the engine worker (measured outside it: %s %.0f ms, %s %.0f ms)", waited, un, 100*un/waited, browser.CauseNotScheduled, sched, browser.CauseInFlight, flight), true
 }
 
 // hostSlowReport is the split of the slow calls, for the log: the totals of each
