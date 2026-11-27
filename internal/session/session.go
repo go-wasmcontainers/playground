@@ -24,6 +24,7 @@ import (
 	"github.com/go-wasmcontainers/engine/cli"
 	"github.com/go-wasmcontainers/engine/cli/lineedit"
 
+	"github.com/go-wasmcontainers/playground/internal/composefs"
 	"github.com/go-wasmcontainers/playground/internal/termfilter"
 )
 
@@ -63,7 +64,9 @@ func (s *Session) CLIOptions() cli.Options {
 		// wctr build and wctr compose, as cmd/wctr wires them.
 		Extra: []func(cli.Engine) *cobra.Command{
 			func(e cli.Engine) *cobra.Command { return buildcli.ForEngine(e) },
-			func(e cli.Engine) *cobra.Command { return composecli.Command(composecli.Options{Client: e.Client}) },
+			func(e cli.Engine) *cobra.Command {
+				return composecli.Command(composecli.Options{Client: e.Client, FS: s.ComposeFiles()})
+			},
 		},
 		PullCandidates: func(context.Context) []cobra.Completion {
 			var out []cobra.Completion
@@ -112,6 +115,17 @@ type Session struct {
 	// Models is the browser's model cache (nil: the `models` command says
 	// there is none).
 	Models ModelCache
+
+	composeOnce  sync.Once
+	composeFiles *composefs.Store
+}
+
+// ComposeFiles is the directory `wctr compose` reads: in memory, empty until
+// something imports into it. A page has no working directory, so compose's
+// native loader (os.OpenRoot) cannot run there.
+func (s *Session) ComposeFiles() *composefs.Store {
+	s.composeOnce.Do(func() { s.composeFiles = &composefs.Store{} })
+	return s.composeFiles
 }
 
 // Model is one row of `models`: a pinned registry model, or a cached file the
