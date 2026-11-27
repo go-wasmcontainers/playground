@@ -50,6 +50,9 @@ type reading struct {
 	Underruns uint32  `json:"underruns"`
 	Heartbeat uint32  `json:"heartbeat"`
 	Buffered  uint32  `json:"buffered"`
+	Written   uint32  `json:"written"` // the ring's write position, in frames
+	Rate      float64 `json:"sampleRate"`
+	Rms       float64 `json:"rms"`
 	RmsDb     float64 `json:"rmsDb"`
 	PeakBin   int     `json:"peakBin"`
 	PeakHz    float64 `json:"peakHz"`
@@ -205,6 +208,19 @@ func freshTab(t *testing.T, browser playwright.Browser, url, who string) audioTa
 	if err != nil {
 		t.Fatal(err)
 	}
+	// E2E_CPU_THROTTLE=4 slows the page's main thread 4x (CDP
+	// Emulation.setCPUThrottlingRate): the local comparison that tells a VM's
+	// slowness from a code path that scales badly.
+	if v := os.Getenv("E2E_CPU_THROTTLE"); v != "" {
+		rate, err := strconv.ParseFloat(v, 64)
+		if err != nil || rate < 1 {
+			t.Fatalf("E2E_CPU_THROTTLE=%q", v)
+		}
+		if _, err := cdp.Send("Emulation.setCPUThrottlingRate", map[string]interface{}{"rate": rate}); err != nil {
+			t.Fatal(err)
+		}
+		t.Logf("CPU throttling %gx on the page's main thread", rate)
+	}
 	a := audioTab{tab{t, quietPage{cdp}, who}, page}
 	a.ready()
 	return a
@@ -328,20 +344,27 @@ func TestAudio(t *testing.T) {
 		return db
 	}
 	loud := until("full volume", func(db float64) bool { return db > rmsFloorDb })
-	a.eval(`() => { const r = document.querySelector('#soundbar input[type=range]'); r.value = "30"; r.dispatchEvent(new Event("input")); return true; }`)
+	// Per container: the dashboard's pane calls setContainer (TestQuakeAudioPane
+	// drives the real pane buttons); this page has no dashboard, so the entry
+	// point is called directly.
+	cname, _ := a.eval(`() => window.__wctrAudio.containers()[0].container`).(string)
+	setc := func(v float64, muted bool) {
+		a.eval(fmt.Sprintf(`() => { window.wctrAudio.setContainer(%q, %g, %v); return true; }`, cname, v, muted))
+	}
+	setc(0.3, false)
 	// The analyser holds 4096 samples (0.5 s at 8 kHz), so wait for the old ones
 	// to leave: the level settles at 20*log10(0.3) = -10.46 dB below full.
 	want30 := loud + 20*math.Log10(0.3)
 	half := until("volume 30%", func(db float64) bool { return math.Abs(db-want30) < 1.5 })
 	t.Logf("speakers: %.1f dBFS at full volume, %.1f at 30%% (expect %.1f)", loud, half, want30)
-	a.eval(`() => { document.querySelector('#soundbar .soundrow button').click(); return true; }`)
+	setc(0.3, true)
 	until("container mute", func(db float64) bool { return db < -60 })
 	if g := a.eval(`() => window.__wctrAudio.containers()[0].gain`); num(g) != 0 {
 		t.Errorf("a muted container's gain is %v", g)
 	}
-	a.eval(`() => { document.querySelector('#soundbar .soundrow button').click(); return true; }`) // unmute
+	setc(0.3, false) // unmute
 	until("container unmute", func(db float64) bool { return db > -60 })
-	a.eval(`() => { const r = document.querySelector('#soundbar input[type=range]'); r.value = "100"; r.dispatchEvent(new Event("input")); return true; }`)
+	setc(1, false)
 	until("volume back", func(db float64) bool { return db > rmsFloorDb })
 	a.eval(`() => { document.getElementById("soundmute").click(); return true; }`)
 	until("page mute", func(db float64) bool { return db < -60 })

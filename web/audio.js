@@ -19,9 +19,10 @@
 // the engine discards what the guest writes: sound made before the click is
 // never played late.
 //
-// Volume and mute live at two levels: one pair per container (the Sound bar's
-// row) and one page-wide mute. They are gain nodes, so a guest cannot undo
-// them. window.__wctrAudio is the test hook.
+// Volume and mute live at two levels: one pair per container (the dashboard's
+// pane calls setContainer(container, volume, muted); no controls of their own
+// here) and the page-wide mute (the Sound strip's button). They are gain
+// nodes, so a guest cannot undo them. window.__wctrAudio is the test hook.
 "use strict";
 window.wctrAudio = (() => {
   const MAX_STREAMS = 8; // per page, as the engine's module
@@ -40,7 +41,25 @@ window.wctrAudio = (() => {
   const isInt = (v) => typeof v === "number" && Number.isInteger(v);
 
   // validate reads an untrusted open message once and returns what it will use.
+  const BANK_BYTES = 16 << 20; // audioring.MaxBankBytes
+  const CTL_MIN_BYTES = (16 + 2 * 128) * 4; // the header and the slots' snapshot
+
+  // validateVoices is validate for {kind:"voices"}: the mixer that runs in the
+  // worklet (engine docs/audio-design.md section 10) has a control buffer and a
+  // sample bank instead of a ring.
+  function validateVoices(m) {
+    if (!isInt(m.stream) || m.stream < 1 || streams.has(m.stream)) return null;
+    if (typeof m.container !== "string" || m.container.length > 256) return null;
+    if (!isInt(m.mixRate) || m.mixRate < 8000 || m.mixRate > 48000) return null;
+    if (!isInt(m.aheadFrames) || m.aheadFrames < 1 || m.aheadFrames > 8192) return null;
+    if (typeof SharedArrayBuffer === "undefined" || !(m.ctl instanceof SharedArrayBuffer) || !(m.bank instanceof SharedArrayBuffer)) return null;
+    if (m.ctl.byteLength < CTL_MIN_BYTES || m.bank.byteLength !== BANK_BYTES) return null;
+    if (streams.size >= MAX_STREAMS) return null;
+    return { id: m.stream, container: m.container, voices: true, rate: m.mixRate, ch: 2, cap: 0, ahead: m.aheadFrames, ctl: m.ctl, bank: m.bank };
+  }
+
   function validate(m) {
+    if (m.kind === "voices") return validateVoices(m);
     if (!isInt(m.stream) || m.stream < 1 || streams.has(m.stream)) return null;
     if (typeof m.container !== "string" || m.container.length > 256) return null;
     const rate = m.sampleRate, ch = m.channels, cap = m.capacityFrames, sab = m.sab;
@@ -106,7 +125,7 @@ window.wctrAudio = (() => {
     return ctx;
   }
 
-  // ---- the Sound bar: one row per container with a stream, and the page mute ----
+  // ---- the Sound strip: the page-wide mute (per container is the dashboard pane's) ----
   function ensureBar() {
     if (bar) return bar;
     bar = document.createElement("div");
@@ -140,57 +159,43 @@ window.wctrAudio = (() => {
 
   function apply(row) {
     row.gain.gain.value = row.muted ? 0 : row.volume;
-    prefs.set(row.name, { volume: row.volume, muted: row.muted });
-    row.mute.setAttribute("aria-pressed", String(row.muted));
-    row.mute.textContent = row.muted ? "unmute" : "mute";
   }
 
+  // A container's gain node. Its volume and mute are set by the dashboard's
+  // pane (setContainer); the level is remembered by container, so a pane that
+  // sets it before the stream opens, or a container that is run again, keeps it.
   function rowFor(name) {
     let row = rows.get(name);
     if (row) return row;
     const p = prefs.get(name) || { volume: 1, muted: false };
     row = { name, volume: p.volume, muted: p.muted, ids: new Set(), gain: ctx.createGain() };
     row.gain.connect(pageGain);
-    const el = document.createElement("div");
-    el.className = "soundrow";
-    el.dataset.container = name;
-    const label = document.createElement("span");
-    label.textContent = name;
-    const vol = document.createElement("input");
-    vol.type = "range";
-    vol.min = "0";
-    vol.max = "100";
-    vol.step = "1";
-    vol.value = String(Math.round(row.volume * 100));
-    vol.setAttribute("aria-label", "volume of " + name);
-    vol.addEventListener("input", () => {
-      row.volume = Math.min(1, Math.max(0, Number(vol.value) / 100));
-      apply(row);
-    });
-    const mute = document.createElement("button");
-    mute.type = "button";
-    mute.setAttribute("aria-label", "mute " + name);
-    mute.addEventListener("click", () => {
-      row.muted = !row.muted;
-      apply(row);
-    });
-    row.el = el;
-    row.vol = vol;
-    row.mute = mute;
-    el.append(label, vol, mute);
-    ensureBar().append(el);
     rows.set(name, row);
     apply(row);
+    ensureBar();
     return row;
   }
 
   function dropRow(row) {
     row.gain.disconnect();
-    row.el.remove();
     rows.delete(row.name);
     if (rows.size === 0 && bar) {
       bar.remove();
       bar = null;
+    }
+  }
+
+  // setContainer is the dashboard pane's entry point (dashboard host
+  // ConnectSurfaces): volume 0..1 and mute for the sound of one container.
+  function setContainer(name, volume, muted) {
+    if (typeof name !== "string" || typeof volume !== "number" || !Number.isFinite(volume)) return;
+    const p = { volume: Math.min(1, Math.max(0, volume)), muted: !!muted };
+    prefs.set(name, p);
+    const row = rows.get(name);
+    if (row) {
+      row.volume = p.volume;
+      row.muted = p.muted;
+      apply(row);
     }
   }
 
@@ -200,7 +205,7 @@ window.wctrAudio = (() => {
     if (!v) return;
     const c = context();
     if (!c) return;
-    const s = { ...v, hdr: new Int32Array(v.sab, 0, 16), node: null, closed: false, analyser: null, tap: null };
+    const s = { ...v, hdr: new Int32Array(v.voices ? v.ctl : v.sab, 0, 16), node: null, closed: false, analyser: null, tap: null };
     streams.set(v.id, s);
     state.streams = streams.size;
     try {
@@ -214,9 +219,11 @@ window.wctrAudio = (() => {
     const row = rowFor(v.container);
     row.ids.add(v.id);
     s.row = row;
-    s.node = new AudioWorkletNode(c, "wasmbox-ring", {
+    s.node = new AudioWorkletNode(c, v.voices ? "wasmbox-voices" : "wasmbox-ring", {
       numberOfInputs: 0, numberOfOutputs: 1, outputChannelCount: [2],
-      processorOptions: { sab: v.sab, sampleRate: v.rate, channels: v.ch, capacityFrames: v.cap },
+      processorOptions: v.voices
+        ? { ctl: v.ctl, bank: v.bank, aheadFrames: v.ahead, mixRate: v.rate }
+        : { sab: v.sab, sampleRate: v.rate, channels: v.ch, capacityFrames: v.cap },
     });
     s.node.connect(row.gain);
     // The test tap, before the gains: what the worklet produced.
@@ -296,13 +303,24 @@ window.wctrAudio = (() => {
           stream: s.id, container: s.container, context: ctx ? ctx.state : "none", attached: !!s.node,
           sampleRate: s.rate, channels: s.ch, capacityFrames: s.cap,
           played: Atomics.load(s.hdr, 3) >>> 0, underruns: Atomics.load(s.hdr, 2) >>> 0,
+          written: Atomics.load(s.hdr, 0) >>> 0,
           heartbeat: Atomics.load(s.hdr, 6) >>> 0,
           buffered: (Atomics.load(s.hdr, 0) - Atomics.load(s.hdr, 1)) >>> 0,
         };
+        if (s.voices) {
+          // The mixer's own counters (audioring VStarved, VPainted, VBadCmd): what it
+          // painted is what a ring's "written" is, and it keeps no queue.
+          o.voices = true;
+          o.starved = Atomics.load(s.hdr, 7) >>> 0;
+          o.painted = Atomics.load(s.hdr, 8) >>> 0;
+          o.badCommands = Atomics.load(s.hdr, 9) >>> 0;
+          o.written = o.painted;
+          o.buffered = 0;
+        }
         return s.analyser ? Object.assign(o, analyse(s)) : o;
       });
     },
   };
 
-  return { onEngine, state, setGlobalMute };
+  return { onEngine, state, setGlobalMute, setContainer };
 })();

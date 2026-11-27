@@ -22,7 +22,7 @@ type PinnedFile struct {
 // pak0.pak is LibreQuake's data: BSD-3-Clause, except progs.dat, which is
 // GPL-2.0-or-later (GPL-NOTICE names the corresponding source). id
 // Software's pak0.pak is never used here.
-const FreepakTag = "v0.2.0"
+const FreepakTag = "v0.2.1"
 
 func freepak(name, sum string, size int64) PinnedFile {
 	return PinnedFile{
@@ -36,16 +36,16 @@ func freepak(name, sum string, size int64) PinnedFile {
 // QuakeFiles are the freepak release's files the quake image carries: the
 // pak and every licence file that goes with it.
 var QuakeFiles = []PinnedFile{
-	freepak("pak0.pak", "d08670904b5f6fe466135374b6c64e44a0c3a6dbee915c436f8f82bcb286652f", 36931086),
+	freepak("pak0.pak", "924c2f93ac43b085fbeb7ccc6f4fdecbca6782e3eea35bbfa0f995669fdc2ed8", 36931122),
 	freepak("COPYING", "60cb3ca34eb5ee733dd8af8803389d9a1fbcdbad9ff1765c7a92ff9b9ba95f0f", 1496),
 	freepak("COPYING-GPL-2", "32b1062f7da84967e7019d01ab805935caa7ab7321a7ced0e30ebe75e5df1670", 17992),
 	freepak("COPYING-LibreQuake", "c3426ae10fd52ab1a3c3d4de4f2fae60543403e3cfd09ae5dc2ec16ae4717d28", 1697),
 	freepak("CREDITS-LibreQuake", "60b632851de3e5d02cb96ed158ff06700ced1c9fb6425f2d5d10509392021bd0", 3254),
 	freepak("GPL-NOTICE", "e1b622d31e058f4b89d847968747012a3ec4ca502ae2afc654298a24681b5d99", 749),
 	freepak("LibreProgsDeluxe.md", "9425d6c0c7fcfd0c5193efd6baefe285dc1e586b1dee89725821979cddb7b850", 664),
-	freepak("MANIFEST", "82bb77d7f3f808367ee46a73635a8eaf61b023c12a48b3d61f16032f95ecc009", 48463),
+	freepak("MANIFEST", "8129a452a6fa5d6cba0f9d90e4e1a0a3f80a5bea1517e6f1c2aff52a61bb7ffe", 48467),
 	freepak("README-IMPORTANT-LICENCE-INFO", "121e4f2bbae888f442be76795c7e1b431bbfce9c7dd968407b4da969ccb50eae", 706),
-	freepak("SHA256SUMS", "6be51f91bd573876085d4ee0efb7eaabf5a3bd1762d60f6169f2ff3154cf3a2d", 150),
+	freepak("SHA256SUMS", "521d9c7fa96a70eb24270fc9b8979f1a25793abb66f40e50d819e8f07372650e", 150),
 }
 
 // QuakeLicense is the image's licence file. The image combines the engine
@@ -61,7 +61,7 @@ Source:
   image    https://github.com/go-wasmcontainers/playground (images list in
            internal/site/quake.go)
   data     https://github.com/go-quake1/freepak, release ` + FreepakTag + `: /usr/share/quake/pak0.pak
-           (sha256 d08670904b5f6fe466135374b6c64e44a0c3a6dbee915c436f8f82bcb286652f)
+           (sha256 924c2f93ac43b085fbeb7ccc6f4fdecbca6782e3eea35bbfa0f995669fdc2ed8)
 
 The data is LibreQuake's: BSD-3-Clause, except progs.dat, GPL-2.0-or-later.
 Its licence files are next to the pak in /usr/share/quake/ (GPL-NOTICE names

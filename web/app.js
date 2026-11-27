@@ -352,7 +352,10 @@
     // and sha256 like any other. Ignored on every other host.
     const ms = /^(localhost|127\.0\.0\.1)$/.test(location.hostname) ? new URLSearchParams(location.search).get("modelstub") : null;
     const mp = ms ? "&modelstub=" + encodeURIComponent(ms) : "";
-    const real = new Worker("engine-worker.js?v=" + build + cc + rp + mp);
+    // ?nokick=1 (loopback pages only): the e2e's control for the host library's
+    // empty-submit kicks; engine-worker.js drops them.
+    const nk = /^(localhost|127\.0\.0\.1)$/.test(location.hostname) && /[?&]nokick=1\b/.test(location.search) ? "&nokick=1" : "";
+    const real = new Worker("engine-worker.js?v=" + build + cc + rp + mp + nk);
     // The GPU host worker (engine#84): the same engine.wasm started with
     // role=host serves every container's GPU calls, so that a game waiting
     // for a present or a submit does not wait for the engine's worker (which
