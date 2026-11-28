@@ -110,7 +110,7 @@ func TestGPUSurfaceInput(t *testing.T) {
 		`key-down key-a "A" shift=true`,
 		`key-up key-a "A" shift=true`,
 	}
-	d.press("F6", "ArrowUp", "ArrowUp", "ArrowUp", "ArrowUp", "ArrowUp") // Surfaces -> Containers
+	d.press("F6", "ArrowUp", "ArrowUp", "ArrowUp", "ArrowUp", "ArrowUp", "ArrowUp") // Surfaces -> Containers
 	d.until("containers view", 5*time.Second, func(p ui.Probe) bool { return p.View == "Containers" })
 	d.press("F6", "ArrowDown") // the table: select tri
 	p = d.until("the guest's log", 60*time.Second, func(p ui.Probe) bool { return inOrder(p.Logs, want) })

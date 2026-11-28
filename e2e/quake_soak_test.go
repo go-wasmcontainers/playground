@@ -136,8 +136,8 @@ func soak(t *testing.T, runFlags, flag string, idle bool, play time.Duration) {
 		}
 		time.Sleep(200 * time.Millisecond)
 		if s := d.state(); !strings.Contains(s.Status[1], "1 running") {
-			d.press("F6", "ArrowUp", "ArrowUp", "ArrowUp", "ArrowUp", "ArrowUp") // Surfaces -> Containers
-			d.press("F6", "ArrowDown")                                           // select q
+			d.press("F6", "ArrowUp", "ArrowUp", "ArrowUp", "ArrowUp", "ArrowUp", "ArrowUp") // Surfaces -> Containers
+			d.press("F6", "ArrowDown")                                                      // select q
 			time.Sleep(time.Second)
 			s = d.state()
 			lg := s.Logs

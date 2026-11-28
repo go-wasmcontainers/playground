@@ -276,8 +276,8 @@ func quakeMenuMouse(t *testing.T, flag string) {
 	if t.Failed() {
 		st := d.state()
 		t.Logf("surfaces %q containers %q status %q", st.Surfaces, st.Containers, st.Status)
-		d.press("F6", "ArrowUp", "ArrowUp", "ArrowUp", "ArrowUp", "ArrowUp") // Surfaces -> Containers
-		d.press("F6", "ArrowDown")                                           // select q
+		d.press("F6", "ArrowUp", "ArrowUp", "ArrowUp", "ArrowUp", "ArrowUp", "ArrowUp") // Surfaces -> Containers
+		d.press("F6", "ArrowDown")                                                      // select q
 		time.Sleep(time.Second)
 		lg := d.state().Logs
 		if len(lg) > 6000 {

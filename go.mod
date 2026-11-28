@@ -7,10 +7,10 @@ require (
 	github.com/go-pkgx/bottle v0.62.1
 	github.com/go-wasmcontainers/build v0.4.0
 	github.com/go-wasmcontainers/compose v0.6.0
-	github.com/go-wasmcontainers/dashboard v0.13.1-0.20261128134610-f4c2cedd9b0a
-	github.com/go-wasmcontainers/engine v0.51.1
+	github.com/go-wasmcontainers/dashboard v0.13.1-0.20261128140714-4a11db76315c
+	github.com/go-wasmcontainers/engine v0.52.0
 	github.com/go-wasmcontainers/gpu v0.14.4
-	github.com/go-wasmcontainers/relay v0.3.1
+	github.com/go-wasmcontainers/relay v0.4.0
 	github.com/go-widgets/mvvm v0.15.0
 	github.com/go-widgets/toolkit v0.414.0
 	github.com/go-widgets/webcanvas v0.15.0
@@ -50,7 +50,7 @@ require (
 	github.com/go-authn/oidc v0.4.3 // indirect
 	github.com/go-authn/revocation v0.6.6 // indirect
 	github.com/go-authn/rp v0.2.0 // indirect
-	github.com/go-authn/servercert v0.5.2 // indirect
+	github.com/go-authn/servercert v0.5.3 // indirect
 	github.com/go-authn/sshcert v0.1.9 // indirect
 	github.com/go-compressions/lzfse v0.4.1 // indirect
 	github.com/go-compressions/xz v0.1.0 // indirect
