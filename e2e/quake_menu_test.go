@@ -91,7 +91,7 @@ func quakeMenuMouse(t *testing.T, flag string) {
 	d.until("quake running", 120*time.Second, func(p ui.Probe) bool {
 		return len(p.Containers) == 1 && strings.Contains(p.Status[1], "1 running")
 	})
-	d.press("F6", "ArrowDown") // Terminal -> Surfaces
+	d.view("Surfaces")
 	p := d.until("a frame in the pane", 60*time.Second, func(p ui.Probe) bool {
 		return p.View == "Surfaces" && len(p.SurfaceBoxes) == 1 && p.SurfaceBoxes[0].W > 0
 	})
@@ -272,12 +272,12 @@ func quakeMenuMouse(t *testing.T, flag string) {
 		t.Errorf("mouse to the left: the scene moved %d px, want it to move right by more than 5", s)
 	}
 
-	d.press("F6", "ArrowUp") // Surfaces -> Terminal
+	d.view("Terminal")
 	if t.Failed() {
 		st := d.state()
 		t.Logf("surfaces %q containers %q status %q", st.Surfaces, st.Containers, st.Status)
-		d.press("F6", "ArrowUp", "ArrowUp", "ArrowUp", "ArrowUp", "ArrowUp") // Surfaces -> Containers
-		d.press("F6", "ArrowDown")                                           // select q
+		d.view("Containers")
+		d.press("F6", "ArrowDown") // select q
 		time.Sleep(time.Second)
 		lg := d.state().Logs
 		if len(lg) > 6000 {

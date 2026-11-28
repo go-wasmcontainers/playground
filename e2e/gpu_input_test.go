@@ -76,7 +76,7 @@ func TestGPUSurfaceInput(t *testing.T) {
 	d.until("tri running", 120*time.Second, func(p ui.Probe) bool {
 		return len(p.Containers) == 1 && strings.Contains(p.Status[1], "1 running")
 	})
-	d.press("F6", "ArrowDown") // Terminal -> Surfaces
+	d.view("Surfaces")
 	p := d.until("a frame in the pane", 60*time.Second, func(p ui.Probe) bool {
 		return p.View == "Surfaces" && len(p.SurfaceBoxes) == 1 && p.SurfaceBoxes[0].W > 0
 	})
@@ -110,8 +110,7 @@ func TestGPUSurfaceInput(t *testing.T) {
 		`key-down key-a "A" shift=true`,
 		`key-up key-a "A" shift=true`,
 	}
-	d.press("F6", "ArrowUp", "ArrowUp", "ArrowUp", "ArrowUp", "ArrowUp") // Surfaces -> Containers
-	d.until("containers view", 5*time.Second, func(p ui.Probe) bool { return p.View == "Containers" })
+	d.view("Containers")
 	d.press("F6", "ArrowDown") // the table: select tri
 	p = d.until("the guest's log", 60*time.Second, func(p ui.Probe) bool { return inOrder(p.Logs, want) })
 	t.Logf("guest log:\n%s", strings.TrimSpace(p.Logs))
