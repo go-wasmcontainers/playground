@@ -83,9 +83,10 @@ func main() {
 	// and the GPU surfaces' frames (drawn, acknowledged) and input.
 	host.ConnectClass(g, worker, app, q)
 	host.ConnectSurfaces(worker, app, q, scene)
-	connectCompose(g, sess)
+	connectCompose(g, sess, app, q)
 	host.ConnectTopology(g, app, q) // the Topology view: page-wide mute, sounding containers, compose Import/Export
-	host.ConnectMouse(scene)        // every mouse button, relative motion and the pointer lock for a surface pane
+	connectSoundAll(g, app, q) // the page strip's mute all is Sound.All
+	host.ConnectMouse(scene)       // every mouse button, relative motion and the pointer lock for a surface pane
 
 	g.Set("__dashboard", map[string]any{
 		"version": version,

@@ -7,7 +7,7 @@ require (
 	github.com/go-pkgx/bottle v0.62.1
 	github.com/go-wasmcontainers/build v0.4.0
 	github.com/go-wasmcontainers/compose v0.6.0
-	github.com/go-wasmcontainers/dashboard v0.13.1-0.20261128140714-4a11db76315c
+	github.com/go-wasmcontainers/dashboard v0.13.1-0.20261128150532-5d72e0c2708a
 	github.com/go-wasmcontainers/engine v0.52.0
 	github.com/go-wasmcontainers/gpu v0.14.4
 	github.com/go-wasmcontainers/relay v0.4.0

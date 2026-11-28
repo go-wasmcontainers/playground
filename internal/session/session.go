@@ -118,6 +118,7 @@ type Session struct {
 
 	composeOnce  sync.Once
 	composeFiles *composefs.Store
+	imp          importedProject
 }
 
 // ComposeFiles is the directory `wctr compose` reads: in memory, empty until

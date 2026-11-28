@@ -131,7 +131,16 @@ window.wctrAudio = (() => {
     g.id = "soundmute";
     g.setAttribute("aria-pressed", "false");
     g.textContent = "mute all";
-    g.addEventListener("click", () => setGlobalMute(!globalMuted));
+    // One state: the dashboard's Sound.All is the page-wide mute, so the strip
+    // asks it (which calls setGlobalMute back). Without the dashboard, the strip
+    // is the only control and acts on the page itself.
+    g.addEventListener("click", () => {
+      const f = window.__wctrSoundAll;
+      if (typeof f === "function") {
+        try { f(!globalMuted); return; } catch (e) { /* fall back to the page */ }
+      }
+      setGlobalMute(!globalMuted);
+    });
     head.append(g);
     const u = document.createElement("button");
     u.type = "button";
@@ -156,9 +165,20 @@ window.wctrAudio = (() => {
     }
   }
 
+  // The most preferences kept: the dashboard's vm.MaxSoundKeys.
+  const MAX_PREFS = 256;
+
+  // remember keeps a container's level across its runs. A default level (full
+  // volume, not muted) is not kept, so a slot the dashboard frees by resetting
+  // a container is a slot here too.
+  function remember(name, volume, muted) {
+    if (volume === 1 && !muted) prefs.delete(name);
+    else prefs.set(name, { volume, muted });
+  }
+
   function apply(row) {
     row.gain.gain.value = row.muted ? 0 : row.volume;
-    prefs.set(row.name, { volume: row.volume, muted: row.muted });
+    remember(row.name, row.volume, row.muted);
   }
 
   // The dashboard's Topology view and Surfaces panes own the per-container
@@ -179,13 +199,15 @@ window.wctrAudio = (() => {
     const v = Math.min(1, Math.max(0, volume));
     const m = !!muted;
     const row = rows.get(name);
+    // Refused when it would need a slot no run frees (the dashboard reports it,
+    // so a mute that does not take is never shown as muted).
+    if ((v !== 1 || m) && !prefs.has(name) && prefs.size >= MAX_PREFS) return false;
     if (row) {
       row.volume = v;
       row.muted = m;
       apply(row);
     } else {
-      if (!prefs.has(name) && prefs.size >= 256) return false;
-      prefs.set(name, { volume: v, muted: m });
+      remember(name, v, m);
     }
     return true;
   }

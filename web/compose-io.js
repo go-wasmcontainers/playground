@@ -19,30 +19,46 @@
 
   let last = ""; // the last outcome, for the e2e and the status line
 
-  function status(msg) {
+  // status records the outcome and shows it: the dashboard's Topology view
+  // renders refusals and errors (window.__wctrComposeFailed); Go reports its
+  // own outcomes there directly. ok is false for a refusal or an error.
+  function status(msg, ok) {
     last = msg;
+    if (ok === false && typeof window.__wctrComposeFailed === "function") {
+      try { window.__wctrComposeFailed(msg); } catch (_) { /* the view is not up */ }
+    }
     try { window.dispatchEvent(new CustomEvent("wctr-compose", { detail: msg })); } catch (_) { /* ignored */ }
+  }
+  const refuse = (msg) => status(msg, false);
+
+  // confirmReplace: a drop (or a pick) over files already held replaces them
+  // whole, so it asks first. Nothing is read or sent before the answer.
+  function confirmReplace(n) {
+    const has = typeof window.__wctrComposeHas === "function" && window.__wctrComposeHas();
+    if (!has) return true;
+    return window.confirm("Replace the compose files already imported with " + n + " new file(s)?");
   }
 
   async function importFiles(list) {
     const files = Array.from(list || []);
     if (files.length === 0) return;
-    if (files.length > MAX_FILES) return status("import: more than " + MAX_FILES + " files");
+    if (files.length > MAX_FILES) return refuse("import: more than " + MAX_FILES + " files");
     let total = 0;
     for (const f of files) {
-      if (f.size > MAX_FILE) return status("import: " + f.name + " is over " + MAX_FILE + " bytes");
+      if (f.size > MAX_FILE) return refuse("import: " + f.name + " is over " + MAX_FILE + " bytes");
       total += f.size;
     }
-    if (total > MAX_TOTAL) return status("import: over " + MAX_TOTAL + " bytes in all");
+    if (total > MAX_TOTAL) return refuse("import: over " + MAX_TOTAL + " bytes in all");
+    if (typeof window.__wctrComposeImport !== "function") return refuse("import: the dashboard is not ready");
+    if (!confirmReplace(files.length)) return refuse("import: cancelled, the files already imported are kept");
     const names = [];
     const texts = [];
     for (const f of files) {
       names.push(f.name);
       texts.push(await f.text());
     }
-    if (typeof window.__wctrComposeImport !== "function") return status("import: the dashboard is not ready");
-    const err = window.__wctrComposeImport(names, texts);
-    status(err ? err : "imported " + names.length + " file(s)");
+    const err = await window.__wctrComposeImport(names, texts);
+    status(err ? err : "imported " + names.length + " file(s)", !err);
   }
 
   function pick() {
@@ -63,7 +79,7 @@
   }
 
   async function exportProject(project) {
-    if (typeof window.__wctrComposeExport !== "function") return status("export: the dashboard is not ready");
+    if (typeof window.__wctrComposeExport !== "function") return refuse("export: the dashboard is not ready");
     try {
       const text = await window.__wctrComposeExport(String(project));
       const a = document.createElement("a");
@@ -75,7 +91,9 @@
       setTimeout(() => URL.revokeObjectURL(a.href), 60000);
       status("exported " + a.download);
     } catch (err) {
-      status(String(err));
+      // Go has already reported the refusal to the view; keep the page's record.
+      last = String(err);
+      try { window.dispatchEvent(new CustomEvent("wctr-compose", { detail: last })); } catch (_) { /* ignored */ }
     }
   }
 

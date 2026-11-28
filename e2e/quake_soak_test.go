@@ -106,7 +106,7 @@ func soak(t *testing.T, runFlags, flag string, idle bool, play time.Duration) {
 	d.until("quake running", 120*time.Second, func(p ui.Probe) bool {
 		return len(p.Containers) == 1 && strings.Contains(p.Status[1], "1 running")
 	})
-	d.press("F6", "ArrowDown") // Terminal -> Surfaces
+	d.view("Surfaces")
 	p := d.until("a frame in the pane", 60*time.Second, func(p ui.Probe) bool {
 		return p.View == "Surfaces" && len(p.SurfaceBoxes) == 1 && p.SurfaceBoxes[0].W > 0
 	})
@@ -136,8 +136,8 @@ func soak(t *testing.T, runFlags, flag string, idle bool, play time.Duration) {
 		}
 		time.Sleep(200 * time.Millisecond)
 		if s := d.state(); !strings.Contains(s.Status[1], "1 running") {
-			d.press("F6", "ArrowUp", "ArrowUp", "ArrowUp", "ArrowUp", "ArrowUp", "ArrowUp") // Surfaces -> Containers
-			d.press("F6", "ArrowDown")                                                      // select q
+			d.view("Containers")
+			d.press("F6", "ArrowDown") // select q
 			time.Sleep(time.Second)
 			s = d.state()
 			lg := s.Logs
@@ -149,6 +149,5 @@ func soak(t *testing.T, runFlags, flag string, idle bool, play time.Duration) {
 	}
 	_ = page.Keyboard().Up("KeyW")
 	t.Logf("quake soak%s: still running after %.0f s of play", flag, time.Since(t0).Seconds())
-	d.press("F6", "ArrowUp") // Surfaces -> Terminal
 	d.run("wctr rm -f q")
 }

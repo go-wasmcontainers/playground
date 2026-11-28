@@ -4,6 +4,7 @@ package e2e
 
 import (
 	"encoding/json"
+	"fmt"
 	"os"
 	"slices"
 	"strings"
@@ -13,6 +14,7 @@ import (
 	"github.com/mxschmitt/playwright-go"
 
 	"github.com/go-wasmcontainers/dashboard/ui"
+	"github.com/go-wasmcontainers/dashboard/vm"
 )
 
 // The dashboard (the playground's default page) driven as a person does:
@@ -102,22 +104,21 @@ func (d dash) press(keys ...string) {
 	}
 }
 
-// view moves the navigation to a view: F6 then arrows (the views are
-// Containers, Images, Volumes, Networks, Topology, Terminal, in that order).
+// view opens a view by its name (vm.ViewNames), never by counting arrows: the
+// navigation gains views, and a count then lands on the wrong one. Alt+N is the
+// view's place in the navigation; the Terminal keeps the Alt keys while it is
+// focused, so F6 leaves it first.
 func (d dash) view(name string) {
 	d.t.Helper()
-	order := []string{"Containers", "Images", "Volumes", "Networks", "Topology", "Terminal"}
-	from := slices.Index(order, d.state().View)
-	to := slices.Index(order, name)
-	if from < 0 || to < 0 {
-		d.t.Fatalf("%s: view %q from %q", d.who, name, d.state().View)
+	to := slices.Index(vm.ViewNames[:], name)
+	if to < 0 {
+		d.t.Fatalf("%s: no view named %q", d.who, name)
 	}
-	d.press("F6")
-	for ; from < to; from++ {
-		d.press("ArrowDown")
+	if d.state().View == "Terminal" && name != "Terminal" {
+		d.press("F6")
 	}
-	for ; from > to; from-- {
-		d.press("ArrowUp")
+	if d.state().View != name {
+		d.press(fmt.Sprintf("Alt+%d", to+1))
 	}
 	d.until("view "+name, 5*time.Second, func(p ui.Probe) bool { return p.View == name })
 }
