@@ -127,3 +127,30 @@ func TestHasCompose(t *testing.T) {
 		t.Fatal("an imported session has none")
 	}
 }
+
+// A name that is not a project is refused as such, before anything else.
+func TestExportComposeNotAProjectName(t *testing.T) {
+	var r rec
+	s := noEngine()
+	if _, err := s.ExportCompose(context.Background(), "a b; rm", r.report()); err == nil || len(r.failed) != 1 || !strings.Contains(r.failed[0], "not a project name") {
+		t.Fatalf("err %v failed %q", err, r.failed)
+	}
+}
+
+// If the files stop loading after the import, the export fails visibly and no
+// command is shown as run.
+func TestExportComposeFailingConfig(t *testing.T) {
+	var r rec
+	s := noEngine()
+	if msg := s.ImportCompose(context.Background(), demoFiles(), r.report()); msg != "" {
+		t.Fatal(msg)
+	}
+	if err := s.ComposeFiles().Import([]composefs.File{{Name: "compose.yaml", Data: []byte("services: [")}}); err != nil {
+		t.Fatal(err)
+	}
+	r = rec{}
+	text, err := s.ExportCompose(context.Background(), "demo", r.report())
+	if err == nil || text != "" || len(r.failed) != 1 || len(r.doneArgs) != 0 {
+		t.Fatalf("err %v text %q failed %q done %q", err, text, r.failed, r.doneArgs)
+	}
+}
