@@ -251,6 +251,16 @@ browser without WebGPU, gets no adapter: these images print
   Ctrl-P Ctrl-Q detaches from `run -it` and leaves the container running. `wctr build` and `wctr compose` are wired in as in
   `cmd/wctr`.
 
+  **`wctr compose` runs in the page** on a directory of its own, in memory
+  (`internal/composefs`): a page has no working directory, so compose's native
+  loader (`os.OpenRoot`) cannot run there, and `wctr compose config` used to
+  answer `getwd: not implemented on js`. The directory is flat and read-only
+  for compose, empty until files are imported into it, and bounded: **at most 64
+  files, 4 MiB each and 16 MiB in all**, with plain file names (no path, no
+  `..`); an import that breaks a bound is refused whole and leaves the previous
+  files as they were. With it empty, compose answers `no Compose file found`.
+  The import control (file picker and drop) is not in the page yet.
+
 Last, **every pkgx `wasip1/wasm` bottle**, taken from `ghcr.io/go-pkgx/packages`
 at build time. The list is not typed anywhere: `go run ./cmd/site build --pkgx`
 reads pkgx's signed catalogue (`go-pkgx.dev/catalog`, `bottle.FetchCatalog`,
