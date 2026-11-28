@@ -7,18 +7,18 @@ require (
 	github.com/go-pkgx/bottle v0.62.1
 	github.com/go-wasmcontainers/build v0.4.0
 	github.com/go-wasmcontainers/compose v0.6.0
-	github.com/go-wasmcontainers/dashboard v0.11.0
-	github.com/go-wasmcontainers/engine v0.48.1
+	github.com/go-wasmcontainers/dashboard v0.13.1-0.20261128132057-21b6590a0b9d
+	github.com/go-wasmcontainers/engine v0.51.1
 	github.com/go-wasmcontainers/gpu v0.14.4
 	github.com/go-wasmcontainers/relay v0.3.1
 	github.com/go-widgets/mvvm v0.15.0
-	github.com/go-widgets/toolkit v0.362.0
-	github.com/go-widgets/webcanvas v0.14.0
+	github.com/go-widgets/toolkit v0.414.0
+	github.com/go-widgets/webcanvas v0.15.0
 	github.com/klauspost/compress v1.20.4
 	github.com/mxschmitt/playwright-go v0.6401.0
 	github.com/spf13/cobra v1.10.2
 	github.com/stealthrocket/net v0.2.1
-	github.com/wasmdesk/wasmbox/audioring v0.2.0
+	github.com/wasmdesk/wasmbox/audioring v0.3.0
 )
 
 require (
@@ -54,7 +54,7 @@ require (
 	github.com/go-authn/sshcert v0.1.9 // indirect
 	github.com/go-compressions/lzfse v0.4.1 // indirect
 	github.com/go-compressions/xz v0.1.0 // indirect
-	github.com/go-crdt/crdt v0.57.0 // indirect
+	github.com/go-crdt/crdt v0.59.0 // indirect
 	github.com/go-encryptions/ccm v0.0.0-20260927083542-1713f748107c // indirect
 	github.com/go-encryptions/xts v0.0.0-20260911133109-312298263872 // indirect
 	github.com/go-encryptions/zfscrypt v0.0.0-20260927173133-ff7dd33bb415 // indirect
@@ -88,11 +88,11 @@ require (
 	github.com/go-fsctl/btrfs v0.1.1 // indirect
 	github.com/go-fsctl/projquota v0.1.0 // indirect
 	github.com/go-fsctl/zfs v0.1.1 // indirect
-	github.com/go-gfx/gfx v0.41.0 // indirect
+	github.com/go-gfx/gfx v0.42.0 // indirect
 	github.com/go-gfx/wgsl v0.4.0 // indirect
 	github.com/go-gtk/gtk4 v0.9.0 // indirect
 	github.com/go-icons/iconoir v0.3.0 // indirect
-	github.com/go-images/images v0.1.1-0.20261026203936-4ac989d310a1 // indirect
+	github.com/go-images/images v0.3.0 // indirect
 	github.com/go-jose/go-jose/v4 v4.1.6 // indirect
 	github.com/go-ldap/ldap/v3 v3.4.15 // indirect
 	github.com/go-logr/logr v1.4.4 // indirect
@@ -102,10 +102,11 @@ require (
 	github.com/go-mswin/win32 v0.6.0 // indirect
 	github.com/go-net-health/endpoint v0.1.0 // indirect
 	github.com/go-opentype/fonts v0.14.0 // indirect
-	github.com/go-opentype/opentype v0.16.2-0.20261027113239-5e69589e9a5e // indirect
+	github.com/go-opentype/opentype v0.20.0 // indirect
 	github.com/go-opentype/shape v0.7.0 // indirect
 	github.com/go-quake1/engine v0.35.0 // indirect
 	github.com/go-richdoc/richdoc v0.7.0 // indirect
+	github.com/go-simd/floats v0.42.0 // indirect
 	github.com/go-sql-driver/mysql v1.10.1 // indirect
 	github.com/go-stack/stack v1.8.1 // indirect
 	github.com/go-typeset/bidi v0.3.1 // indirect
@@ -117,9 +118,10 @@ require (
 	github.com/go-widgets/android v0.16.0 // indirect
 	github.com/go-widgets/lineedit v0.1.1 // indirect
 	github.com/go-widgets/mvvmtk v0.15.0 // indirect
-	github.com/go-widgets/painter v0.17.0 // indirect
+	github.com/go-widgets/painter v0.19.0 // indirect
 	github.com/go-widgets/shellterm v0.1.0 // indirect
 	github.com/go-widgets/textinput v0.1.1 // indirect
+	github.com/go-widgets/vcs v0.1.0 // indirect
 	github.com/go-widgets/window v0.89.1 // indirect
 	github.com/goccy/go-json v0.11.2 // indirect
 	github.com/godbus/dbus/v5 v5.2.2 // indirect

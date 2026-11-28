@@ -19,9 +19,11 @@
 // the engine discards what the guest writes: sound made before the click is
 // never played late.
 //
-// Volume and mute live at two levels: one pair per container (the Sound bar's
-// row) and one page-wide mute. They are gain nodes, so a guest cannot undo
-// them. window.__wctrAudio is the test hook.
+// Volume and mute live at two levels: one pair per container (set by the
+// dashboard's Topology view and Surfaces panes through setContainer) and one
+// page-wide mute (the Sound strip's button, and the dashboard's Mute all).
+// They are gain nodes, so a guest cannot undo them. The Sound strip keeps only
+// the global mute and the unlock. window.__wctrAudio is the test hook.
 "use strict";
 window.wctrAudio = (() => {
   const MAX_STREAMS = 8; // per page, as the engine's module
@@ -53,8 +55,16 @@ window.wctrAudio = (() => {
     return { id: m.stream, container: m.container, rate, ch, cap, sab };
   }
 
+  // The unlock button is offered while the context is not running (a browser
+  // lets sound start only after a gesture).
+  function updateUnlock() {
+    const u = document.getElementById("soundunlock");
+    if (u) u.hidden = !!ctx && ctx.state === "running";
+  }
+
   function setState() {
     state.context = ctx ? ctx.state : "none";
+    updateUnlock();
   }
 
   // The unlock: a user gesture is what lets a context leave "suspended".
@@ -123,7 +133,15 @@ window.wctrAudio = (() => {
     g.textContent = "mute all";
     g.addEventListener("click", () => setGlobalMute(!globalMuted));
     head.append(g);
+    const u = document.createElement("button");
+    u.type = "button";
+    u.id = "soundunlock";
+    u.textContent = "unlock";
+    u.setAttribute("aria-label", "unlock sound");
+    u.addEventListener("click", onGesture);
+    head.append(u);
     bar.append(head);
+    updateUnlock();
     document.body.append(bar);
     return bar;
   }
@@ -141,8 +159,35 @@ window.wctrAudio = (() => {
   function apply(row) {
     row.gain.gain.value = row.muted ? 0 : row.volume;
     prefs.set(row.name, { volume: row.volume, muted: row.muted });
-    row.mute.setAttribute("aria-pressed", String(row.muted));
-    row.mute.textContent = row.muted ? "unmute" : "mute";
+  }
+
+  // The dashboard's Topology view and Surfaces panes own the per-container
+  // controls: this page keeps the gain nodes, and tells the dashboard which
+  // containers have a stream (window.__wctrSoundActive, set by the dashboard).
+  function reportActive() {
+    const f = window.__wctrSoundActive;
+    if (typeof f === "function") {
+      try { f(Array.from(rows.keys())); } catch (e) { /* a page without the dashboard */ }
+    }
+  }
+
+  // setContainer is the dashboard's control of one container's gain: volume
+  // 0..1, muted. It applies to a container with no stream yet (its next run).
+  function setContainer(name, volume, muted) {
+    if (typeof name !== "string" || name.length === 0 || name.length > 256) return false;
+    if (typeof volume !== "number" || !Number.isFinite(volume)) return false;
+    const v = Math.min(1, Math.max(0, volume));
+    const m = !!muted;
+    const row = rows.get(name);
+    if (row) {
+      row.volume = v;
+      row.muted = m;
+      apply(row);
+    } else {
+      if (!prefs.has(name) && prefs.size >= 256) return false;
+      prefs.set(name, { volume: v, muted: m });
+    }
+    return true;
   }
 
   function rowFor(name) {
@@ -151,47 +196,21 @@ window.wctrAudio = (() => {
     const p = prefs.get(name) || { volume: 1, muted: false };
     row = { name, volume: p.volume, muted: p.muted, ids: new Set(), gain: ctx.createGain() };
     row.gain.connect(pageGain);
-    const el = document.createElement("div");
-    el.className = "soundrow";
-    el.dataset.container = name;
-    const label = document.createElement("span");
-    label.textContent = name;
-    const vol = document.createElement("input");
-    vol.type = "range";
-    vol.min = "0";
-    vol.max = "100";
-    vol.step = "1";
-    vol.value = String(Math.round(row.volume * 100));
-    vol.setAttribute("aria-label", "volume of " + name);
-    vol.addEventListener("input", () => {
-      row.volume = Math.min(1, Math.max(0, Number(vol.value) / 100));
-      apply(row);
-    });
-    const mute = document.createElement("button");
-    mute.type = "button";
-    mute.setAttribute("aria-label", "mute " + name);
-    mute.addEventListener("click", () => {
-      row.muted = !row.muted;
-      apply(row);
-    });
-    row.el = el;
-    row.vol = vol;
-    row.mute = mute;
-    el.append(label, vol, mute);
-    ensureBar().append(el);
+    ensureBar();
     rows.set(name, row);
     apply(row);
+    reportActive();
     return row;
   }
 
   function dropRow(row) {
     row.gain.disconnect();
-    row.el.remove();
     rows.delete(row.name);
     if (rows.size === 0 && bar) {
       bar.remove();
       bar = null;
     }
+    reportActive();
   }
 
   // ---- streams ----
@@ -304,5 +323,5 @@ window.wctrAudio = (() => {
     },
   };
 
-  return { onEngine, state, setGlobalMute };
+  return { onEngine, state, setGlobalMute, setContainer, reportActive };
 })();

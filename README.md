@@ -14,7 +14,7 @@ and sees what they do — no virtual machine, no server: the
 
 **Open it: <https://go-wasmcontainers.github.io/playground/>** — the
 [dashboard](https://github.com/go-wasmcontainers/dashboard) (Containers,
-Images, Volumes, Terminal; logs and stats of the selected container, stop,
+Images, Volumes, Networks, Topology, Terminal; logs and stats of the selected container, stop,
 start and remove buttons, which act on every selected row (Shift-click
 selects several), that print the `wctr` command they ran). The
 dashboard's Terminal is [go-widgets/shellterm](https://github.com/go-widgets/shellterm),
@@ -151,9 +151,15 @@ picture 0 of the MNIST test set by Y. LeCun, C. Cortes and C. J. C. Burges
   what the container writes, instead of playing it late. The page runs one
   `AudioContext`, an `AudioWorklet` per stream (wasmbox's `audioring` asset,
   served as `audio-worklet.js`), a gain per container and a page gain.
-  **Volume and mute** work at two levels in the *Sound* strip at the bottom left
-  (one row per playing container with a slider and a mute button, and *mute
-  all*), and are gain nodes, so a container cannot undo them. Native `wctr`
+  **Volume and mute** are per container (the dashboard's *Topology* view, Alt+5,
+  and the surface panes: a speaker toggle on each container, *Mute project*,
+  *Mute all*) and page-wide (the *Sound* strip at the bottom left keeps only
+  *mute all* and the *unlock audio* button). They are gain nodes, so a
+  container cannot undo them. The Topology view also **imports** compose files
+  (the *Import compose* button or dropping files on the page; names and sizes
+  are checked by `internal/composefs`, and the files are the ones `wctr
+  compose` reads) and **exports** a project's resolved compose text as
+  `<project>.compose.yaml`; nothing is persisted. Native `wctr`
   has no audio output and answers *unsupported*. Design and bounds:
   [go-wasmcontainers/engine docs/audio-design.md](https://github.com/go-wasmcontainers/engine/blob/main/docs/audio-design.md).
 - `quake`: **Quake in a container**, level 1. `wctr run --rm --gpu -m 512m quake`
@@ -655,7 +661,7 @@ gestures that would let the context start by itself. It runs
 gesture, clicks (a trusted event), and over 2 s asserts: frames played at least
 half of 2 s worth, the analyser's peak in the 440 Hz bin (plus or minus one), an
 RMS above -30 dBFS, and fewer than 5 underruns. It also drives the volume and
-mute controls and reads the level after both gains. Planted negatives, each
+mute entry points (`wctrAudio.setContainer`, the page mute) and reads the level after both gains. Planted negatives, each
 required to fail its own assertion (and the test fails if it passes):
 `tone --silent` (RMS), `tone --hz 880` (frequency), no click (frames played: the
 context stays suspended), and no `--audio` (*denied*, no stream, no context).
