@@ -1,0 +1,2 @@
+go test fuzz v1
+[]byte("compose.yaml\x01x-a: &a [1,2,3]\nx-b: &b [*a,*a,*a]\nx-c: &c [*b,*b,*b]\nservices:\n  s:\n    image: i\n    command: *c\n")

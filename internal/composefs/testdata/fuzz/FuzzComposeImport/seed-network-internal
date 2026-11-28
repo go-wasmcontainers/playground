@@ -1,0 +1,2 @@
+go test fuzz v1
+[]byte("compose.yaml\x01name: x\nservices:\n  a:\n    image: i\n    networks: [n]\n    ports: [\"8080:80\"]\n    expose: [\"3000\"]\nnetworks:\n  n:\n    internal: true\n")
