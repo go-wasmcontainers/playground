@@ -114,7 +114,9 @@ func (d dash) view(name string) {
 	if to < 0 {
 		d.t.Fatalf("%s: no view named %q", d.who, name)
 	}
-	if d.state().View == "Terminal" && name != "Terminal" {
+	// A Terminal or a Surfaces pane holds the keyboard (a surface forwards it to
+	// its guest): F6 hands it back to the navigation first.
+	if cur := d.state().View; (cur == "Terminal" || cur == "Surfaces") && cur != name {
 		d.press("F6")
 	}
 	if d.state().View != name {

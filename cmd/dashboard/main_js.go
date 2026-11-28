@@ -85,8 +85,8 @@ func main() {
 	host.ConnectSurfaces(worker, app, q, scene)
 	connectCompose(g, sess, app, q)
 	host.ConnectTopology(g, app, q) // the Topology view: page-wide mute, sounding containers, compose Import/Export
-	connectSoundAll(g, app, q) // the page strip's mute all is Sound.All
-	host.ConnectMouse(scene)       // every mouse button, relative motion and the pointer lock for a surface pane
+	connectSoundAll(g, app, q)      // the page strip's mute all is Sound.All
+	host.ConnectMouse(scene)        // every mouse button, relative motion and the pointer lock for a surface pane
 
 	g.Set("__dashboard", map[string]any{
 		"version": version,

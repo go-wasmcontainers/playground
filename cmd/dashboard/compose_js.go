@@ -47,7 +47,7 @@ func connectCompose(g js.Value, sess *session.Session, app *vm.App, q *mvvm.Queu
 		}
 		return nil
 	}))
-	g.Set("__wctrComposeImport",js.FuncOf(func(_ js.Value, a []js.Value) any {
+	g.Set("__wctrComposeImport", js.FuncOf(func(_ js.Value, a []js.Value) any {
 		refuse := func(msg string) any {
 			rep.Failed(msg)
 			return js.Global().Get("Promise").Call("resolve", msg)

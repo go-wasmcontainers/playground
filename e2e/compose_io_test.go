@@ -158,7 +158,11 @@ func TestComposeImportExport(t *testing.T) {
 
 	// The page-wide mute is one state: the Topology button, the dashboard's
 	// Sound.All and the page's gain agree, whichever side moves it.
-	muted := func() bool { v, _ := page.Evaluate(`() => window.__wctrAudio ? window.__wctrAudio.pageMuted() : null`); b, _ := v.(bool); return b }
+	muted := func() bool {
+		v, _ := page.Evaluate(`() => window.__wctrAudio ? window.__wctrAudio.pageMuted() : null`)
+		b, _ := v.(bool)
+		return b
+	}
 	waitMuted := func(want bool, what string) {
 		t.Helper()
 		end := time.Now().Add(5 * time.Second)
